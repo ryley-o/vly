@@ -1,0 +1,445 @@
+{
+  "size": 9064,
+  "ram": {
+    "best": {
+      "addr": 46080,
+      "bytes": 2,
+      "type": "word"
+    },
+    "state": {
+      "addr": 46082,
+      "bytes": 2,
+      "type": "word"
+    },
+    "font_base": {
+      "addr": 46084,
+      "bytes": 2,
+      "type": "word"
+    },
+    "muted": {
+      "addr": 46086,
+      "bytes": 2,
+      "type": "word"
+    },
+    "timer": {
+      "addr": 46088,
+      "bytes": 2,
+      "type": "word"
+    },
+    "beep": {
+      "addr": 46090,
+      "bytes": 2,
+      "type": "word"
+    },
+    "mus_tick": {
+      "addr": 46092,
+      "bytes": 2,
+      "type": "word"
+    },
+    "mus_step": {
+      "addr": 46094,
+      "bytes": 2,
+      "type": "word"
+    },
+    "mus_song": {
+      "addr": 46096,
+      "bytes": 6,
+      "type": "word[]"
+    },
+    "mus_wait": {
+      "addr": 46102,
+      "bytes": 6,
+      "type": "word[]"
+    },
+    "mus_pos": {
+      "addr": 46108,
+      "bytes": 6,
+      "type": "word[]"
+    },
+    "audio_hold": {
+      "addr": 46114,
+      "bytes": 8,
+      "type": "word[]"
+    },
+    "mus_ch": {
+      "addr": 46122,
+      "bytes": 6,
+      "type": "word[]"
+    },
+    "mus_cur": {
+      "addr": 46128,
+      "bytes": 6,
+      "type": "word[]"
+    },
+    "mus_muted": {
+      "addr": 46134,
+      "bytes": 2,
+      "type": "word"
+    },
+    "mus_vol": {
+      "addr": 46136,
+      "bytes": 6,
+      "type": "word[]"
+    },
+    "mus_duty": {
+      "addr": 46142,
+      "bytes": 6,
+      "type": "word[]"
+    },
+    "grid": {
+      "addr": 46148,
+      "bytes": 180,
+      "type": "byte[]"
+    },
+    "score": {
+      "addr": 46328,
+      "bytes": 2,
+      "type": "word"
+    },
+    "lines": {
+      "addr": 46330,
+      "bytes": 2,
+      "type": "word"
+    },
+    "level": {
+      "addr": 46332,
+      "bytes": 2,
+      "type": "word"
+    },
+    "next": {
+      "addr": 46334,
+      "bytes": 2,
+      "type": "word"
+    },
+    "piece": {
+      "addr": 46336,
+      "bytes": 2,
+      "type": "word"
+    },
+    "rot": {
+      "addr": 46338,
+      "bytes": 2,
+      "type": "word"
+    },
+    "px": {
+      "addr": 46340,
+      "bytes": 2,
+      "type": "word"
+    },
+    "py": {
+      "addr": 46342,
+      "bytes": 2,
+      "type": "word"
+    },
+    "fall": {
+      "addr": 46344,
+      "bytes": 2,
+      "type": "word"
+    },
+    "rest": {
+      "addr": 46346,
+      "bytes": 2,
+      "type": "word"
+    },
+    "text_pal": {
+      "addr": 46348,
+      "bytes": 2,
+      "type": "word"
+    },
+    "numbuf": {
+      "addr": 46350,
+      "bytes": 8,
+      "type": "byte[]"
+    },
+    "cx": {
+      "addr": 46358,
+      "bytes": 8,
+      "type": "word[]"
+    },
+    "cy": {
+      "addr": 46366,
+      "bytes": 8,
+      "type": "word[]"
+    },
+    "bag_n": {
+      "addr": 46374,
+      "bytes": 2,
+      "type": "word"
+    },
+    "bag": {
+      "addr": 46376,
+      "bytes": 8,
+      "type": "byte[]"
+    },
+    "nfull": {
+      "addr": 46384,
+      "bytes": 2,
+      "type": "word"
+    },
+    "full": {
+      "addr": 46386,
+      "bytes": 8,
+      "type": "word[]"
+    },
+    "das_dir": {
+      "addr": 46394,
+      "bytes": 2,
+      "type": "word"
+    },
+    "das": {
+      "addr": 46396,
+      "bytes": 2,
+      "type": "word"
+    }
+  },
+  "functions": {
+    "load_cells": {
+      "addr": 42,
+      "bytes": 234
+    },
+    "fits": {
+      "addr": 276,
+      "bytes": 182
+    },
+    "draw_bag": {
+      "addr": 458,
+      "bytes": 158
+    },
+    "take": {
+      "addr": 616,
+      "bytes": 42
+    },
+    "cell": {
+      "addr": 658,
+      "bytes": 98
+    },
+    "draw_well": {
+      "addr": 756,
+      "bytes": 166
+    },
+    "draw_next": {
+      "addr": 922,
+      "bytes": 252
+    },
+    "draw_score": {
+      "addr": 1174,
+      "bytes": 210
+    },
+    "draw_panel": {
+      "addr": 1384,
+      "bytes": 288
+    },
+    "draw_piece": {
+      "addr": 1672,
+      "bytes": 290
+    },
+    "hide_piece": {
+      "addr": 1962,
+      "bytes": 58
+    },
+    "blip": {
+      "addr": 2020,
+      "bytes": 50
+    },
+    "start_music": {
+      "addr": 2070,
+      "bytes": 98
+    },
+    "spawn": {
+      "addr": 2168,
+      "bytes": 290
+    },
+    "new_game": {
+      "addr": 2458,
+      "bytes": 86
+    },
+    "lock": {
+      "addr": 2544,
+      "bytes": 522
+    },
+    "collapse": {
+      "addr": 3066,
+      "bytes": 262
+    },
+    "turn": {
+      "addr": 3328,
+      "bytes": 398
+    },
+    "slide": {
+      "addr": 3726,
+      "bytes": 76
+    },
+    "play": {
+      "addr": 3802,
+      "bytes": 562
+    },
+    "title": {
+      "addr": 4364,
+      "bytes": 514
+    },
+    "frame": {
+      "addr": 4878,
+      "bytes": 268
+    },
+    "init": {
+      "addr": 5146,
+      "bytes": 606
+    },
+    "rand": {
+      "addr": 5752,
+      "bytes": 18
+    },
+    "set_cell": {
+      "addr": 5770,
+      "bytes": 40
+    },
+    "print_u": {
+      "addr": 5810,
+      "bytes": 104
+    },
+    "text": {
+      "addr": 5914,
+      "bytes": 42
+    },
+    "sprite": {
+      "addr": 5956,
+      "bytes": 84
+    },
+    "hide_sprite": {
+      "addr": 6040,
+      "bytes": 34
+    },
+    "tone": {
+      "addr": 6074,
+      "bytes": 82
+    },
+    "music_tempo": {
+      "addr": 6156,
+      "bytes": 18
+    },
+    "music_play": {
+      "addr": 6174,
+      "bytes": 96
+    },
+    "music_duty": {
+      "addr": 6270,
+      "bytes": 24
+    },
+    "music_mute": {
+      "addr": 6294,
+      "bytes": 98
+    },
+    "music_stop_all": {
+      "addr": 6392,
+      "bytes": 34
+    },
+    "save_set": {
+      "addr": 6426,
+      "bytes": 26
+    },
+    "save_seal": {
+      "addr": 6452,
+      "bytes": 10
+    },
+    "save_commit": {
+      "addr": 6462,
+      "bytes": 10
+    },
+    "fill_cells": {
+      "addr": 6472,
+      "bytes": 120
+    },
+    "frames": {
+      "addr": 6592,
+      "bytes": 6
+    },
+    "clear_bg": {
+      "addr": 6598,
+      "bytes": 16
+    },
+    "min": {
+      "addr": 6614,
+      "bytes": 36
+    },
+    "btnp": {
+      "addr": 6650,
+      "bytes": 38
+    },
+    "btn": {
+      "addr": 6688,
+      "bytes": 38
+    },
+    "get_cell": {
+      "addr": 6726,
+      "bytes": 36
+    },
+    "tone_off": {
+      "addr": 6762,
+      "bytes": 34
+    },
+    "music_update": {
+      "addr": 6796,
+      "bytes": 658
+    },
+    "load_font": {
+      "addr": 7454,
+      "bytes": 56
+    },
+    "load_tiles": {
+      "addr": 7510,
+      "bytes": 52
+    },
+    "bg_pal": {
+      "addr": 7562,
+      "bytes": 86
+    },
+    "obj_pal": {
+      "addr": 7648,
+      "bytes": 86
+    },
+    "hide_all_sprites": {
+      "addr": 7734,
+      "bytes": 58
+    },
+    "master_volume": {
+      "addr": 7792,
+      "bytes": 18
+    },
+    "save_loaded": {
+      "addr": 7810,
+      "bytes": 28
+    },
+    "save_valid": {
+      "addr": 7838,
+      "bytes": 34
+    },
+    "save_get": {
+      "addr": 7872,
+      "bytes": 22
+    },
+    "lcd": {
+      "addr": 7894,
+      "bytes": 18
+    },
+    "utoa": {
+      "addr": 7912,
+      "bytes": 106
+    },
+    "pad_map": {
+      "addr": 8018,
+      "bytes": 92
+    },
+    "put_text": {
+      "addr": 8110,
+      "bytes": 208
+    },
+    "music_stop": {
+      "addr": 8318,
+      "bytes": 54
+    },
+    "save_sum": {
+      "addr": 8372,
+      "bytes": 86
+    }
+  }
+}

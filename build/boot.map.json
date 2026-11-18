@@ -1,0 +1,82 @@
+{
+  "size": 1768,
+  "ram": {
+    "font_base": {
+      "addr": 46080,
+      "bytes": 2,
+      "type": "word"
+    },
+    "t": {
+      "addr": 46082,
+      "bytes": 2,
+      "type": "word"
+    },
+    "text_pal": {
+      "addr": 46084,
+      "bytes": 2,
+      "type": "word"
+    }
+  },
+  "functions": {
+    "init": {
+      "addr": 34,
+      "bytes": 128
+    },
+    "frame": {
+      "addr": 162,
+      "bytes": 506
+    },
+    "load_font": {
+      "addr": 668,
+      "bytes": 56
+    },
+    "load_tiles": {
+      "addr": 724,
+      "bytes": 52
+    },
+    "bg_pal": {
+      "addr": 776,
+      "bytes": 86
+    },
+    "obj_pal": {
+      "addr": 862,
+      "bytes": 86
+    },
+    "hide_all_sprites": {
+      "addr": 948,
+      "bytes": 58
+    },
+    "lcd": {
+      "addr": 1006,
+      "bytes": 18
+    },
+    "master_volume": {
+      "addr": 1024,
+      "bytes": 18
+    },
+    "sprite": {
+      "addr": 1042,
+      "bytes": 84
+    },
+    "text": {
+      "addr": 1126,
+      "bytes": 42
+    },
+    "tone": {
+      "addr": 1168,
+      "bytes": 82
+    },
+    "tone_off": {
+      "addr": 1250,
+      "bytes": 34
+    },
+    "hide_sprite": {
+      "addr": 1284,
+      "bytes": 34
+    },
+    "put_text": {
+      "addr": 1318,
+      "bytes": 208
+    }
+  }
+}

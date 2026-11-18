@@ -185,6 +185,7 @@ export function checkCartridge(rom, o = {}) {
     if (!o.brief.present) add('brief', 'warn', 'there is no DESIGN.md: the design brief and content plan were never written down', 'Before building, write DESIGN.md in the project folder: the game in one sentence, the controls, the screens, and a content table (one row per stage or level: theme, new mechanic or enemy, boss or set-piece, music). Show it to the person. See "Depth and length" in `vly docs design`.');
     else if (o.brief.chars < 600) add('brief', 'warn', `DESIGN.md is only ${o.brief.chars} characters`, 'A brief that fits in a tweet is not a plan. Add the content table (one row per stage or level) and what makes this game different from the template or sample game nearest to it.');
     else add('brief', 'pass', 'DESIGN.md exists');
+    if (o.brief.checklist && o.brief.checklist.length) add('plan', 'info', `your own plan promises ${o.brief.checklist.length} things (nothing here can verify them):\n          ${o.brief.checklist.map((x) => `[ ] ${x}`).join('\n          ')}`, 'In your final message to the person, go through this list: done, partly done or not done, with the evidence (a test, a recorded run, a screenshot). If you fell short, say so.');
   }
   if (!script) add('path', 'info', 'no recorded path was checked, so the late game (later stages, bosses, the ending) was not looked at', 'Record a winning run with a bot (`vly docs workflow`) and run `vly check --input-file tests/win.input`.');
 

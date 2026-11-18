@@ -37,7 +37,7 @@
   ],
   "scripts": {
     "test": "node --test test/*.test.js",
-    "gen": "node scripts/gen.js && node scripts/gen-stdlib-docs.js && node scripts/gen-originality.js",
+    "gen": "node scripts/gen.js && node scripts/gen-stdlib-docs.js && node scripts/gen-originality.js && node scripts/gen-boot.js",
     "conformance": "node scripts/gen-conformance.js",
     "difftest": "node scripts/difftest.js",
     "build:c": "make -C c",

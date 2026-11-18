@@ -20,6 +20,7 @@
 #include "config.h"
 #include "device.h"
 #include "cart.h"
+#include "../../c/boot_rom.h"
 
 #if LCD_PARALLEL
 /* ---------------- display, rev B: 3.5" ILI9488 on an 8-bit parallel bus, PIO + DMA ----------------
@@ -360,7 +361,7 @@ int main(void) {
         NULL, hal_wait_vsync, hal_buttons, hal_display_begin, hal_display_line, hal_display_end,
         hal_audio_push, hal_save_load, hal_save_store,
     };
-    int rc = vly_device_init(&device, &hal, cart_data, cart_size, AUDIO_RATE);
+    int rc = vly_device_init_with_boot(&device, &hal, cart_data, cart_size, AUDIO_RATE, vly_boot_rom, sizeof vly_boot_rom, VLY_BOOT_FRAMES);
     if (rc != 0) for (;;) sleep_ms(1000);   /* bad cartridge: a real device would draw an error screen */
     next_frame = get_absolute_time();
     vly_device_run(&device);

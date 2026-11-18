@@ -22,6 +22,8 @@ progress or best score, 3+ music tracks that do not loop audibly within 20 s, an
 levels. Plan the content in a table first (stage, theme, new mechanic, boss, music, secret), keep levels as data (ASCII maps or generated banked bytes), build a vertical slice, then add stages in passes with a
 bot through every one. Repeating sounds (guns, ticks) stay below 800 Hz and quiet; `vly check` flags shrill ones. See "Depth and length" in `vly docs design`.
 
+**Go past the minimum when you can** (best practices): a rising difficulty curve (200 levels in order of difficulty beat 40 at random), generated or endless levels, unlock plus a level select to replay beaten levels, and records per level (time, moves, collectibles, medals). Write `DESIGN.md` with a `## Done when` list; `vly check` prints it back and you report against it. See "Beyond the minimum" in `vly docs design`.
+
 ## The order of work
 
 1. **Brief first** (show it): genre and core loop in one sentence; locked controls map (D-pad, A main action, B second, START pause,

@@ -75,7 +75,12 @@ function projectInfo(target) {
     if (Object.keys(files).length) out.originality = verdict(compareProject(files, { ...idx, refs }));
   } catch { /* no index: no gate */ }
   const brief = path.join(dir, 'DESIGN.md');
-  out.brief = { present: fs.existsSync(brief), chars: fs.existsSync(brief) ? fs.readFileSync(brief, 'utf8').trim().length : 0 };
+  const briefText = fs.existsSync(brief) ? fs.readFileSync(brief, 'utf8') : '';
+  // the plan's own promises: the list under a heading such as "Done when" or "Checklist"
+  const checklist = [];
+  const m = /^#{1,6}\s*(done when|definition of done|checklist|promises)[^\n]*\n([\s\S]*?)(?=^#{1,6}\s|$(?![\s\S]))/im.exec(briefText);
+  if (m) for (const line of m[2].split('\n')) { const t = /^\s*(?:[-*]|\d+[.)])\s*(?:\[[ xX]\]\s*)?(.+?)\s*$/.exec(line); if (t && checklist.length < 15) checklist.push(t[1].slice(0, 160)); }
+  out.brief = { present: fs.existsSync(brief), chars: briefText.trim().length, checklist };
   return out;
 }
 

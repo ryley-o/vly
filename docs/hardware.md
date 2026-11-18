@@ -194,3 +194,8 @@ desktop player and the WebAssembly build use the same code.
 - Draw the schematic and PCB (KiCad), and the enclosure (the dimensions above are placeholders).
 - A physical cartridge connector and shell.
 - Metadata sidecar (title, icon) for device menus; battery gauge; sleep when idle.
+
+
+## The boot sequence
+
+Like the Game Boy's logo drop, the console shows the VLY-1 logo and a two-note chime when it powers on, for about two seconds (130 frames), before the game starts. It is **not part of the machine and not part of any game**: it is a small ordinary cartridge (`boot/boot.vly`, 1.8 KB) that the **host** runs first (the browser player, the native player, the firmware), ignoring the buttons, and then replaces with the real cartridge on a fresh machine and its save. A game never sees it, so game frame numbers, tests and hashes are unchanged, and the specification does not change. `npm run gen` builds it into `src/boot/boot-rom.js` (browser players and exported games) and `c/boot_rom.h` (native player and firmware); the device loop has `vly_device_init_with_boot`. The native player takes `--no-boot`; headless runs (`vly run`, tests) never show it.

@@ -1,6 +1,7 @@
 // Export a cartridge as one self-contained HTML file: the WebAssembly emulator, the cartridge, touch controls,
 // sound and battery saves, all inline. Works offline, from file://, on phones, in any static host.
 
+import { BOOT_ROM, BOOT_FRAMES } from '../boot/boot-rom.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,5 +25,7 @@ export function exportHtml(rom, opts = {}) {
     .replaceAll('__DESCRIPTION__', escHtml(description))
     .replaceAll('__ROM_ID__', sha256Hex(rom).slice(0, 16))
     .replace('__WASM_BASE64__', WASM_BASE64)
-    .replace('__ROM_BASE64__', Buffer.from(rom).toString('base64'));
+    .replace('__ROM_BASE64__', Buffer.from(rom).toString('base64'))
+    .replace('__BOOT_BASE64__', Buffer.from(BOOT_ROM).toString('base64'))
+    .replace('__BOOT_FRAMES__', String(BOOT_FRAMES));
 }

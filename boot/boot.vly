@@ -1,0 +1,38 @@
+// The VLY-1 boot sequence: a real cartridge that the console (the player, the native player, the firmware) runs for BOOT_FRAMES
+// before it starts the game, like the Game Boy's logo drop. It is not part of any game, never counts in a game's frame numbers,
+// tests or hashes (those run the game alone), and it is built by `npm run gen` into src/boot/boot-rom.js and c/boot_rom.h.
+//   0-14    black      15-54  the logo falls     55  it lands, a two-note chime      55-129  it rests
+
+tileset logo = "logo.tiles";
+
+const T = 100;
+const LAND = 56;                     // the y where the letters come to rest
+var t;
+
+func init() {
+  load_font(0);
+  load_tiles(logo, T, logo_COUNT);
+  bg_pal(0, rgb(1, 2, 4), rgb(3, 5, 9), rgb(6, 9, 13), rgb(10, 13, 15));              // a deep blue night; the font ink is colour 3
+  obj_pal(0, 0, rgb(4, 6, 10), rgb(9, 12, 15), rgb(15, 15, 15));                        // shadow, body, highlight
+  hide_all_sprites();
+  lcd(LCD_BG | LCD_OBJ);
+  master_volume(9);
+}
+
+func frame() {
+  var y = -24;
+  if (t >= 15) {
+    var p = t - 15;
+    if (p > 39) { p = 39; }
+    y = -24 + ((LAND + 24) * (p < 30 ? (p * p) / 9 : 100 - (39 - p) * 2)) / 100;
+  }
+  if (t >= 55) { y = LAND; }
+  sprite(0, 53, y, T + logo_v, SPR_16X16);
+  sprite(1, 72, y, T + logo_l, SPR_16X16);
+  sprite(2, 91, y, T + logo_y, SPR_16X16);
+  if (t == 55) { text(7, 11, "VLY-1"); tone(1, 659, 8, 1); }
+  if (t == 61) { tone(1, 988, 8, 1); }
+  if (t >= 61 && t < 100) { tone(1, 988, 8 - (t - 61) / 6, 1); }
+  if (t == 100) { tone_off(1); }
+  t++;
+}

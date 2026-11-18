@@ -33,13 +33,19 @@ games stop at three stages because they were built to show *techniques*; **do no
 
 - **Targets for a full game**: an action or platform game has **8 or more stages in 3 or 4 worlds** (each world a new look, palette, music track and *one new mechanic* introduced safely, used
   in combination, then tested by a boss); a first playthrough takes **30 to 60 minutes** for a person (a bot that knows the level takes a third of that); a racing game has 12 or more tracks in
-  cups; a puzzle game 40 or more levels; an adventure 6 or more areas. A small game (an arcade score-chaser) is fine at one screen, but then it needs **escalation** (new rules every minute), not stages.
+  cups; a puzzle game 40 or more levels (100 to 200 on a rising curve, or generated, is better); an adventure 6 or more areas. A small game (an arcade score-chaser) is fine at one screen, but then it needs **escalation** (new rules every minute), not stages.
 - **Plan the content in a table before coding** (one row per stage: name, theme, new mechanic or enemy, length in screens, boss or gimmick, music, secret). The table is what
   keeps stage 6 from being stage 2 with a new palette. Introduce each mechanic in a safe spot, repeat it with a twist, then combine it with an earlier one.
 - **Make content cheap to add**: levels are **data** (an ASCII `.map`, a generator script that writes banked bytes, or a spawn script table), enemies are a few behaviours with parameters
   (speed, hits, pattern), and a bigger game reuses the same systems with new data, so stage 7 costs hours of design, not a rewrite. Put level data in banks (`vly docs language`, Banks).
 - **Build a vertical slice first** (title to boss to results, with stage 1 only, all polish), then add content in passes, **running a bot through every new stage** and `vly check` with a recorded
   path after each pass. Time budget: the engine and the first stage are about a third of the work, the other stages the rest.
+- **Beyond the minimum (best practices, not requirements).** The numbers above are a floor, and many games should go well past them. What makes a long game *fun* is not the count but the shape:
+  - **A curve, not a pile.** 200 puzzle levels that rise steadily in difficulty, each introducing or recombining one idea, are far better than 40 in random order. Order content by measured difficulty (moves a solver needs, how often a bot dies, par time), teach one idea, test it, twist it, combine it with an old one, then give a breather before the next step up.
+  - **Generated content is a strength.** A generator with a difficulty parameter and a seed (`srand`) gives hundreds of levels, or an endless mode that escalates, from a few hundred bytes of code. Make solvable by construction, or verify each level with a solver or bot and ship the verified list as data. Infinite generated levels can beat hand-made ones; keep a few hand-made set pieces for the high points.
+  - **Progress the player can see and replay.** Unlock the next level by beating the last; give a **level select** (a grid of levels showing locked, open, beaten, and the medal earned) so beaten levels can be played again; resume where the player left off. 200 levels fit the 1 KB save easily (a byte or two each).
+  - **Records that make a level worth replaying.** Best time, fewest moves or highest score per level, collectibles found, a par and bronze/silver/gold medals, power-ups used or skipped, a perfect-run flag. Show them on the select screen and on the title. A record turns "I won" into "I can do better".
+  - **Modes.** A relaxed mode and a hard mode, an endless mode with a saved best, a time attack, a daily-style seeded challenge (a fixed seed shared by everyone, since there is no clock).
 - **Reasons to come back**: unlockable stages or characters, a second harder loop with changed layouts, time and score medals per stage, hidden collectibles, a bestiary or recipe list, a
   password-free save (1 KB holds all of it).
 - **Difficulty is a curve, not a ramp**: easy stage, hard stage, breather, set-piece. Test with a bot that reacts late (`delay: 12`); if only the perfect bot finishes, it is too hard; if it never
@@ -67,6 +73,10 @@ perfect bot completes in under two minutes is too thin: **measure it** (`runBot`
 and third place) until the bot needs at least five minutes of play, so a person, who is slower and wanders, takes 20 or more. Optional for a calm game: game
 over and retry, bosses, power-ups, hit-stop, a difficulty curve. Where something would normally punish, let it only make a pleasant thing take longer.
 `games/cat-garden` is the worked example (a gift game for a mother who likes gardening and cats: three gardens, six cats, a birthday finale).
+
+### `DESIGN.md`: the plan, and a checklist (best practice)
+
+Write it in the project folder before you code and show it to the person. A good one has: **the game in one sentence**; **what makes it this person's** (their name, their jokes, their rules); **controls**; **screens**; a **content table** (a row per stage or level: theme, new mechanic or enemy, boss or set-piece, music); **how progress works** (unlocks, level select, saves, records); and what makes it different from the nearest sample game. End it with a list headed `## Done when` with one line per promise ("8 stages, each with its own boss", "a recorded path clears stage 3", "level select shows medals"). `vly check` prints that list back at the end; go through it in your final message to the person: done, partly done or not done, with evidence. It is a best practice, not a gate: its value is that a gap is hard to hide.
 
 ## 1. Process: brief, one mechanic at a time, see everything, play the whole game
 
@@ -251,6 +261,7 @@ frame), which cooperate so effects interrupt the music cleanly and the music com
   loop of the most frequent sound is annoying until the numbers say otherwise.
 - **Keep the mix balanced**: music voices at volume 5 to 8, effects at 9 to 13, `master_volume` at 8 to 12. The run summary
   tells you `peak_volume`; above 0.6 it will be loud on a small speaker.
+- **Do not draw your own boot logo.** The console shows the VLY-1 logo and a chime before any game starts (the player, the native player and the firmware run a small boot cartridge first, then start your game fresh). Your game begins at its own title screen.
 - Silence is a tool: drop the music for a boss intro. On pause, **lower** the music (`master_volume`, e.g. to a third) instead of muting it: `vly check`
   presses START at random, so a game that mutes on pause looks silent for much of the test and WARNs that it has no sound.
 - You cannot hear the result through the API; the `audio` summary says how long it was audible and how loud. Check that gameplay
@@ -358,7 +369,7 @@ that mini-game star counts spread with reaction delay (a late bot should get 0 o
 about once a minute; the cartridge flash survives about 100,000 writes per sector, so a save every few seconds would wear it out within weeks (`vly check` warns above about 3 a minute).
 Keep numbers that grow past 32,767 (age in frames) in two words or compare with `ult` (the compiler warns when a constant above 32,767 meets a signed `<`).
 
-**Puzzle.** Rules a person can state in a sentence; a tutorial level that teaches by doing; 15 or more levels ramping up; undo and restart on a button; a clear "solved" moment with a sound; progress saved. The `puzzle` template has 7 levels and undo.
+**Puzzle.** Rules a person can state in a sentence; a tutorial level that teaches by doing; 15 or more levels ramping up (aim for far more on a rising curve, or a generator with a difficulty setting; see "Beyond the minimum"); undo and restart on a button; a clear "solved" moment with a sound; progress saved. The `puzzle` template has 7 levels and undo.
 
 **Arcade (endless).** One screen, rising speed, a score and a saved high score, a danger that escalates in phases (not just faster), and a combo or risk reward. Ends fast, restarts instantly.
 

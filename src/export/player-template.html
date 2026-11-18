@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
 <meta name="theme-color" content="#1d3a1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="description" content="__DESCRIPTION__">
 <title>__TITLE__</title>
 <style>
+html, body { touch-action: manipulation; }
 :root { --bg: #12160f; --body: #1d3a1a; --btn: #2c4a2a; --btn-down: #6b9a4a; --ink: #cfe3b8; --red: #7a2a3a; --red-down: #b04a5e; color-scheme: dark; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px system-ui, sans-serif; overflow: hidden; }
@@ -40,10 +41,13 @@ button.k.down { background: var(--btn-down); }
 </div>
 <div id="msg"><div id="msgtext"></div></div>
 <script>
+// no zoom on a double tap or a pinch: this is a game pad that gets tapped fast
+(function () { var last = 0; document.addEventListener('touchend', function (e) { var t = Date.now(); if (t - last < 350) e.preventDefault(); last = t; }, { passive: false }); ['gesturestart', 'gesturechange', 'gestureend', 'dblclick'].forEach(function (n) { document.addEventListener(n, function (e) { e.preventDefault(); }); }); })();
 (function () {
   "use strict";
   var WASM = "__WASM_BASE64__";
   var ROM = "__ROM_BASE64__";
+  var BOOT = "__BOOT_BASE64__", BOOT_FRAMES = __BOOT_FRAMES__;   // the VLY-1 logo cartridge runs first, then the game starts fresh
   var SAVE_KEY = "vly-save:__ROM_ID__";
   function b64(s) { var bin = atob(s), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
   var canvas = document.getElementById("screen"), ctx = canvas.getContext("2d"), img = ctx.createImageData(160, 144);
@@ -79,11 +83,16 @@ button.k.down { background: var(--btn-down); }
   WebAssembly.instantiate(b64(WASM), {}).then(function (r) {
     var x = r.instance.exports, rom = b64(ROM);
     var mem = new Uint8Array(x.memory.buffer);
-    mem.set(rom, x.vly_rom_ptr());
-    if (saved) mem.set(saved, x.vly_save_in_ptr());
-    var rc = x.vly_load(rom.length, saved ? 1 : 0);
-    if (rc) { show("This cartridge could not be loaded (error " + rc + ")."); return; }
-    x.vly_boot();
+    function insert(cart, withSave) {
+      mem.set(cart, x.vly_rom_ptr());
+      if (withSave && saved) mem.set(saved, x.vly_save_in_ptr());
+      var rc = x.vly_load(cart.length, withSave && saved ? 1 : 0);
+      if (rc) { show("This cartridge could not be loaded (error " + rc + ")."); return false; }
+      x.vly_boot();
+      return true;
+    }
+    var bootLeft = 0;
+    if (BOOT && BOOT_FRAMES > 0 && insert(b64(BOOT), false)) bootLeft = BOOT_FRAMES; else if (!insert(rom, true)) return;
     var lastSaves = 0, acc = 0, last = performance.now();
     function draw() { var p = x.vly_render_rgba(); img.data.set(new Uint8Array(x.memory.buffer, p, 160 * 144 * 4)); ctx.putImageData(img, 0, 0); }
     function pushAudio() {
@@ -99,7 +108,8 @@ button.k.down { background: var(--btn-down); }
       var steps = 0;
       while (acc >= 1000 / 60 && steps < 4) {
         acc -= 1000 / 60; steps++;
-        x.vly_frame(keys | touch | latch); latch = 0; // latched presses guarantee even a very quick tap lasts one frame
+        x.vly_frame(bootLeft > 0 ? 0 : keys | touch | latch); latch = 0; // latched presses guarantee even a very quick tap lasts one frame
+        if (bootLeft > 0 && --bootLeft === 0) { if (!insert(rom, true)) return; lastSaves = x.vly_save_requests(); }
         var n = x.vly_save_requests();
         if (n !== lastSaves) {
           lastSaves = n;

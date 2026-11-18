@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "vly.h"
+#include "boot_rom.h"
 
 static vly_t machine;
 static const char *save_path;
@@ -87,6 +88,7 @@ static void write_ppm(const char *path) {
 
 int main(int argc, char **argv) {
     const char *cart = NULL, *dump = NULL;
+    int no_boot = 0;
     int scale = 4, fullscreen = 0, mute = 0, max_frames = -1;
     char default_save[1024];
     save_path = NULL;
@@ -97,10 +99,11 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--save") && i + 1 < argc) save_path = argv[++i];
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) max_frames = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--dump") && i + 1 < argc) dump = argv[++i];
+        else if (!strcmp(argv[i], "--no-boot")) no_boot = 1;
         else if (argv[i][0] != '-') cart = argv[i];
         else { fprintf(stderr, "unknown option %s\n", argv[i]); return 2; }
     }
-    if (!cart) { fprintf(stderr, "usage: vly-player game.vlc [--scale N] [--fullscreen] [--save FILE] [--mute] [--frames N --dump out.ppm]\n"); return 2; }
+    if (!cart) { fprintf(stderr, "usage: vly-player game.vlc [--scale N] [--fullscreen] [--save FILE] [--mute] [--no-boot] [--frames N --dump out.ppm]\n"); return 2; }
     size_t rom_len = 0;
     uint8_t *rom = slurp(cart, &rom_len);
     if (!rom) { fprintf(stderr, "cannot read %s\n", cart); return 1; }
@@ -117,10 +120,10 @@ int main(int argc, char **argv) {
     int rc = vly_init(&machine, rom, (uint32_t)rom_len, save, save ? VLY_SAVE_SIZE : 0);
     if (rc) { fprintf(stderr, "%s is not a valid VLY-1 cartridge (error %d)\n", cart, rc); return 1; }
     machine.on_save = on_save;
-    vly_boot(&machine);
 
     int headless = max_frames >= 0;
     if (headless) {
+        vly_boot(&machine);
         for (int i = 0; i < max_frames; i++) vly_run_frame(&machine, 0);
         if (dump) write_ppm(dump);
         return 0;
@@ -154,6 +157,13 @@ int main(int argc, char **argv) {
     SDL_GameController *pad = NULL;
     for (int i = 0; i < SDL_NumJoysticks(); i++) if (SDL_IsGameController(i)) { pad = SDL_GameControllerOpen(i); if (pad) break; }
 
+    /* The boot sequence (a small cartridge: the VLY-1 logo and a chime) runs first, then the game starts fresh. --no-boot skips it. */
+    static vly_t boot_machine;
+    int boot_left = 0;
+    if (!no_boot && vly_init(&boot_machine, vly_boot_rom, sizeof vly_boot_rom, NULL, 0) == 0) { boot_left = VLY_BOOT_FRAMES; vly_boot(&boot_machine); }
+    if (!boot_left) vly_boot(&machine);
+    vly_t *cur = boot_left ? &boot_machine : &machine;
+
     static uint8_t rgb[VLY_SCREEN_W * VLY_SCREEN_H * 3];
     int running = 1, paused = 0, shots = 0;
     uint64_t freq = SDL_GetPerformanceFrequency(), last = SDL_GetPerformanceCounter();
@@ -182,16 +192,17 @@ int main(int argc, char **argv) {
         while (acc >= 1.0 / 60.0) {
             acc -= 1.0 / 60.0;
             if (paused) continue;
-            vly_run_frame(&machine, (uint8_t)(keyboard_buttons(SDL_GetKeyboardState(NULL)) | pad_buttons(pad)));
+            vly_run_frame(cur, boot_left ? 0 : (uint8_t)(keyboard_buttons(SDL_GetKeyboardState(NULL)) | pad_buttons(pad)));
+            if (boot_left && --boot_left == 0) { vly_boot(&machine); cur = &machine; }
             stepped = 1;
             if (audio_dev && SDL_GetQueuedAudioSize(audio_dev) < 735 * 2 * 6) {
                 int16_t buf[735];
-                vly_audio_render(&machine, &audio, buf, 735, 44100);
+                vly_audio_render(cur, &audio, buf, 735, 44100);
                 SDL_QueueAudio(audio_dev, buf, sizeof buf);
             }
         }
         if (stepped || shots == 0) {
-            vly_render_rgb(&machine, rgb);
+            vly_render_rgb(cur, rgb);
             SDL_UpdateTexture(tex, NULL, rgb, VLY_SCREEN_W * 3);
         }
         SDL_RenderClear(ren);

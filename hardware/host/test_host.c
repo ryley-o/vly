@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "../device.h"
+#include "../../c/boot_rom.h"
 
 static uint8_t *slurp(const char *path, size_t *len) {
     FILE *f = fopen(path, "rb");
@@ -103,7 +104,35 @@ int main(int argc, char **argv) {
         CHECK((vly_status(&dev2.m) & 0x100) != 0, "the cartridge did not see its stored save");
         CHECK(memcmp(&dev2.m.mem[0x6000], stub.last_save, VLY_SAVE_SIZE) == 0, "the save did not round-trip");
     }
-    printf("ok  %s  %u frames, %u samples, %u saves\n", argv[1], frames, stub.samples, stub.saves);
+    /* with the boot sequence: the logo runs first and ignores the buttons, then the game starts fresh and matches the reference frame for frame */
+    uint32_t out_samples = stub.samples, out_saves = stub.saves;
+    {
+        static vly_device_t dev3;
+        static vly_t ref2;
+        memset(&stub, 0, sizeof stub);
+        stub.next_line = -1;
+        CHECK(vly_device_init_with_boot(&dev3, &hal, rom, (uint32_t)len, rate, vly_boot_rom, sizeof vly_boot_rom, VLY_BOOT_FRAMES) == 0, "init with boot failed");
+        CHECK(vly_init(&ref2, rom, (uint32_t)len, NULL, 0) == 0, "reference init failed");
+        vly_boot(&ref2);
+        uint16_t logo_px = 0;
+        for (uint32_t f = 0; f < VLY_BOOT_FRAMES + 40; f++) {
+            stub.frame = f < VLY_BOOT_FRAMES ? f : f - VLY_BOOT_FRAMES;
+            vly_device_frame(&dev3);
+            if (f == VLY_BOOT_FRAMES - 1) logo_px = stub.fb[80][72];
+            if (f >= VLY_BOOT_FRAMES) {
+                vly_run_frame(&ref2, script(f - VLY_BOOT_FRAMES));
+                vly_render_rgb(&ref2, rgb);
+                for (int y = 0; y < VLY_SCREEN_H; y++)
+                    for (int x = 0; x < VLY_SCREEN_W; x++) {
+                        const uint8_t *p = &rgb[(y * VLY_SCREEN_W + x) * 3];
+                        CHECK(stub.fb[y][x] == to565(p[0], p[1], p[2]), "after the boot, frame %u pixel (%d,%d) differs from the reference", f - VLY_BOOT_FRAMES, x, y);
+                    }
+            }
+        }
+        CHECK(logo_px != 0, "the boot logo drew nothing");
+        CHECK(stub.order_errors == 0, "%d display calls were out of order during boot", stub.order_errors);
+    }
+    printf("ok  %s  %u frames, %u samples, %u saves\n", argv[1], frames, out_samples, out_saves);
     free(rom);
     return 0;
 }

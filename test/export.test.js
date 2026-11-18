@@ -32,7 +32,7 @@ test('exported players run the cartridge: the embedded WASM and script drive a s
   const el = (id) => (els[id] ||= { id, style: {}, classList: { add() {}, remove() {} }, addEventListener() {}, getContext: () => ({ createImageData: () => ({ data: new Uint8ClampedArray(160 * 144 * 4) }), putImageData() { drawn++; } }), dataset: {}, set onclick(f) {} });
   const store = {};
   const sandbox = {
-    document: { getElementById: el, querySelectorAll: () => [], documentElement: { style: { setProperty() {} } }, fullscreenElement: null },
+    document: { addEventListener() {}, getElementById: el, querySelectorAll: () => [], documentElement: { style: { setProperty() {} } }, fullscreenElement: null },
     window: {}, localStorage: { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; } },
     atob: (s) => Buffer.from(s, 'base64').toString('binary'), btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     WebAssembly, Uint8Array, Int16Array, performance: { now: () => 0 }, matchMedia: () => ({ matches: false }), innerWidth: 800, innerHeight: 800,
