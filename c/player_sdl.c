@@ -3,7 +3,7 @@
  *   vly-player game.vlc [--scale N] [--fullscreen] [--save FILE] [--mute]
  *   vly-player game.vlc --frames 120 --dump shot.ppm      (headless: run N frames, write the screen, exit)
  *
- * Keys: arrows / WASD = D-pad, X or K = A, Z or J = B, Enter or Space = START, Shift or Backspace = SELECT,
+ * Keys: WASD or arrows = D-pad, K or X = A, J or Z = B, Enter or Space = START, Shift or Backspace = SELECT,
  *       P = pause, F11 = fullscreen, F12 = screenshot (BMP), Esc = quit. Game controllers work too.
  * Battery saves are stored next to the cartridge as game.sav and written the moment the game asks to save.
  */

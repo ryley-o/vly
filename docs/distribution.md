@@ -13,7 +13,7 @@ cartridge, keyboard and touch controls, sound, and battery saves in `localStorag
 `file://`, on phones (use "Add to Home Screen"), and on any static host. The playground has the same thing as an
 **Export .html** button.
 
-Controls: arrows or WASD, `X` = A, `Z` = B, `Enter` = Start, `Shift` = Select, `M` toggles sound, `F` is fullscreen.
+Controls: `W` `A` `S` `D` or the arrow keys, `K` = A, `J` = B (`X` and `Z` also work), `Enter` or `Space` = Start, `Shift` = Select, `M` toggles sound, `F` is fullscreen.
 
 ## 2. The native desktop player
 
