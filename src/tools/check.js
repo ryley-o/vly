@@ -179,6 +179,15 @@ export function checkCartridge(rom, o = {}) {
     add('save', 'pass', 'the game saves');
   }
 
+  // project gates (the CLI passes these when it can see the project folder)
+  if (o.originality) { const v = o.originality; add('originality', v.status, v.status === 'pass' ? `it is its own game (the closest reference, ${v.top ? v.top.name : 'none'}, shares ${v.top ? Math.round(100 * Math.max(v.top.code, v.top.art)) : 0}%)` : v.message, v.hint); }
+  if (o.brief) {
+    if (!o.brief.present) add('brief', 'warn', 'there is no DESIGN.md: the design brief and content plan were never written down', 'Before building, write DESIGN.md in the project folder: the game in one sentence, the controls, the screens, and a content table (one row per stage or level: theme, new mechanic or enemy, boss or set-piece, music). Show it to the person. See "Depth and length" in `vly docs design`.');
+    else if (o.brief.chars < 600) add('brief', 'warn', `DESIGN.md is only ${o.brief.chars} characters`, 'A brief that fits in a tweet is not a plan. Add the content table (one row per stage or level) and what makes this game different from the template or sample game nearest to it.');
+    else add('brief', 'pass', 'DESIGN.md exists');
+  }
+  if (!script) add('path', 'info', 'no recorded path was checked, so the late game (later stages, bosses, the ending) was not looked at', 'Record a winning run with a bot (`vly docs workflow`) and run `vly check --input-file tests/win.input`.');
+
   const verdict = checks.some((c) => c.status === 'fail') ? 'fail' : checks.some((c) => c.status === 'warn') ? 'warn' : 'pass';
   return {
     ok: verdict !== 'fail', verdict,

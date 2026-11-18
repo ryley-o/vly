@@ -9,7 +9,7 @@ import { commands, CliError } from './commands.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const BOOLEAN_FLAGS = new Set(['profile', 'tile', 'accept', 
-  'new', 'sources', 'dry-run', 'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex',
+  'new', 'no-sources', 'dry-run', 'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex',
 ]);
 const SHORT = { o: 'out', h: 'help', f: 'frames', i: 'input', s: 'screenshot', j: 'json', v: 'version' };
 

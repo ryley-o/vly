@@ -23,7 +23,7 @@ Every command accepts `--json` and then prints one JSON object with `"ok": true|
 | `vly tiles <file> [-o out.bin] [--sheet preview.png] [--colors c0,c1,c2,c3]` | convert `.tiles` text or `.png` art to tile data, or preview it: the sheet shows every tile and multi-tile sprite assembled with its name (color 0 as a checkerboard); `--colors 9bd,fff,8a5,321` previews with real palette colors; `--raw` gives the plain grid |
 | `vly isa` | instruction table |
 | `vly docs [topic] [--all]` | print documentation |
-| `vly publish <cart or source> [--title T] [--sources] [--new] [--dry-run]` | upload the cartridge to the VLY-1 site and print a play link and a buy link (no account); run again to revise the same game (the edit token is kept in `.vly-publish.json`, do not commit it). It uploads the game, so ask the person first |
+| `vly publish <cart or source> [--title T] [--no-sources] [--new] [--dry-run]` | upload the cartridge to the VLY-1 site and print a play link and a buy link (no account); run again to revise the same game (the edit token is kept in `.vly-publish.json`, do not commit it). It uploads the game, so ask the person first |
 | `vly export <cart or source> [--html out.html] [--title T]` | package a cartridge as one self-contained HTML game (see `vly docs distribution`) |
 | `vly chunks <cart> [--deployer 0xADDR] [--out-dir d]` | plan on-chain storage: chunk creation code, salts, ROM hash, gas estimate; with `--deployer` also predicted chunk addresses, per-chunk `ChunkDeployer.deploy` calldata and a `VlyFactory.create` config (see CONTRACTS.md section 7) |
 | `vly mcp` | MCP server on stdio |

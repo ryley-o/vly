@@ -38,7 +38,7 @@ test('vly publish: sends the cartridge, saves the token, revises the same game n
   const dry = await run(dir, 'publish', 'game.vlc', '--site', site, '--dry-run');
   assert.equal(dry.status, 0, dry.out); assert.match(dry.out, /would upload GAME/); assert.equal(seen.length, 0, 'a dry run sends nothing');
 
-  const first = await run(dir, 'publish', 'game.vlc', '--title', 'My Game', '--site', site, '--sources');
+  const first = await run(dir, 'publish', 'game.vlc', '--title', 'My Game', '--site', site);
   assert.equal(first.status, 0, first.out);
   assert.match(first.out, /play:\s+http:\/\/x\/g\/gabc/);
   assert.equal(seen[0].title, 'MY GAME');

@@ -14,6 +14,7 @@ import { wavFromFloat } from '../src/core/audio.js';
 import { parseUntil } from '../src/tools/names.js';
 import { profileCartridge, profileFrames } from '../src/tools/profile.js';
 import { checkCartridge } from '../src/tools/check.js';
+import { compare as compareProject, verdict, loadIndex as loadOriginalityIndex, readProjectFiles } from '../src/tools/originality.js';
 import { parseTilesText, tilesFromRGBA, tilesToRGBA, pngToTilesText } from '../src/tools/tiles.js';
 import { runSpecFile, findSpecFiles } from '../src/tools/testrunner.js';
 import { disassemble } from '../src/asm/disasm.js';
@@ -56,6 +57,26 @@ function formatBuildError(e) {
 
 async function build(entry, opts) {
   try { return await buildFile(entry, opts); } catch (e) { throw formatBuildError(e); }
+}
+
+// The project folder around a source or cartridge (the nearest folder with a vly.json): its sources are compared with the shipped templates and
+// sample games (a re-skin is not a game), and its DESIGN.md is looked for. Nothing here when the folder cannot be found.
+function projectInfo(target) {
+  let dir = path.resolve(target || '.');
+  if (fs.existsSync(dir) && !fs.statSync(dir).isDirectory()) dir = path.dirname(dir);
+  while (!fs.existsSync(path.join(dir, 'vly.json')) && path.dirname(dir) !== dir) dir = path.dirname(dir);
+  if (!fs.existsSync(path.join(dir, 'vly.json'))) return {};
+  const out = {};
+  try {
+    const idx = loadOriginalityIndex();
+    const self = ['templates', 'games'].map((g) => path.relative(path.join(ROOT, g), dir)).find((r) => r && !r.startsWith('..') && !r.includes(path.sep));
+    const refs = self ? Object.fromEntries(Object.entries(idx.refs).filter(([k]) => k !== self && k !== `template ${self}`)) : idx.refs;
+    const files = readProjectFiles(dir);
+    if (Object.keys(files).length) out.originality = verdict(compareProject(files, { ...idx, refs }));
+  } catch { /* no index: no gate */ }
+  const brief = path.join(dir, 'DESIGN.md');
+  out.brief = { present: fs.existsSync(brief), chars: fs.existsSync(brief) ? fs.readFileSync(brief, 'utf8').trim().length : 0 };
+  return out;
 }
 
 async function loadCart(target) {
@@ -328,7 +349,7 @@ export const commands = {
   },
 
   publish: {
-    help: 'vly publish <cart or source> [--title "Name"] [--sources] [--site URL] [--new] [--dry-run]\n  Upload the cartridge to the VLY-1 site and print a play link (no account). It uploads the game, so ask the person first.\n  Run again in the same folder to revise the same game (the edit token is kept in .vly-publish.json: do not commit it).\n  --sources also sends the text files of src/ and assets/ so the game can be fetched back; --dry-run shows what would be sent.',
+    help: 'vly publish <cart or source> [--title "Name"] [--no-sources] [--site URL] [--new] [--dry-run]\n  Upload the cartridge to the VLY-1 site and print a play link (no account). It uploads the game, so ask the person first.\n  Run again in the same folder to revise the same game (the edit token is kept in .vly-publish.json: do not commit it).\n  The text files of src/ and assets/ go along (so the game can be fetched back, and so a re-skin of a template or sample game can be refused); --no-sources leaves them out; --dry-run shows what would be sent.',
     async run(args) {
       const { rom } = await loadCart(args._[0]);
       const site = String(args.flags.site || process.env.VLY_SITE || 'https://vly-1.vercel.app').replace(/\/$/, '');
@@ -338,7 +359,7 @@ export const commands = {
       if (!args.flags.new && fs.existsSync(stateFile)) { try { state = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { state = null; } }
       const body = { title, cartridge_base64: Buffer.from(rom).toString('base64') };
       if (state && state.site === site && state.game_id && state.edit_token) { body.game_id = state.game_id; body.edit_token = state.edit_token; }
-      if (args.flags.sources) {
+      if (!args.flags['no-sources']) {
         const files = {};
         const walk = (dir) => { for (const e of fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : []) { const p = path.join(dir, e.name); if (e.isDirectory()) walk(p); else if (/\.(vly|tiles|map|txt)$/i.test(e.name) && fs.statSync(p).size < 200000) files[p.split(path.sep).join('/')] = fs.readFileSync(p, 'utf8'); } };
         walk('src'); walk('assets');
@@ -411,12 +432,14 @@ export const commands = {
   check: {
     help: 'vly check [cart.vlc|source] [--frames N] [--input-file path.input [--save file.sav]] [--json]\n  Quality gates: plays the game with no input, with START, and with a careless player for N frames (default 7200, two\n  minutes), and reports faults, cycle budget, whether it is alive, sound, sprite use, text covered by sprites and variety.\n  Every WARN is a bug to fix or a decision to explain; any FAIL means it is not finished. Exit code 1 on a FAIL.',
     async run(args) {
+      if (!args._[0] && fs.existsSync('vly.json')) { try { const cfg = JSON.parse(fs.readFileSync('vly.json', 'utf8')); if (cfg.entry) args._[0] = cfg.entry; } catch { /* fall through to the error below */ } }
       const { rom } = await loadCart(args._[0]);
       const frames = int(args.flags.frames ?? 7200);
       if (!(frames >= 600 && frames <= 18000)) throw new CliError('--frames must be 600 to 18000');
       const script = inputText(args) || null;                              // --input / --input-file: a recorded path (a bot's winning run) to check as well
       const save = args.flags.save ? new Uint8Array(fs.readFileSync(args.flags.save)) : null;
-      const r = checkCartridge(rom, { frames, script, save });
+      const project = projectInfo(args._[0]);
+      const r = checkCartridge(rom, { frames, script, save, ...project });
       const mark = { pass: 'PASS', warn: 'WARN', fail: 'FAIL', info: 'INFO' };
       let text = `quality check (${Math.round(frames / 60)} s of careless play): ${r.verdict.toUpperCase()}, ${r.summary}\n`;
       for (const c of r.checks) text += `  ${mark[c.status]}  ${c.id}: ${c.message}${c.hint ? `\n        -> ${c.hint}` : ''}\n`;

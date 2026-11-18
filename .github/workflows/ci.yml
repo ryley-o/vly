@@ -24,7 +24,7 @@ jobs:
       - name: Generated files are up to date
         run: |
           npm run gen
-          git diff --exit-code -- spec c/isa_table.h c/font_data.h docs/stdlib.md
+          git diff --exit-code -- spec c/isa_table.h c/font_data.h docs/stdlib.md src/tools/originality-index.json
       - name: C implementation matches the JavaScript reference
         run: npm run difftest
       - name: Device layer on the host, and the RP2040 firmware type-check
