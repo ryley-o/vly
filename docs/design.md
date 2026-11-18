@@ -363,7 +363,7 @@ Keep numbers that grow past 32,767 (age in frames) in two words or compare with 
 
 Do all of these. Each has a tool.
 
-1. **Compile cleanly.** `try_game` (or `vly build`): fix the first error first.
+1. **Compile cleanly.** `vly build`: fix the first error first.
 2. **`faults` must be `none`.** Division by zero, writes to ROM, illegal instruction and cycle overruns are all reported.
 3. **Check the budget.** `cycles_per_frame.max` under 80,000 (120,000 is the hard cap), and `init_overran` false. If it is high, run the
    profiler (`profile: true` returns cycles per function) and fix the top function, not guesses.
@@ -372,7 +372,7 @@ Do all of these. Each has a tool.
 5. **Press the buttons a player would.** Use `input` for movement, jumps and menus. Then press START at the title and play a
    full run. Watch the variables that matter with `watch` (state, score, lives, speed) and read the timeline: it is how you
    prove a jump, a flip or a lap really happened.
-6. **Run the automated quality check.** `check_game` (or `vly check`) plays the game with scripted and random input for several
+6. **Run the automated quality check.** `vly check` plays the game with scripted and random input for several
    minutes of game time and reports: faults, worst-frame cycles, whether the screen changes (not frozen), whether sound plays, sprite
    hygiene, text covered by sprites, whether the title responds to START, and whether the game ends or resets. **Treat every WARN as a bug to fix or a decision to explain.**
 7. **Play every state.** Title, play, pause, death, game over, retry, win. Retry must be identical to a fresh start.

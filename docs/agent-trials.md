@@ -5,12 +5,12 @@ We have run seven (a racer, a cozy garden, a mystery, a platformer, a rhythm gam
 
 ## The brief to give an agent
 
-Replace the quoted request with anything a person might say. Use a new agent session each time, with no access to this repository's source if you want to test the website path.
+Replace the quoted request with anything a person might say. Use a new agent session each time; it must be able to run code (a shell with Node.js 20+).
 
 > You are a fresh AI assistant. A person has just said to you: "**I'm 15 and I play guitar. Can you make me a rhythm game for my VLY-1 handheld? I want it to feel good, have a few songs, and keep my high scores.**" Your job is to build it.
 >
 > Rules of this trial (it is a test of our tools and documentation, so follow them exactly):
-> - Use ONLY the public site https://vly-1.vercel.app and what you download from it. Start with https://vly-1.vercel.app/build (or /llms-full.txt) and the tarball https://vly-1.vercel.app/vly-cli.tgz. Do not read anything else.
+> - Use ONLY the public site https://vly-1.vercel.app and what you download from it. Start at https://vly-1.vercel.app/build (it tells you to download the toolchain tarball). Do not read anything else.
 > - Keep a worklog (WORKLOG.md) as you go: what you tried, every confusion, every error, every time a doc was wrong, missing or slow to find, and what you wished existed.
 > - Follow the tools' own advice: read the design guidance, run `vly check`, look at screenshots, write tests, prove the game works with a bot (try a reaction delay), and use `--input-file` with check.
 > - Make it genuinely good, not a demo. Do not ask questions; make choices and note them.

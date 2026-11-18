@@ -42,4 +42,4 @@ npm test              # emulator, assembler, compiler, CLI, templates, conforman
 npm run difftest      # every conformance case in JavaScript and C, hash for hash
 ```
 
-MIT licensed. A hosted builder (describe a game to ChatGPT or Claude and get a link to play) is a separate service and is not part of this repository.
+MIT licensed. The hosted site (https://vly-1.vercel.app: the arcade, publishing play links, the downloadable toolchain) is a separate service and is not part of this repository. Hand an agent that can run code the line *Build me a game for the VLY-1 handheld. Start at https://vly-1.vercel.app/build* and it can start building.
