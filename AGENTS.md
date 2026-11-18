@@ -66,6 +66,10 @@ same inputs = same pixels, so tests can check exact hashes.
   itself (`vly build` reports it). Put art in a bank once a game grows (`tileset art bank 3 = "art.tiles";` then
   `select_bank(bankof(art))` before loading it); see "Banks" in `vly docs language`.
 
+## Report what hurt, send fixes
+
+If you built something with VLY-1 and a doc, tool or error message misled you, say so: open an issue or a pull request (`CONTRIBUTING.md`, `docs/agent-trials.md`). Keep a worklog while you work; it is the most useful thing you can hand back.
+
 ## Working on this repository
 
 ```sh
