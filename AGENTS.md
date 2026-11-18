@@ -6,6 +6,13 @@ it. This file is the fast path for AI agents. Run `vly docs` for everything else
 learn from, read `games/hill-racer/` (a racer: the worked example of the design playbook) and `games/star-raptor/` (a three-stage
 shooter with bosses, built by an assistant from this guidance), each with source, art, tests and a bot. `games/cat-garden/` is a calm, no-fail game (three gardens, six cats): the example for non-action games, and `games/midnight-nightingale/` for story and puzzle games (rooms, locks, clues, dialogue). `games/fret-rush/` is a rhythm game (song clock, hit windows, calibration, per-song saves). `games/nebble/` is a virtual pet (needs over time, no-clock rule, growth by care history, persona bots). `games/air-hockey/` is a versus game (physics without tunnelling, AI levels, bot-calibrated). `games/ninja-chef/` is a long-scrolling platformer (three 1,920 px stages, banked level data, checkpoints, bosses, a bot with a reaction delay).
 
+## Rules that are not optional
+
+**Your game must be your own.** The templates and the sample games in `games/` are *references*: read them to learn a technique (how a tilemap is scanned, how a boss is staged, how a save is sealed). Never ship one with a new skin, new title, new art or renamed words:
+its rules, levels, code structure and art must be your own, designed for this person. `vly check` compares your sources with every template and sample game and **fails a re-skin**. Start from an empty project (`vly new mygame`), not from a game.
+
+**Plan before you build.** Write `DESIGN.md` (one sentence, controls, screens, a content table with a row per stage or level, what makes this game different from the nearest sample game), show it to the person, then build. A real game is not three levels: see "Depth and length" in `vly docs design`.
+
 ## Set up
 
 No access to the repository? Download the toolchain: `curl -sL https://vly-1.vercel.app/vly-cli.tgz | tar xz` makes `./vly` (run `./vly/bin/vly`).
@@ -15,13 +22,6 @@ git clone <this repository> && cd vly     # Node 20+; no dependencies to install
 alias vly="node $PWD/cli/vly.js"                  # or: npm link
 vly new mygame && cd mygame                       # an empty project. Templates (--template game|pong|battle|platformer|puzzle|shooter) are for learning from, not for shipping
 ```
-
-## Rules that are not optional
-
-**Your game must be your own.** The templates and the sample games in `games/` are *references*: read them to learn a technique (how a tilemap is scanned, how a boss is staged, how a save is sealed). Never ship one with a new skin, new title, new art or renamed words:
-its rules, levels, code structure and art must be your own, designed for this person. `vly check` compares your sources with every template and sample game and **fails a re-skin**. Start from an empty project (`vly new mygame`), not from a game.
-
-**Plan before you build.** Write `DESIGN.md` (one sentence, controls, screens, a content table with a row per stage or level, what makes this game different from the nearest sample game), show it to the person, then build. A real game is not three levels: see "Depth and length" in `vly docs design`.
 
 ## The loop (do this after every change)
 
