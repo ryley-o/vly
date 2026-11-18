@@ -1,0 +1,367 @@
+{
+  "name": "fret-rush",
+  "entry": "src/main.vly",
+  "out": "build/game.vlc",
+  "tests": [
+    {
+      "name": "title screen shows and has no faults",
+      "frames": 60,
+      "expect": {
+        "words": {
+          "state": 0
+        },
+        "frameHash": "1104a1a2d51df96caa11705d5be6f0d479ec570d57c4c3b4ca77654dda3bf2b9",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "START on the title opens song select",
+      "frames": 120,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 1,
+          "sel": 0
+        },
+        "frameHash": "4a5e17dca3d3996f2c16cfdf3eaee27af7b16e03f04c498a798a7b1c434f291e"
+      }
+    },
+    {
+      "name": "DOWN moves the cursor and the preview music changes song",
+      "frames": 140,
+      "input": "START@30,DOWN@80,DOWN@100",
+      "expect": {
+        "words": {
+          "state": 1,
+          "sel": 2
+        }
+      }
+    },
+    {
+      "name": "UP wraps from the first song to the last",
+      "frames": 120,
+      "input": "START@30,UP@80",
+      "expect": {
+        "words": {
+          "sel": 3
+        }
+      }
+    },
+    {
+      "name": "starting a song begins the count-in at the right tempo",
+      "frames": 260,
+      "input": "START@30,DOWN@60,DOWN@70,DOWN@80,START@110",
+      "expect": {
+        "words": {
+          "state": 2,
+          "cur": 3,
+          "sf": 6,
+          "nst": 656,
+          "st": 29
+        }
+      }
+    },
+    {
+      "name": "perfect bot full-combos FIRST CHORDS (90 BPM) and gets an S",
+      "frames": 4414,
+      "inputFile": "tests/song0.input",
+      "expect": {
+        "words": {
+          "state": 4,
+          "cur": 0,
+          "nperf": 115,
+          "ngood": 0,
+          "nmiss": 0,
+          "maxcombo": 115,
+          "score": 4030,
+          "res_grade": 5,
+          "res_fc": 1
+        },
+        "saves": 1,
+        "maxCycles": 80000,
+        "saveWords": {
+          "16": 4030
+        }
+      }
+    },
+    {
+      "name": "perfect bot full-combos OPEN ROAD (112.5 BPM) and gets an S",
+      "frames": 4618,
+      "inputFile": "tests/song1.input",
+      "expect": {
+        "words": {
+          "state": 4,
+          "cur": 1,
+          "nperf": 249,
+          "ngood": 0,
+          "nmiss": 0,
+          "maxcombo": 249,
+          "score": 9390,
+          "res_grade": 5,
+          "res_fc": 1
+        },
+        "saves": 1,
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "perfect bot full-combos NEON RIFF (128.6 BPM) and gets an S",
+      "frames": 4528,
+      "inputFile": "tests/song2.input",
+      "expect": {
+        "words": {
+          "state": 4,
+          "cur": 2,
+          "nperf": 320,
+          "ngood": 0,
+          "nmiss": 0,
+          "maxcombo": 320,
+          "score": 12230,
+          "res_grade": 5,
+          "res_fc": 1
+        },
+        "saves": 1,
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "perfect bot full-combos SHRED STORM (150 BPM) and gets an S",
+      "frames": 4310,
+      "inputFile": "tests/song3.input",
+      "expect": {
+        "words": {
+          "state": 4,
+          "cur": 3,
+          "nperf": 414,
+          "ngood": 0,
+          "nmiss": 0,
+          "maxcombo": 414,
+          "score": 15990,
+          "res_grade": 5,
+          "res_fc": 1
+        },
+        "saves": 1,
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a bot 6 frames late hits every note GOOD (no PERFECT) and gets a B",
+      "frames": 4618,
+      "inputFile": "tests/song1_late6.input",
+      "expect": {
+        "words": {
+          "state": 4,
+          "nperf": 0,
+          "ngood": 249,
+          "nmiss": 0,
+          "res_grade": 3,
+          "score": 5634
+        }
+      }
+    },
+    {
+      "name": "A on the results screen skips the tally, and the best score is still saved",
+      "frames": 4540,
+      "inputFile": "tests/song2_skip.input",
+      "expect": {
+        "words": {
+          "state": 4,
+          "res_saved": 1,
+          "res_grade": 5
+        },
+        "saves": 1,
+        "saveWords": {
+          "48": 12230
+        }
+      }
+    },
+    {
+      "name": "a worse run does not lower the saved best, and the play count goes up",
+      "frames": 4430,
+      "inputFile": "tests/song0_late6.input",
+      "save": "tests/after_song0.sav",
+      "expect": {
+        "words": {
+          "state": 4,
+          "res_new": 0,
+          "res_grade": 3
+        },
+        "saves": 1,
+        "saveWords": {
+          "16": 4030,
+          "18": 115,
+          "22": 5,
+          "24": 2
+        }
+      }
+    },
+    {
+      "name": "the same late bot with a 6-frame input offset saved gets all PERFECT",
+      "frames": 4618,
+      "inputFile": "tests/song1_late6_cal6.input",
+      "save": "tests/cal6.sav",
+      "expect": {
+        "words": {
+          "state": 4,
+          "nperf": 249,
+          "ngood": 0,
+          "res_grade": 5,
+          "score": 9390
+        }
+      }
+    },
+    {
+      "name": "a bot 12 frames late cannot play SHRED STORM: the rock meter empties and the song fails",
+      "frames": 500,
+      "inputFile": "tests/song3_fail.input",
+      "expect": {
+        "words": {
+          "state": 5,
+          "meter": 0
+        }
+      }
+    },
+    {
+      "name": "a human-like bot (2 frames late, +-3 jitter, 3% skipped notes) finishes SHRED STORM with an A",
+      "frames": 4310,
+      "inputFile": "tests/song3_human.input",
+      "expect": {
+        "words": {
+          "state": 4,
+          "nperf": 296,
+          "ngood": 102,
+          "nmiss": 16,
+          "res_grade": 4,
+          "score": 9086,
+          "maxcombo": 129
+        }
+      }
+    },
+    {
+      "name": "START pauses: the song clock freezes",
+      "frames": 500,
+      "input": "START@30,START@100,START@400",
+      "expect": {
+        "words": {
+          "state": 3,
+          "st": 115
+        },
+        "frameHash": "76f8a1fe3ab0da0412fa8ec367987082be174a17c35008e2539bf14279eec158"
+      }
+    },
+    {
+      "name": "paused for 100 frames, the clock is exactly where it was",
+      "frames": 450,
+      "input": "START@30,START@100,START@400",
+      "expect": {
+        "words": {
+          "state": 3,
+          "st": 115
+        }
+      }
+    },
+    {
+      "name": "RESUME counts 3-2-1 and then the song carries on from the same step",
+      "frames": 700,
+      "input": "START@30,START@100,START@400,START@450",
+      "expect": {
+        "words": {
+          "state": 2,
+          "st": 274,
+          "pstep": 28
+        }
+      }
+    },
+    {
+      "name": "RETRY from the pause menu restarts at the count-in",
+      "frames": 700,
+      "input": "START@30,START@100,START@400,DOWN@420,A@430",
+      "expect": {
+        "words": {
+          "state": 2,
+          "score": 0,
+          "combo": 0
+        }
+      }
+    },
+    {
+      "name": "QUIT from the pause menu goes back to song select",
+      "frames": 700,
+      "input": "START@30,START@100,START@400,DOWN@420,DOWN@425,A@430",
+      "expect": {
+        "words": {
+          "state": 1
+        }
+      }
+    },
+    {
+      "name": "SETUP: eight taps 3 frames after the click measure an offset of +3 and B saves it",
+      "frames": 361,
+      "inputFile": "tests/cal3.input",
+      "expect": {
+        "words": {
+          "cal": 3
+        },
+        "saves": 1,
+        "saveWords": {
+          "2": 3
+        }
+      }
+    },
+    {
+      "name": "SETUP: taps 2 frames before the click measure -2",
+      "frames": 392,
+      "inputFile": "tests/calm2.input",
+      "expect": {
+        "words": {
+          "cal": -2
+        },
+        "saveWords": {
+          "2": -2
+        }
+      }
+    },
+    {
+      "name": "a saved best score shows on song select",
+      "frames": 120,
+      "input": "START@30",
+      "save": "tests/after_song0.sav",
+      "expect": {
+        "words": {
+          "state": 1
+        },
+        "frameHash": "4a68f4ce7d8ec8635a0279b160a43f2936c87317e4b4d4060e6f43e4811e4dd6"
+      }
+    },
+    {
+      "name": "pressing every button at once on the title never faults",
+      "frames": 300,
+      "input": "UP+DOWN+LEFT+RIGHT+A+B+SELECT@10-299",
+      "expect": {
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "mashing all four lanes every third frame fails the song with almost no score",
+      "frames": 900,
+      "input": "START@30,START@100,LEFT+DOWN+B+A@130-330/3",
+      "expect": {
+        "words": {
+          "state": 5,
+          "meter": 0
+        }
+      }
+    },
+    {
+      "name": "mashing during the count-in alone costs nothing",
+      "frames": 240,
+      "input": "START@30,START@100,LEFT+DOWN+B+A@130-240/3",
+      "expect": {
+        "words": {
+          "state": 2,
+          "meter": 60
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+// Sound: std/sfx covers the standard effects; this file adds a tiny note queue for the pet's own sounds (munch, bubbles, chirps,
+// lullaby, the "copy me" tones) and the music switching rules. Music plays on channels 0 and 2, effects on 1 and 3.
+
+const Q_N = 8;
+var q_ch[8]; var q_hz[8]; var q_vol[8]; var q_len[8]; var q_duty[8]; var q_gap[8];
+var q_head; var q_tail; var q_wait;
+
+// queue one note: channel, hz, volume, frames it lasts (a rest of gap frames follows)
+func note(ch, hz, vol, len, duty, gap) {
+  var n = (q_tail + 1) & 7;
+  if (n == q_head) { return; }                      // full: drop it
+  q_ch[q_tail] = ch; q_hz[q_tail] = hz; q_vol[q_tail] = vol; q_len[q_tail] = len; q_duty[q_tail] = duty; q_gap[q_tail] = gap;
+  q_tail = n;
+}
+func q_update() {
+  if (q_wait > 0) { q_wait--; return; }
+  if (q_head == q_tail) { return; }
+  var h = q_head;
+  sfx_tone(q_ch[h], q_hz[h], q_vol[h], q_duty[h], q_len[h]);
+  q_wait = q_len[h] + q_gap[h];
+  q_head = (h + 1) & 7;
+}
+func q_clear() { q_head = 0; q_tail = 0; q_wait = 0; }
+
+// ---- the pet's sounds (each event has its own) ----
+func snd_move() { sfx_play(SFX_SELECT); }
+func snd_ok() { note(1, 784, 11, 3, 2, 0); note(1, 1175, 11, 5, 2, 0); }
+func snd_back() { sfx_play(SFX_BACK); }
+func snd_no() { note(1, 180, 11, 5, 2, 1); note(1, 150, 11, 7, 2, 0); }          // "not now": a soft low double buzz
+func snd_munch() { sfx_tone(3, 500, 9, 0, 3); }
+func snd_gulp() { note(1, 300, 10, 3, 2, 0); note(1, 220, 10, 5, 2, 0); }
+func snd_bubble(i) { sfx_tone(1, 700 + (i & 3) * 180, 6, 2, 3); sfx_tone(3, 1500, 4, 0, 2); }
+func snd_pet() { note(1, 1047, 9, 3, 2, 1); note(1, 1319, 9, 4, 2, 0); }
+func snd_call() { note(1, 880, 8, 4, 1, 3); note(1, 880, 8, 4, 1, 12); note(1, 1109, 8, 6, 1, 0); }   // the pet asks for something
+func snd_plop() { note(3, 300, 10, 4, 0, 0); note(1, 160, 9, 5, 2, 0); }
+func snd_sleep() { note(1, 659, 8, 8, 2, 2); note(1, 523, 8, 8, 2, 2); note(1, 392, 8, 14, 2, 0); }
+func snd_wake() { note(1, 392, 9, 5, 2, 1); note(1, 523, 9, 5, 2, 1); note(1, 659, 9, 5, 2, 1); note(1, 880, 10, 9, 2, 0); }
+func snd_yawn() { note(1, 440, 7, 10, 2, 0); note(1, 330, 7, 10, 2, 0); }
+func snd_crack() { note(3, 900, 12, 3, 0, 1); note(3, 700, 12, 4, 0, 0); }
+func snd_hatch() { sfx_play(SFX_WIN); }
+func snd_grow() { sfx_play(SFX_POWER); }
+func snd_star(n) { if (n > 0) { note(1, 784, 11, 4, 2, 1); note(1, 988, 11, 4, 2, 1); } if (n > 1) { note(1, 1175, 11, 4, 2, 1); } if (n > 2) { note(1, 1568, 12, 10, 2, 0); } }
+func snd_tone4(d) { var hz = 523; if (d == 1) { hz = 659; } if (d == 2) { hz = 784; } if (d == 3) { hz = 1047; } sfx_tone(1, hz, 11, 2, 12); }
+func snd_chime() { note(1, 659, 7, 6, 2, 2); note(1, 523, 7, 6, 2, 2); note(1, 392, 7, 12, 2, 0); }
+func snd_fail() { note(1, 392, 10, 6, 2, 1); note(1, 311, 10, 6, 2, 1); note(1, 262, 10, 12, 2, 0); }
+
+// ---- music ----
+const MU_NONE = 0; const MU_TITLE = 1; const MU_DAY = 2; const MU_EVE = 3; const MU_NIGHT = 4; const MU_GAME = 5; const MU_HOP = 6; const MU_SLEEP = 7; const MU_EVO = 8;
+var mu_now; var mu_vol = 8;
+byte lul_lead[129]; byte lul_bass[129];
+btable lul_lp = { N_E5,0,N_C5,0,N_G4,0,N_C5,0,   N_D5,0,N_B4,0,N_G4,0,N_B4,0,   N_C5,0,N_A4,0,N_E4,0,N_A4,0,   N_B4,0,N_G4,0,N_D4,0,0,0 };
+btable lul_lo = { 0,1,2,3, 0,1,2,3 };
+btable lul_bp = { N_C3,0,0,0,N_G3,0,0,0,  N_G2,0,0,0,N_D3,0,0,0,  N_A2,0,0,0,N_E3,0,0,0,  N_G2,0,0,0,N_D3,0,0,0 };
+btable lul_bo = { 0,1,2,3, 0,1,2,3 };
+btable evo_song = { N_C5,2,N_E5,2,N_G5,2,N_C6,3,0,1,N_G5,2,N_C6,2,N_E6,4,0,2,N_C6,2,N_E6,2,N_G6,10, MUS_END };
+btable evo_bass = { N_C3,6,N_G3,6,N_C4,14, MUS_END };
+
+func music_set(m) {
+  if (m == mu_now) { return; }
+  mu_now = m;
+  music_stop_all();
+  if (m == MU_TITLE) { tune_play(TUNE_TITLE); }
+  else if (m == MU_DAY) { tune_play(TUNE_ADVENTURE); }
+  else if (m == MU_EVE) { tune_play(TUNE_TITLE); }
+  else if (m == MU_NIGHT) { tune_play(TUNE_SPACE); }
+  else if (m == MU_GAME) { tune_play(TUNE_ADVENTURE); }
+  else if (m == MU_HOP) { tune_play(TUNE_ACTION); }
+  else if (m == MU_SLEEP) {
+    music_tempo(14);
+    music_play(0, 0, music_build(lul_lead, lul_lp, 8, lul_lo, 8), 4);
+    music_play(2, 2, music_build(lul_bass, lul_bp, 8, lul_bo, 8), 5);
+  }
+  else if (m == MU_EVO) { music_tempo(7); music_play(0, 0, evo_song, 8); music_play(2, 2, evo_bass, 8); }
+}
+// which music suits the room right now
+func room_music() {
+  if (sleeping) { return MU_SLEEP; }
+  var ph = phase();
+  if (ph == 0) { return MU_DAY; }
+  if (ph == 1) { return MU_EVE; }
+  return MU_NIGHT;
+}
+func set_volume(v) { mu_vol = v; master_volume(v); }

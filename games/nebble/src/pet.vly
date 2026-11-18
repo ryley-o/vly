@@ -1,0 +1,120 @@
+// The pet: what is saved, how needs move, how it grows and what it grows into. No drawing in here.
+//
+// TIME: the VLY-1 has no clock. Pet time is the time the console is ON. While it is off the pet "naps": every power-on
+// applies one fixed nap (AWAY_*), whether you were gone for five seconds or five weeks, and never lets a need fall below
+// AWAY_FLOOR. So the pet can never starve while the console is in a drawer.
+
+const SV_MAGIC = 0x4E42;
+const EVO1 = 180;          // baby -> child after this many seconds of life
+const EVO2 = 720;          // child -> adult
+const HATCH_NEED = 40;
+const DAYLEN = 360;        // one pet day in seconds: 0-179 day, 180-239 evening, 240-359 night
+const AWAY_HUN = 14; const AWAY_FUN = 10; const AWAY_CLN = 8; const AWAY_NRG = 12; const AWAY_CLK = 40; const AWAY_FLOOR = 30;
+
+const M_HAPPY = 0; const M_OK = 1; const M_HUNGRY = 2; const M_BORED = 3; const M_SLEEPY = 4; const M_DIRTY = 5; const M_SULK = 6; const M_SLEEP = 7; const M_EAT = 8; const M_JOY = 9;
+const F_STAR = 0; const F_DASH = 1; const F_PUDGE = 2; const F_LUNA = 3; const F_SCAMP = 4;
+
+var stage; var form; var pname; var age; var day = 1; var clk;
+var hun = 80; var fun = 80; var nrg = 90; var cln = 90;
+var n_meal; var n_snack; var n_play; var n_win; var n_wash; var n_rest; var n_neg; var n_good;
+var album; var best[3]; var hp; var mess; var boots; var gens; var tadult; var sound_on = 1;
+var sleeping; var sleep_sec; var sc; var have_save; var sv_dirty;
+
+func phase() { if (clk < 180) { return 0; } if (clk < 240) { return 1; } return 2; }
+func minneed() { return min(min(hun, fun), min(nrg, cln)); }
+func lowcount() { var n = 0; if (hun < 15) { n++; } if (fun < 15) { n++; } if (nrg < 15) { n++; } if (cln < 15) { n++; } return n; }
+
+func get_mood() {
+  if (sleeping) { return M_SLEEP; }
+  if (lowcount() >= 2) { return M_SULK; }
+  if (hun < 35) { return M_HUNGRY; }
+  if (cln < 30 || mess >= 2) { return M_DIRTY; }
+  if (nrg < 30) { return M_SLEEPY; }
+  if (fun < 35) { return M_BORED; }
+  if (minneed() >= 65) { return M_HAPPY; }
+  return M_OK;
+}
+
+func new_pet(n) {
+  stage = 0; form = 0; pname = n; age = 0; day = 1; clk = 20;
+  hun = 80; fun = 80; nrg = 90; cln = 90;
+  n_meal = 0; n_snack = 0; n_play = 0; n_win = 0; n_wash = 0; n_rest = 0; n_neg = 0; n_good = 0;
+  hp = 0; mess = 0; tadult = 0; sleeping = 0; sc = 0;
+}
+
+func save_game() {
+  save_set(0, SV_MAGIC); save_set(2, 1);
+  save_set(4, stage); save_set(6, form); save_set(8, pname); save_set(10, age); save_set(12, day); save_set(14, clk);
+  save_set(16, hun); save_set(18, fun); save_set(20, nrg); save_set(22, cln);
+  save_set(24, n_meal); save_set(26, n_snack); save_set(28, n_play); save_set(30, n_win);
+  save_set(32, n_wash); save_set(34, n_rest); save_set(36, n_neg); save_set(38, n_good);
+  save_set(40, album); save_set(42, best[0]); save_set(44, best[1]); save_set(46, best[2]);
+  save_set(48, hp); save_set(50, mess); save_set(52, boots); save_set(54, gens); save_set(56, sound_on); save_set(58, tadult);
+  save_seal(); save_commit();
+  sv_dirty = 0;
+}
+func load_game() {
+  if (!save_loaded()) { return 0; }
+  if (!save_valid()) { return 0; }
+  if (save_get(0) != SV_MAGIC) { return 0; }
+  stage = clamp(save_get(4), 0, 3); form = clamp(save_get(6), 0, 4); pname = clamp(save_get(8), 0, 7);
+  age = save_get(10); day = max(1, save_get(12)); clk = clamp(save_get(14), 0, DAYLEN - 1);
+  hun = clamp(save_get(16), 0, 99); fun = clamp(save_get(18), 0, 99); nrg = clamp(save_get(20), 0, 99); cln = clamp(save_get(22), 0, 99);
+  n_meal = save_get(24); n_snack = save_get(26); n_play = save_get(28); n_win = save_get(30);
+  n_wash = save_get(32); n_rest = save_get(34); n_neg = save_get(36); n_good = save_get(38);
+  album = save_get(40) & 31; best[0] = save_get(42); best[1] = save_get(44); best[2] = save_get(46);
+  hp = save_get(48); mess = clamp(save_get(50), 0, 3); boots = save_get(52); gens = save_get(54); sound_on = save_get(56) & 1; tadult = save_get(58);
+  return 1;
+}
+
+// While the console was off: one fixed nap. Needs drop a little but never below the floor (a need already lower stays as it is).
+func nap_drop(v, d) { if (v <= AWAY_FLOOR) { return v; } return max(AWAY_FLOOR, v - d); }
+func apply_away() {
+  boots++;
+  if (stage == 0) { return; }
+  hun = nap_drop(hun, AWAY_HUN); fun = nap_drop(fun, AWAY_FUN); cln = nap_drop(cln, AWAY_CLN);
+  nrg = min(99, nrg + AWAY_NRG);                        // it napped
+  clk = clk + AWAY_CLK;
+  if (clk >= DAYLEN) { clk = clk - DAYLEN; day++; }
+  if (mess > 1) { mess = 1; }
+}
+
+// which adult form the care so far has led to (evaluated once, when the child grows up)
+func choose_form() {
+  if (n_neg >= 60) { return F_SCAMP; }                              // a minute or more with a need near zero
+  if (n_snack >= 8 || (n_snack >= 5 && n_snack > n_meal)) { return F_PUDGE; }
+  if (n_play >= 8 && n_win >= 5) { return F_DASH; }
+  if (n_rest >= 5 && n_wash >= 10) { return F_LUNA; }
+  if (n_good * 4 >= EVO2) { return F_STAR; }                         // all four needs above half for a quarter of its life
+  return F_SCAMP;
+}
+
+func clock_second(step) {
+  clk = clk + step;
+  if (clk >= DAYLEN) { clk = clk - DAYLEN; if (day < 99) { day++; } }
+  if (stage >= 1 && age < 30000) { age++; if (stage == 3 && tadult < 30000) { tadult++; } }
+}
+
+// once a second while the pet is looked after in the room. Returns nothing; the caller redraws.
+func needs_second() {
+  sc++; if (sc >= 60) { sc = 0; }
+  var ph = phase();
+  var hp_ = 3; var fp = 4; var np = 5; var cp = 5;
+  if (ph == 2) { np = 3; }
+  if (stage == 3) {                                     // grown-ups have habits of their own
+    if (form == F_DASH) { fp = 3; np = 4; }               // needs lots of play
+    if (form == F_PUDGE) { hp_ = 2; }                     // always hungry
+    if (form == F_LUNA && ph == 2) { np = 2; }            // sleepy at night
+    if (form == F_SCAMP) { cp = 3; }                      // gets grubby fast
+  }
+  if (sleeping) { hp_ = 9; fp = 12; cp = 15; }
+  if (sc % hp_ == 0) { hun = max(0, hun - 1); }
+  if (sc % fp == 0) { fun = max(0, fun - 1); }
+  if (sc % cp == 0 || (mess > 0 && sc % 4 == 0)) { cln = max(0, cln - 1); }
+  if (!sleeping && sc % np == 0) { nrg = max(0, nrg - 1); }
+  if (sleeping) { nrg = min(99, nrg + (stage == 3 && form == F_LUNA ? 5 : 4)); }
+  if (!sleeping && stage >= 1 && stage < 3) {
+    if (minneed() < 12) { n_neg++; }
+    if (minneed() >= 50) { n_good++; }
+  }
+}

@@ -1,0 +1,29 @@
+; 8-bit 8080-style parallel write for a 3.5 inch ILI9488 / ST7796 module.
+; One FIFO entry is one byte. Data goes on the 8 "out" pins, and the WR strobe is the side-set pin:
+; low while the byte is put on the bus, high to latch it (the panel samples on the rising edge).
+; Two PIO cycles per byte, so the byte rate is half the state machine clock (see LCD_WRITE_NS in config.h).
+.program lcd_parallel
+.side_set 1
+
+.wrap_target
+    out pins, 8   side 0
+    nop           side 1
+.wrap
+
+% c-sdk {
+static inline void lcd_parallel_program_init(PIO pio, uint sm, uint offset, uint d0, uint wr, float div) {
+    pio_sm_config c = lcd_parallel_program_get_default_config(offset);
+    sm_config_set_out_pins(&c, d0, 8);
+    sm_config_set_sideset_pins(&c, wr);
+    sm_config_set_out_shift(&c, true, true, 8);          // shift right, autopull every 8 bits
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);       // 8 entries deep become 16
+    sm_config_set_clkdiv(&c, div);
+    for (uint i = 0; i < 8; i++) pio_gpio_init(pio, d0 + i);
+    pio_gpio_init(pio, wr);
+    pio_sm_set_consecutive_pindirs(pio, sm, d0, 8, true);
+    pio_sm_set_consecutive_pindirs(pio, sm, wr, 1, true);
+    pio_sm_set_pins_with_mask(pio, sm, 1u << wr, 1u << wr);   // WR idles high
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}

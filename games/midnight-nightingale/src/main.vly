@@ -1,0 +1,946 @@
+// THE MIDNIGHT NIGHTINGALE: a mystery and escape-room adventure for VLY-1.
+//
+// Larkspur House on a storm night. Aunt Odile's music box has been stolen, her puzzle locks have snapped shut, and one of her
+// three guests is the thief. Search six rooms, crack five locks, collect clues in your notebook and name the thief.
+//
+//   D-PAD walk    A look / talk / confirm    B back    SELECT notebook    START pause (shows your goal)
+//
+// Shows: room maps as text (one character per 16x16 block), a typewriter dialogue box with speakers, one reusable lock screen
+// (digits, colours, letters, a clock), clue and flag bits saved on the cartridge, fades between screens, three tunes plus
+// two built from patterns.
+
+import "std/tunes";
+import "std/fade";
+import "std/sprites";
+import "std/anim";
+import "story.vly";
+import "story_ids.vly";
+
+tileset art bank 3 = "../assets/art.tiles";
+asset story bank 5 = incbin("../assets/story.bin");   // every line of dialogue lives in a bank: text would not fit the 16 KB otherwise
+
+const T = 100;
+const S_TITLE = 0; const S_INTRO = 1; const S_PLAY = 2; const S_LOCK = 3; const S_NOTE = 4; const S_PAUSE = 5; const S_ACCUSE = 6; const S_END = 7;
+// progress flags (fl)
+const F_INTRO = 1; const F_RUG = 2; const F_DRAWER = 4; const F_SAFE = 8; const F_LIBOPEN = 16; const F_GEAR = 32; const F_CLKKEY = 64;
+const F_CLKOPEN = 128; const F_GEARSET = 256; const F_STAIRS = 512; const F_BOX = 1024; const F_DONE = 2048;
+// clues (cl)
+const C_LETTER = 1; const C_INK = 2; const C_TIME = 4; const C_PIE = 8; const C_CHESS = 16; const C_ALONE = 32; const C_ROOKINK = 64; const C_DIARY = 128;
+const NEED = 30;                      // C_INK | C_TIME | C_PIE | C_CHESS: the proof needed before accusing
+// things talked to or read (tk)
+const K_CARD = 1; const K_VALE = 2; const K_PIM = 4; const K_ROOK = 8; const K_CAT = 16;
+const L_SAFE = 0; const L_BOOK = 1; const L_PIE = 2; const L_TIME = 3; const L_TRUNK = 4;
+const M_TITLE = 1; const M_HOUSE = 2; const M_SPACE = 3; const M_BOSS = 4; const M_END = 5;
+
+byte rg[80];                          // the room as it is now
+var state; var room; var hx; var hy; var face; var moving; var wstep;
+var fl; var cl; var tk; var wrong; var best; var play_t; var play_m; var save_pending; var has_save;
+var db = 10; var dlg_open; var dlg_s; var dlg_i; var dlg_c; var dlg_r; var dlg_wait; var dlg_t; var dlg_after; var dlg_name;
+var pk; var pa; var pb; var pstage; var ts; var troom; var tfrom; var post_s; var post_n;
+var song_now; var song_want; var ph; var note_t; var hud_dirty;
+var nn; var nx[4]; var ny[4]; var nk[4];
+var cat_x; var cat_y; var cat_dir; var cat_t; var cat_f;
+var newconf; var shake_t; var menu_i; var intro_p; var lk_id; var lk_cur; var lk_val[4]; var lk_rep; var lk_msg; var sel; var bump_t; var thunder_t;
+byte onech[2];
+byte hl_buf[257]; byte hb_buf[257]; byte nl_buf[193]; byte nb_buf[193];
+
+// ---------------------------------------------------------------- music
+btable hl_pats = {
+  N_A4,0,N_C5,0,N_E5,0,N_D5,N_C5,   N_B4,0,N_D5,0,N_GS4,0,N_B4,N_E5,   N_F4,0,N_A4,0,N_C5,0,N_B4,N_A4,   N_E4,0,N_GS4,0,N_B4,0,N_A4,N_GS4,
+  N_A4,N_C5,N_E5,N_A5,N_G5,N_E5,N_C5,0
+};
+btable hl_ord = { 0, 1, 0, 1, 2, 3, 2, 3, 0, 1, 4, 3, 2, 3, 4, 1 };
+btable hb_pats = {
+  N_A2,0,0,0,N_E3,0,0,0,   N_E2,0,0,0,N_B2,0,0,0,   N_F2,0,0,0,N_C3,0,0,0,   N_E2,0,0,0,N_GS2,0,0,0,
+  N_A2,0,N_A2,0,N_E3,0,N_A2,0
+};
+btable nl_pats = {
+  N_E5,0,N_G5,0,N_B5,0,N_G5,0,   N_A5,0,N_G5,0,N_E5,0,0,0,   N_D5,0,N_FS4,0,N_A4,0,N_D5,0,   N_E5,0,0,0,0,0,0,0
+};
+btable nl_ord = { 0, 1, 0, 1, 2, 1, 2, 3, 0, 1, 2, 3 };
+btable nb_pats = { N_E3,0,0,0,N_B3,0,0,0,   N_A2,0,0,0,N_E3,0,0,0,   N_D3,0,0,0,N_A3,0,0,0,   N_E3,0,0,0,0,0,0,0 };
+btable nb_ord = { 0, 1, 0, 1, 2, 1, 2, 3, 0, 1, 2, 3 };
+
+func play_music(m) {
+  music_stop_all();
+  song_now = m;
+  if (m == M_TITLE) { tune_play(TUNE_TITLE); }
+  else if (m == M_SPACE) { tune_play(TUNE_SPACE); }
+  else if (m == M_BOSS) { tune_play(TUNE_BOSS); }
+  else if (m == M_HOUSE) {
+    music_tempo(10);
+    music_play(0, 0, music_build(hl_buf, hl_pats, 8, hl_ord, 16), 6);
+    music_duty(0, 1);
+    music_play(1, 2, music_build(hb_buf, hb_pats, 8, hl_ord, 16), 9);
+  } else if (m == M_END) {
+    music_tempo(13);
+    music_play(0, 0, music_build(nl_buf, nl_pats, 8, nl_ord, 12), 7);
+    music_duty(0, 0);
+    music_play(1, 2, music_build(nb_buf, nb_pats, 8, nb_ord, 12), 8);
+  }
+}
+
+// ---------------------------------------------------------------- save
+func save_game() {
+  save_set(0, fl); save_set(2, cl); save_set(4, tk); save_set(6, wrong); save_set(8, best); save_set(10, play_m);
+  save_set(12, 0x5A17);
+  save_seal(); save_commit();
+}
+func load_game() {
+  has_save = 0;
+  if (save_loaded() && save_valid() && save_get(12) == 0x5A17) {
+    fl = save_get(0); cl = save_get(2); tk = save_get(4); wrong = save_get(6); best = save_get(8); play_m = save_get(10);
+    has_save = 1;
+  }
+}
+func new_game() { fl = 0; cl = 0; tk = 0; wrong = 0; play_t = 0; play_m = 0; save_pending = 1; }
+func nclues() { var n = 0; for (var i = 0; i < 8; i++) { if (cl & (1 << i)) { n++; } } return n; }
+func give(f) { fl |= f; sfx_play(SFX_POWER); save_pending = 1; hud_dirty = 1; }
+func clue(b) {
+  if ((cl & b) == 0) { cl |= b; note_t = 150; sfx_play(SFX_COIN); save_pending = 1; hud_dirty = 1; }
+}
+
+// ---------------------------------------------------------------- palettes
+table theme = {
+  0x643, 0x975, 0xA45, 0x211,        // 0 hall
+  0x542, 0x873, 0x486, 0x122,        // 1 study
+  0x432, 0x753, 0x373, 0x121,        // 2 library
+  0xBBC, 0xEEE, 0xDA5, 0x334,        // 3 kitchen
+  0x447, 0x77B, 0x559, 0x113,        // 4 clock room
+  0x433, 0x765, 0x346, 0x112,        // 5 attic
+  0x114, 0x67B, 0xABE, 0xFFD         // 6 screens
+};
+func set_theme(t) {
+  fade_apply(4);
+  for (var i = 0; i < 4; i++) { poke(BG_PAL + i * 2, theme[t * 4 + i]); }
+  for (var p = 1; p < 6; p++) { poke(BG_PAL + p * 8, theme[t * 4]); }
+  fade_save();
+  fade_set(0);
+}
+
+// ---------------------------------------------------------------- the room
+func door_state(d) {            // 0 open, 1 locked, 2 hidden in the wall
+  if (room == 0 && d == 2 && !(fl & F_LIBOPEN)) { return 1; }
+  if (room == 0 && d == 4 && !(fl & F_CLKOPEN)) { return 1; }
+  if (room == 4 && d == 5 && !(fl & F_STAIRS)) { return 2; }
+  return 0;
+}
+func is_door(c) { return c >= '0' && c <= '5'; }
+func solid_char(c) {
+  if (c == '.' || c == ',' || c == 'r') { return 0; }
+  if (is_door(c)) { return door_state(c - '0') != 0; }
+  return 1;
+}
+func cell_at(x, y) {
+  if (x < 0 || y < 0 || x >= 160 || y >= 128) { return '#'; }
+  return rg[(y >> 4) * 10 + (x >> 4)];
+}
+var hbx; var hby;
+func hit_char(px, py) {          // the first solid block touching the feet box, or 0
+  for (var k = 0; k < 4; k++) {
+    var x = px + ((k & 1) ? 12 : 3);
+    var y = py + ((k & 2) ? 15 : 8);
+    var c = cell_at(x, y);
+    if (solid_char(c)) { hbx = x >> 4; hby = y >> 4; return c; }
+  }
+  return 0;
+}
+func art_of(c, bx, by) {         // the first tile of a block; sets blk_pal
+  if (c == '.' || c == 'O' || c == 'V' || c == 'R' || c == 'M') { return ((bx + by) & 1) ? art_floor_b : art_floor_a; }
+  if (c == '#') { return art_wall; }
+  if (c == ',' || c == 'r') { return art_rug; }
+  if (c == 'w') { return art_window; }
+  if (is_door(c)) {
+    var s = door_state(c - '0');
+    if (s == 0) { return (room == 4 && c == '5') ? art_stairs : art_door; }
+    if (s == 1) { return art_door_lock; }
+    return art_wall;
+  }
+  if (c == 'F') { return ph ? art_fire2 : art_fire; }
+  if (c == 'x') { return ph ? art_pend2 : art_pend; }
+  if (c == 'P') { return art_painting; }
+  if (c == 'T' || c == 't') { return art_table; }
+  if (c == 'U') { return art_umbrella; }
+  if (c == 'p') { return art_plant; }
+  if (c == 'H') { return art_chess; }
+  if (c == 'S') { return art_shells; }
+  if (c == 'm') { return art_moonwin; }
+  if (c == 'K') { return art_painting_cats; }
+  if (c == 'A') { return art_safe; }
+  if (c == 'a') { return art_safe_open; }
+  if (c == 'D') { return art_desk; }
+  if (c == 'E') { return art_case; }
+  if (c == 'B' || c == 'L') { return art_shelf; }
+  if (c == 'Q') { return art_shelf_odd; }
+  if (c == 'q') { return art_shelf_open; }
+  if (c == 'Y') { return art_painting_rain; }
+  if (c == 'N') { return art_stove; }
+  if (c == 'I') { return art_timer; }
+  if (c == 'k') { return art_cupboard; }
+  if (c == 'C') { return art_cupboard_lock; }
+  if (c == 'c') { return art_cupboard_open; }
+  if (c == 'b') { return art_barrel; }
+  if (c == 'X') { return art_clock; }
+  if (c == 'G') { return art_gears; }
+  if (c == 'W') { return art_bench; }
+  if (c == 'Z') { return art_trunk; }
+  if (c == 'z') { return art_trunk_open; }
+  if (c == 'h') { return art_hatbox; }
+  if (c == 'd') { return art_dummy; }
+  if (c == 'o') { return art_mirror; }
+  if (c == 'y') { return art_toys; }
+  return art_wall;
+}
+func pal_of(c) {
+  if (c == ',' || c == 'r' || c == 'h') { return 2; }
+  if (c == 'T' || c == 't' || c == 'D' || c == 'B' || c == 'k' || c == 'C' || c == 'c' || c == 'b' || c == 'X' || c == 'x' || c == 'W' || c == 'Z' || c == 'z' || c == 'y' || c == 'H') { return 1; }
+  if (c == 'U' || c == 'A' || c == 'a' || c == 'N' || c == 'G' || c == 'd' || c == 'o') { return 3; }
+  if (c == 'p' || c == 'L' || c == 'q') { return 4; }
+  if (c == 'F' || c == 'P' || c == 'm' || c == 'K' || c == 'E' || c == 'Q' || c == 'Y') { return 5; }
+  if (is_door(c)) { var s = door_state(c - '0'); if (s == 1) { return 1; } if (s == 0 && room == 4 && c == '5') { return 3; } }
+  return 0;
+}
+func put_block(bx, by) {
+  var c = rg[by * 10 + bx];
+  var t = T + art_of(c, bx, by);
+  var p = pal_of(c) << 12;
+  var a = BG_MAP + (((by << 1) << 5) + (bx << 1)) * 2;
+  poke(a, t | p); poke(a + 2, (t + 1) | p);
+  poke(a + 64, (t + 2) | p); poke(a + 66, (t + 3) | p);
+}
+func load_room(r, from) {
+  room = r;
+  nn = 0;
+  for (var y = 0; y < 8; y++) {
+    var s = peek(maprows + (r * 8 + y) * 2);
+    for (var x = 0; x < 10; x++) {
+      var c = peek8(s + x);
+      if (c == 'A' && (fl & F_SAFE)) { c = 'a'; }
+      else if (c == 'Q' && (fl & F_GEAR)) { c = 'q'; }
+      else if (c == 'C' && (fl & F_CLKKEY)) { c = 'c'; }
+      else if (c == 'Z' && (fl & F_BOX)) { c = 'z'; }
+      rg[y * 10 + x] = c;
+      if (c == 'O' || c == 'V' || c == 'R' || c == 'M') { nx[nn] = x * 16; ny[nn] = y * 16; nk[nn] = c; nn++; }
+    }
+  }
+  if (from >= 0) {             // arrive at the door we came through, one block inside
+    for (var i = 0; i < 80; i++) {
+      if (rg[i] == '0' + from) {
+        var cx = i % 10; var cy = i / 10;
+        var px = cx * 16; var py = cy * 16;
+        if (cx == 0) { px += 16; } else if (cx == 9) { px -= 16; } else if (cy == 0) { py += 16; } else { py -= 16; }
+        hx = px * 4; hy = py * 4;
+        face = (cx == 0) ? 3 : ((cx == 9) ? 2 : ((cy == 0) ? 0 : 1));
+      }
+    }
+  }
+  cat_x = 40; cat_y = 100; cat_dir = 1; cat_t = 0;
+}
+func room_name(r) {
+  if (r == 0) { return "GRAND HALL"; }
+  if (r == 1) { return "THE STUDY"; }
+  if (r == 2) { return "THE LIBRARY"; }
+  if (r == 3) { return "THE KITCHEN"; }
+  if (r == 4) { return "CLOCK ROOM"; }
+  return "THE ATTIC";
+}
+
+// ---------------------------------------------------------------- the HUD (window layer)
+func hud_blank(row) { for (var c = 0; c < 20; c++) { set_wcell(c, row, 6 << 12); } }
+func hud_draw() {
+  hud_blank(0); hud_blank(1);
+  var c = 1;
+  if ((fl & F_RUG) && !(fl & F_DRAWER)) { set_wcell(c, 0, (T + art_ic_key1) | (7 << 12)); c += 2; }
+  if ((fl & F_SAFE) && !(fl & F_LIBOPEN)) { set_wcell(c, 0, (T + art_ic_key2) | (7 << 12)); c += 2; }
+  if ((fl & F_GEAR) && !(fl & F_GEARSET)) { set_wcell(c, 0, (T + art_ic_gear) | (7 << 12)); c += 2; }
+  if ((fl & F_CLKKEY) && !(fl & F_CLKOPEN)) { set_wcell(c, 0, (T + art_ic_key3) | (7 << 12)); c += 2; }
+  if ((fl & F_BOX)) { set_wcell(c, 0, (T + art_ic_box) | (7 << 12)); c += 2; }
+  set_wcell(13, 0, (T + art_ic_book) | (7 << 12));
+  text_pal = 6;
+  wprint_u(15, 0, nclues());
+  wtext(16, 0, "/8");
+  wtext(1, 1, room_name(room));
+  if (note_t > 0) { wtext(13, 1, "+CLUE!"); }
+  text_pal = 0;
+  hud_dirty = 0;
+}
+
+// ---------------------------------------------------------------- dialogue
+func dcell(c, r, v) { set_cell(c, r, v | (6 << 12) | CELL_PRIO); }
+func dlabel(n) {
+  for (var c = 1; c < 19; c++) { dcell(c, db, T + art_bx_h); }
+  if (n > 0) {
+    var s = names[n];
+    dcell(2, db, 0);
+    var i = 0;
+    while (peek8(s + i) != 0) { dcell(3 + i, db, font_base + peek8(s + i) - 32); i++; }
+    dcell(3 + i, db, 0);
+  }
+}
+func dclear_text() { for (var r = db + 1; r < db + 5; r++) { for (var c = 1; c < 19; c++) { dcell(c, r, 0); } } }
+func dbox() {
+  dlabel(0);
+  for (var c = 1; c < 19; c++) { dcell(c, db + 5, (T + art_bx_h) | CELL_FLIPY); }
+  for (var r = db + 1; r < db + 5; r++) { dcell(0, r, T + art_bx_v); dcell(19, r, (T + art_bx_v) | CELL_FLIPX); }
+  dcell(0, db, T + art_bx_c); dcell(19, db, (T + art_bx_c) | CELL_FLIPX);
+  dcell(0, db + 5, (T + art_bx_c) | CELL_FLIPY); dcell(19, db + 5, (T + art_bx_c) | CELL_FLIPX | CELL_FLIPY);
+  dclear_text();
+}
+func say(n, s) {
+  db = 10;
+  if (state == S_PLAY && (hy >> 2) >= 56) { db = 0; }       // the box goes to the top when the hero is in the lower half
+  dlg_open = 1; dlg_s = s; dlg_i = 0; dlg_c = 1; dlg_r = db + 1; dlg_wait = 0; dlg_t = 0;
+  dbox();
+  dlabel(n);
+}
+func dlg_close() {
+  dlg_open = 0;
+  if (state == S_PLAY) { var b0 = (db == 0) ? 0 : 5; for (var by = b0; by < b0 + 3; by++) { for (var bx = 0; bx < 10; bx++) { put_block(bx, by); } } }
+  else { fill_cells(0, 10, 20, 6, 0); }
+  if (state == S_ACCUSE) { accuse_draw(); }
+  if (dlg_after == 1) { dlg_after = 0; go(S_END, 0, 0); }
+}
+func dlg_tick() {
+  select_bank(bankof(story));
+  if (dlg_wait) {
+    dcell(18, db + 4, blink(frames(), 16) ? (T + art_arrow) : 0);
+    if (btnp(BTN_A) || btnp(BTN_B)) {
+      sfx_play(SFX_SELECT);
+      if (dlg_wait == 2) { dlg_close(); return; }
+      dlg_wait = 0; dlg_c = 1; dlg_r = db + 1; dclear_text();
+    }
+    return;
+  }
+  var n = 1;
+  if (btn(BTN_A)) { n = 3; } else { dlg_t++; if (dlg_t < 2) { return; } dlg_t = 0; }
+  for (var k = 0; k < n; k++) {
+    var c = peek8(story + dlg_s + dlg_i);
+    if (c == 0) { dlg_wait = 2; return; }
+    dlg_i++;
+    if (c == '\n') { dlg_c = 1; dlg_r++; }
+    else if (c == '|') { dlg_wait = 1; return; }
+    else if (c == '@') { dlabel(peek8(story + dlg_s + dlg_i) - '0'); dlg_i++; }
+    else if (c == ' ') {
+      if (dlg_c > 1) {
+        var len = 0;
+        var ch = peek8(story + dlg_s + dlg_i);
+        while (ch > 32 && ch != '|') { len++; ch = peek8(story + dlg_s + dlg_i + len); }
+        if (dlg_c + len > 18) { dlg_c = 1; dlg_r++; } else { dlg_c++; }
+      }
+    }
+    else {
+      dcell(dlg_c, dlg_r, font_base + c - 32);
+      dlg_c++;
+      if ((dlg_i & 1) == 0) { sfx_tone(1, 700 + (dlg_i & 7) * 40, 4, 2, 2); }
+    }
+    if (dlg_r > db + 4) { dlg_wait = 1; return; }
+  }
+}
+
+// ---------------------------------------------------------------- screen changes (always through a fade)
+func go(s, r, from) {
+  if (pk) { return; }
+  pk = 1; ts = s; troom = r; tfrom = from; pstage = 0;
+  fade_to(0, 3);
+}
+func theme_of_state(s, r) { return (s == S_PLAY) ? r : 6; }
+func run_pending() {
+  if (pstage == 0) {
+    state = ts;
+    hide_all_sprites();
+    set_theme(theme_of_state(ts, troom));
+    scroll(0, 0);
+    text_pal = 0;
+    clear_bg();
+    if (ts == S_PLAY) {
+      lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+      window_pos(0, 128);
+      load_room(troom, tfrom);
+      song_want = (troom >= 4) ? M_SPACE : M_HOUSE;
+    } else {
+      window_pos(0, 144);
+      lcd(LCD_BG | LCD_OBJ);
+      if (ts == S_TITLE) { song_want = M_TITLE; }
+      else if (ts == S_INTRO) { song_want = M_TITLE; }
+      else if (ts == S_ACCUSE) { sel = 0; song_want = M_BOSS; }
+      else if (ts == S_END) { song_want = M_END; }
+    }
+    pstage = 1;
+    return;
+  }
+  if (ts == S_PLAY && pstage < 4) {                  // draw the room in three slices so no frame is too heavy
+    var y0 = (pstage - 1) * 3;
+    var y1 = y0 + 3; if (y1 > 8) { y1 = 8; }
+    for (var y = y0; y < y1; y++) { for (var x = 0; x < 10; x++) { put_block(x, y); } }
+    if (pstage == 3) { hud_draw(); }
+    pstage++;
+    return;
+  }
+  if (pstage == 1 && ts != S_PLAY) {                  // stage 1: draw the new screen (kept apart from the heavy setup in stage 0)
+    if (ts == S_TITLE) { title_draw(); }
+    else if (ts == S_INTRO) { intro_draw(); }
+    else if (ts == S_LOCK) { lock_draw(); }
+    else if (ts == S_NOTE) { note_draw(); }
+    else if (ts == S_PAUSE) { pause_draw(); }
+    else if (ts == S_ACCUSE) { accuse_draw(); }
+    else if (ts == S_END) { end_draw(); }
+    pstage = 2;
+    return;
+  }
+  if (song_want != 0 && song_want != song_now) { play_music(song_want); }
+  pk = 0;
+  fade_to(4, 3);
+}
+
+// ---------------------------------------------------------------- the lock screen (one screen for every puzzle)
+btable lk_n = { 3, 4, 3, 2, 3 };
+btable lk_kind = { 0, 1, 2, 3, 0 };          // 0 digits, 1 colours, 2 letters, 3 clock
+btable lk_ans = { 7, 3, 2, 0,   0, 1, 2, 3,   15, 8, 4, 0,   8, 5, 0, 0,   2, 3, 7, 0 };
+table lk_title = { "WALL SAFE", "THE ODD BOOKS", "PANTRY LOCK", "THE GREAT CLOCK", "OLD TRUNK" };
+table lk_hint = {
+  "THE LETTER SAID:", "SEA, MOON, CATS.",
+  "THE FRAME SAID:", "ALWAYS IN ORDER.",
+  "THE CARD SAID:", "CRUST, SWEET HEART.",
+  "SET THE TIME THE", "BOX WAS MOVED.",
+  "SAME NUMBERS AS", "THE SAFE, REVERSED."
+};
+table col_names = { "RED", "YEL", "GRN", "BLU" };
+table min_names = { "00", "10", "20", "30", "40", "50" };
+func lk_size(slot) {
+  var k = lk_kind[lk_id];
+  if (k == 0) { return 10; }
+  if (k == 1) { return 4; }
+  if (k == 2) { return 26; }
+  return slot == 0 ? 12 : 6;
+}
+func lk_sym(slot) {
+  var k = lk_kind[lk_id];
+  var v = lk_val[slot];
+  if (k == 0) { return utoa(v); }
+  if (k == 1) { return col_names[v]; }
+  if (k == 2) { poke8(onech, 65 + v); poke8(onech + 1, 0); return onech; }
+  if (slot == 0) { return utoa(v + 1); }
+  return min_names[v];
+}
+func lk_col(slot) { return (20 - lk_n[lk_id] * 4) / 2 + slot * 4; }
+func lk_slots() {
+  fill_cells(0, 7, 20, 3, 0);
+  for (var i = 0; i < lk_n[lk_id]; i++) {
+    text(lk_col(i), 8, lk_sym(i));
+    if (i == lk_cur) { text(lk_col(i), 7, "^"); text(lk_col(i), 9, "v"); }
+  }
+}
+func lock_open(id) {
+  lk_id = id; lk_cur = 0; lk_rep = 0; lk_msg = 0;
+  for (var i = 0; i < 4; i++) { lk_val[i] = (lk_kind[id] == 2) ? 12 : 0; }
+  go(S_LOCK, room, -2);
+}
+func lock_draw() {
+  text(2, 1, lk_title[lk_id]);
+  text(1, 3, lk_hint[lk_id * 2]);
+  text(1, 4, lk_hint[lk_id * 2 + 1]);
+  text(2, 12, "UP DOWN: CHANGE");
+  text(2, 13, "LEFT RIGHT: PICK");
+  text(2, 14, "A: TRY  B: BACK");
+  lk_slots();
+}
+func lock_solved() {
+  var id = lk_id;
+  if (id == L_SAFE) { give(F_SAFE); post_n = 0; post_s = S_T59; }
+  else if (id == L_BOOK) { give(F_GEAR); post_n = 0; post_s = S_T60; }
+  else if (id == L_PIE) { give(F_CLKKEY); post_n = 0; post_s = S_T61; }
+  else if (id == L_TIME) { give(F_STAIRS); post_n = 0; post_s = S_T62; }
+  else { give(F_BOX); sfx_play(SFX_WIN); post_n = 0; post_s = S_T63; }
+  go(S_PLAY, room, -2);
+}
+func lock_try() {
+  var ok = 1;
+  for (var i = 0; i < lk_n[lk_id]; i++) { if (lk_val[i] != lk_ans[lk_id * 4 + i]) { ok = 0; } }
+  if (ok) { lock_solved(); }
+  else { sfx_play(SFX_HIT); text(2, 11, "NOTHING HAPPENS..."); lk_msg = 70; }
+}
+func lock_tick() {
+  if (btnp(BTN_B)) { sfx_play(SFX_BACK); go(S_PLAY, room, -2); return; }
+  if (btnp(BTN_A)) { lock_try(); return; }
+  var n = lk_n[lk_id];
+  if (btnp(BTN_RIGHT)) { lk_cur = (lk_cur + 1) % n; sfx_play(SFX_SELECT); lk_slots(); }
+  if (btnp(BTN_LEFT)) { lk_cur = (lk_cur + n - 1) % n; sfx_play(SFX_SELECT); lk_slots(); }
+  var d = 0;
+  if (btn(BTN_UP)) { d = 1; } else if (btn(BTN_DOWN)) { d = -1; }
+  if (d == 0) { lk_rep = 0; }
+  else {
+    lk_rep++;
+    if (lk_rep == 1 || (lk_rep > 16 && (lk_rep % 5) == 0)) {
+      var sz = lk_size(lk_cur);
+      lk_val[lk_cur] = (lk_val[lk_cur] + d + sz) % sz;
+      sfx_tone(1, 500 + lk_val[lk_cur] * 30, 6, 2, 2);
+      lk_slots();
+    }
+  }
+  if (lk_msg > 0) { lk_msg--; if (lk_msg == 0) { fill_cells(0, 11, 20, 1, 0); } }
+}
+
+// ---------------------------------------------------------------- notebook, pause, goals
+table clue_txt = {
+  "SAFE=SEA,MOON,CATS", "INK PRINTS ON CASE", "BOX MOVED AT 9:50", "PIM: PIE OUT 9:50",
+  "VALE PLAYED CHESS", "ROOK WAS ALONE", "ROOK: INKY HANDS", "ROOK: ITS VALUE?"
+};
+func step() {
+  if (!(fl & F_INTRO)) { return 0; }
+  if (!(fl & F_RUG)) { return 1; }
+  if (!(fl & F_DRAWER)) { return 2; }
+  if (!(fl & F_SAFE)) { return 3; }
+  if (!(fl & F_LIBOPEN)) { return 4; }
+  if (!(fl & F_GEAR)) { return 5; }
+  if (!(fl & F_CLKKEY)) { return 6; }
+  if (!(fl & F_CLKOPEN)) { return 7; }
+  if (!(fl & F_STAIRS)) { return 8; }
+  if (!(fl & F_BOX)) { return 9; }
+  if (!(fl & F_DONE)) { return 10; }
+  return 11;
+}
+table goals = {
+  "TALK TO ODILE\nIN THE HALL.", "SEARCH THE STUDY\n(WEST DOOR).", "THE STUDY DESK HAS\nA LOCKED DRAWER.",
+  "OPEN THE WALL SAFE\nIN THE STUDY.", "TRY THE LIBRARY\nDOOR (EAST).", "SOLVE THE SHELF\nIN THE LIBRARY.",
+  "THE KITCHEN HAS A\nLOCKED CUPBOARD.", "OPEN THE CLOCK\nROOM (NORTH).", "FIX THE CLOCK. SET\nTHE RIGHT TIME.",
+  "CLIMB THE STAIRS.\nOPEN THE TRUNK.", "GATHER PROOF, THEN\nTELL ODILE: WHO?", "CASE CLOSED!"
+};
+func note_draw() {
+  text(1, 0, "NOTEBOOK");
+  text(12, 0, "CLUES");
+  print_u(18, 0, nclues());
+  for (var i = 0; i < 8; i++) {
+    if (cl & (1 << i)) { set_cell(0, 2 + i, (T + art_note_dot) | (6 << 12)); text(2, 2 + i, clue_txt[i]); }
+    else { text(2, 2 + i, "? ? ?"); }
+  }
+  text(1, 11, "GOAL:");
+  text(1, 12, goals[step()]);
+  text(1, 15, "B: BACK");
+}
+func pause_draw() {
+  text(7, 1, "PAUSED");
+  text(1, 4, "YOUR GOAL:");
+  text(1, 5, goals[step()]);
+  text(1, 8, "D-PAD  WALK");
+  text(1, 9, "A      LOOK, TALK");
+  text(1, 10, "SELECT NOTEBOOK");
+  text(1, 11, "B      BACK");
+  text(1, 14, "START: CONTINUE");
+  text(1, 15, "B: QUIT TO TITLE");
+}
+
+// ---------------------------------------------------------------- title, intro, accusation, ending
+table intro_pages = {
+  "A STORM NIGHT AT\nLARKSPUR HOUSE.\n\nAUNT ODILE'S MUSIC\nBOX, THE SILVER\nNIGHTINGALE, HAS\nVANISHED FROM HER\nSTUDY.",
+  "THE POWER IS OUT\nAND HER OLD PUZZLE\nLOCKS HAVE ALL\nCLICKED SHUT.\n\nTHREE GUESTS ARE\nIN THE HOUSE:\nMRS. PIM, CAPTAIN\nVALE AND DR. ROOK.",
+  "ONE OF THEM TOOK\nIT. SEARCH THE\nROOMS, CRACK THE\nLOCKS, AND FIND\nPROOF. NOT HUNCHES.\n\nYOU ARE THE\nDETECTIVE.",
+  "HOW TO PLAY\n\nD-PAD   WALK\nA       LOOK, TALK\nSELECT  NOTEBOOK\nSTART   PAUSE, GOAL\nB       BACK\n\nTHERE IS NO TIMER\nAND NO GAME OVER."
+};
+func title_draw() {
+  for (var c = 0; c < 20; c++) {
+    for (var r = 10; r < 14; r++) { set_cell(c, r, (T + art_sil) | (5 << 12)); }
+    set_cell(c, 9, (T + art_sil) | (5 << 12));
+  }
+  set_cell(1, 9, (T + art_sil_roofl) | (5 << 12)); set_cell(0, 9, 0);
+  set_cell(18, 9, (T + art_sil_roofr) | (5 << 12)); set_cell(19, 9, 0);
+  for (var r = 6; r < 9; r++) { for (var c = 8; c < 12; c++) { set_cell(c, r, (T + art_sil) | (5 << 12)); } }
+  set_cell(9, 5, (T + art_sil_tower) | (5 << 12)); set_cell(10, 5, (T + art_sil_tower) | (5 << 12));
+  set_cell(8, 5, 0); set_cell(11, 5, 0);
+  set_cell(9, 7, (T + art_sil_win) | (5 << 12)); set_cell(10, 7, (T + art_sil_win) | (5 << 12));
+  set_cell(3, 11, (T + art_sil_win) | (5 << 12)); set_cell(6, 11, (T + art_sil_win) | (5 << 12));
+  set_cell(13, 11, (T + art_sil_win) | (5 << 12)); set_cell(16, 11, (T + art_sil_win) | (5 << 12));
+  set_cell(9, 12, (T + art_sil_win) | (5 << 12));
+  text(4, 1, "THE MIDNIGHT");
+  text(4, 2, "NIGHTINGALE");
+  text(1, 3, "A LARKSPUR MYSTERY");
+  menu_draw();
+  if (best != 0) { text(0, 17, "BEST:"); text(5, 17, rank_name(best - 1)); }
+}
+func menu_draw() {
+  fill_cells(0, 14, 20, 2, 0);
+  text(2, 14, "NEW GAME");
+  if (has_save) { text(2, 15, "CONTINUE"); }
+  text(0, 14 + menu_i, ">");
+}
+func rank_name(w) {
+  if (w == 0) { return "GRAND DETECTIVE"; }
+  if (w == 1) { return "SHARP SLEUTH"; }
+  if (w == 2) { return "GOOD SLEUTH"; }
+  return "KEEN MIND";
+}
+func intro_draw() {
+  text(1, 2, intro_pages[intro_p]);
+  text(1, 16, "A: NEXT");
+}
+func accuse_draw() {
+  fill_cells(0, 0, 20, 10, 0);
+  fill_cells(0, 10, 20, 6, 0);
+  text(1, 1, "THE NIGHTINGALE IS");
+  text(1, 2, "SAFE. BUT WHO TOOK");
+  text(1, 3, "IT?");
+  text(2, 8, "PIM");
+  text(8, 8, "VALE");
+  text(14, 8, "ROOK");
+  text(1 + sel * 6, 8, ">");
+  text(1, 12, "LEFT RIGHT: CHOOSE");
+  text(1, 13, "A: ACCUSE");
+  text(1, 14, "SELECT: NOTEBOOK");
+}
+func end_draw() {
+  text(4, 1, "CASE CLOSED!");
+  text(2, 3, "THE NIGHTINGALE");
+  text(2, 4, "SINGS AGAIN.");
+  text(2, 7, "RANK");
+  text(2, 8, rank_name(wrong));
+  text(2, 10, "WRONG GUESSES");
+  print_u(16, 10, wrong);
+  text(2, 11, "CLUES FOUND");
+  print_u(16, 11, nclues());
+  text(2, 12, "MINUTES");
+  print_u(16, 12, play_m);
+  text(2, 15, "PRESS START");
+  if (best == 0 || wrong + 1 < best) { best = wrong + 1; }
+  fl |= F_DONE;
+  save_pending = 1;
+}
+
+// ---------------------------------------------------------------- talking to things
+func hall_use(c) {
+  if (c == 'O') {
+    if (!(fl & F_INTRO)) { give(F_INTRO); say(1, S_T00); }
+    else if ((fl & F_BOX) && !(fl & F_DONE)) {
+      if ((cl & NEED) == NEED) { say(1, S_T01); dlg_after = 2; }
+      else { say(1, S_T02); }
+    }
+    else if (fl & F_DONE) { say(1, S_T03); }
+    else { say(1, hints[step()]); }
+  }
+  else if (c == 'V') {
+    if (!(tk & K_VALE)) { tk |= K_VALE; save_pending = 1; say(2, S_T04); }
+    else { say(2, S_T05); }
+  }
+  else if (c == 'H') { clue(C_CHESS); say(0, S_T06); }
+  else if (c == 'F') { say(0, S_T07); }
+  else if (c == 'P') { say(0, S_T08); }
+  else if (c == 'T') { say(0, S_T09); }
+  else if (c == 'U') { say(0, S_T10); }
+  else if (c == 'p') { say(0, S_T11); }
+}
+func study_use(c) {
+  if (c == 'r') {
+    if (!(fl & F_RUG)) { give(F_RUG); say(0, S_T12); }
+    else { say(0, S_T13); }
+  }
+  else if (c == 'D') {
+    if (!(fl & F_RUG)) { say(0, S_T14); }
+    else if (!(fl & F_DRAWER)) { give(F_DRAWER); clue(C_LETTER); say(0, S_T15); }
+    else { say(0, S_T16); }
+  }
+  else if (c == 'S') { say(0, S_T17); }
+  else if (c == 'm') { say(0, S_T18); }
+  else if (c == 'K') { say(0, S_T19); }
+  else if (c == 'A') {
+    if (!(cl & C_LETTER)) { say(0, S_T20); }
+    else { lock_open(L_SAFE); }
+  }
+  else if (c == 'a') { say(0, S_T21); }
+  else if (c == 'E') {
+    clue(C_INK); clue(C_TIME);
+    say(0, S_T22);
+  }
+  else if (c == 'B') { say(0, S_T23); }
+  else if (c == 'p') { say(0, S_T24); }
+}
+func library_use(c) {
+  if (c == 'R') {
+    if (!(tk & K_ROOK)) { tk |= K_ROOK; clue(C_ALONE); clue(C_ROOKINK); save_pending = 1; say(4, S_T25); }
+    else { say(4, S_T26); }
+  }
+  else if (c == 'Q') { lock_open(L_BOOK); }
+  else if (c == 'q') { say(0, S_T27); }
+  else if (c == 'Y') { say(0, S_T28); }
+  else if (c == 'L') { say(0, S_T29); }
+  else if (c == 'p') { say(0, S_T30); }
+}
+func kitchen_use(c) {
+  if (c == 'M') {
+    if (!(tk & K_PIM)) { tk |= K_PIM; save_pending = 1; say(3, S_T31); }
+    else { say(3, S_T32); }
+  }
+  else if (c == 'I') { clue(C_PIE); say(0, S_T33); }
+  else if (c == 't') { tk |= K_CARD; save_pending = 1; say(0, S_T34); }
+  else if (c == 'C') {
+    if (!(tk & K_CARD)) { say(0, S_T35); }
+    else { lock_open(L_PIE); }
+  }
+  else if (c == 'c') { say(0, S_T36); }
+  else if (c == 'N') { say(0, S_T37); }
+  else if (c == 'k') { say(0, S_T38); }
+  else if (c == 'b') { say(0, S_T39); }
+}
+func clock_use(c) {
+  if (c == 'X') {
+    if (!(fl & F_GEARSET)) {
+      if (fl & F_GEAR) { give(F_GEARSET); say(0, S_T40); }
+      else { say(0, S_T41); }
+    }
+    else if (!(fl & F_STAIRS)) { lock_open(L_TIME); }
+    else { say(0, S_T42); }
+  }
+  else if (c == 'x') { say(0, S_T43); }
+  else if (c == 'G') { say(0, S_T44); }
+  else if (c == 'W') { clue(C_DIARY); say(0, S_T45); }
+}
+func attic_use(c) {
+  if (c == 'Z') { lock_open(L_TRUNK); }
+  else if (c == 'z') { say(0, S_T46); }
+  else if (c == 'o') { say(0, S_T47); }
+  else if (c == 'd') { say(0, S_T48); }
+  else if (c == 'h') { say(0, S_T49); }
+  else if (c == 'y') { say(0, S_T50); }
+}
+func door_bump(c) {
+  var d = c - '0';
+  if (bump_t > 0) { return; }
+  bump_t = 90;
+  if (room == 0 && d == 2) {
+    if (fl & F_SAFE) { give(F_LIBOPEN); put_block(hbx, hby); say(0, S_T51); }
+    else { say(0, S_T52); }
+  }
+  else if (room == 0 && d == 4) {
+    if (fl & F_CLKKEY) { give(F_CLKOPEN); put_block(hbx, hby); say(0, S_T53); }
+    else { say(0, S_T54); }
+  }
+}
+func use_char(c) {
+  if (is_door(c)) { door_bump(c); return; }
+  if (room == 0) { hall_use(c); }
+  else if (room == 1) { study_use(c); }
+  else if (room == 2) { library_use(c); }
+  else if (room == 3) { kitchen_use(c); }
+  else if (room == 4) { clock_use(c); }
+  else { attic_use(c); }
+}
+func do_interact() {
+  var px = hx >> 2; var py = hy >> 2;
+  var x = px + 8; var y = py + 12;
+  if (face == 0) { y = py + 19; } else if (face == 1) { y = py + 5; } else if (face == 2) { x = px; } else { x = px + 16; }
+  var c = cell_at(x, y);
+  if (room == 0 && abs(px - cat_x) < 18 && abs(py - cat_y) < 14 && (c == '.' || c == ',')) {
+    tk |= K_CAT;
+    sfx_tone(1, 900, 6, 2, 4);
+    say(0, S_T55);
+    return;
+  }
+  if (c == '.' || c == ',' || c == '#' || c == 'w') { sfx_tone(3, 700, 3, 0, 3); return; }
+  use_char(c);
+}
+
+// ---------------------------------------------------------------- walking around
+func move_hero() {
+  var dx = btn(BTN_RIGHT) - btn(BTN_LEFT);
+  var dy = btn(BTN_DOWN) - btn(BTN_UP);
+  moving = (dx != 0 || dy != 0);
+  if (dy != 0) { face = dy > 0 ? 0 : 1; }
+  if (dx != 0) { face = dx > 0 ? 3 : 2; }
+  if (dx != 0) {
+    var nxp = hx + dx * 6;
+    var h = hit_char(nxp >> 2, hy >> 2);
+    if (h == 0) { hx = nxp; } else if (is_door(h)) { door_bump(h); }
+  }
+  if (dy != 0) {
+    var nyp = hy + dy * 6;
+    var h2 = hit_char(hx >> 2, nyp >> 2);
+    if (h2 == 0) { hy = nyp; } else if (is_door(h2)) { door_bump(h2); }
+  }
+  if (moving) {
+    wstep++;
+    if ((wstep & 15) == 0) { sfx_tone(3, 1500, 2, 0, 2); }
+  }
+  // stepping into an open doorway changes the room
+  var c = cell_at((hx >> 2) + 8, (hy >> 2) + 12);
+  if (is_door(c) && !solid_char(c)) {
+    sfx_play(SFX_BACK);
+    go(S_PLAY, c - '0', room);
+  }
+}
+func vis(y) {                    // is a sprite at y clear of the dialogue box?
+  if (!dlg_open) { return 1; }
+  if (db == 0) { return y >= 48; }
+  return y <= 64;
+}
+func draw_play() {
+  spr_begin(0);
+  var px = hx >> 2; var py = hy >> 2;
+  var t = T + art_hero_d_0;
+  var at = 0;
+  if (face == 1) { t = T + art_hero_u_0; }
+  else if (face == 2) { t = T + art_hero_s_0; at = SPR_FLIPX; }
+  else if (face == 3) { t = T + art_hero_s_0; }
+  if (moving && ((wstep >> 3) & 1)) { t += 4; }
+  if (vis(py)) { spr(px, py, t, SPR_16X16 | at); }
+  for (var i = 0; i < nn; i++) {
+    var k = nk[i];
+    var tile = T + art_odile_0; var pal = 1;
+    if (k == 'V') { tile = T + art_vale_0; pal = 2; }
+    else if (k == 'M') { tile = T + art_pim_0; pal = 3; }
+    else if (k == 'R') { tile = T + art_rook_0; pal = 4; }
+    if ((frames() >> 5) & 1) { tile += 4; }
+    if (vis(ny[i])) { spr(nx[i], ny[i], tile, SPR_16X16 | pal); }
+  }
+  if (room == 0 && vis(cat_y)) { spr(cat_x, cat_y, T + art_cat_0 + (cat_f ? 4 : 0), SPR_16X16 | 5 | (cat_dir < 0 ? SPR_FLIPX : 0)); }
+  spr_end();
+}
+func cat_update() {
+  if (cat_t > 0) { cat_t--; return; }
+  if (rand(60) == 0) { cat_t = 40 + rand(80); return; }
+  cat_x += cat_dir;
+  if ((frames() & 7) == 0) { cat_f = !cat_f; }
+  if (cat_x > 112) { cat_dir = -1; } else if (cat_x < 24) { cat_dir = 1; }
+  if (rand(300) == 0) { cat_dir = -cat_dir; }
+}
+func anim_tick() {
+  if ((frames() % 14) == 0 && !dlg_open) {
+    ph = !ph;
+    if (room == 0 || room == 4) {
+      for (var i = 0; i < 80; i++) { if (rg[i] == 'F' || rg[i] == 'x') { put_block(i % 10, i / 10); } }
+    }
+  }
+  if (thunder_t > 0) {
+    thunder_t--;
+    if (thunder_t == 0) { thunder_t = 1500 + rand(1500); sfx_tone(3, 160, 9, 0, 30); shake_t = 12; }
+  }
+}
+func play_frame() {
+  if (bump_t > 0) { bump_t--; }
+  if (note_t > 0) { note_t--; if (note_t == 0) { hud_dirty = 1; } }
+  if (hud_dirty && !dlg_open) { hud_draw(); }
+  anim_tick();
+  if (shake_t > 0) { shake_t--; scroll((shake_t & 2) ? 2 : -1, 0); if (shake_t == 0) { scroll(0, 0); } }
+  if (room == 0) { cat_update(); }
+  if (dlg_open) { dlg_tick(); moving = 0; }
+  else {
+    play_t++;
+    if (play_t >= 3600) { play_t = 0; play_m++; }
+    move_hero();
+    if (btnp(BTN_A)) { do_interact(); }
+    else if (btnp(BTN_START)) { sfx_play(SFX_PAUSE); go(S_PAUSE, room, -2); }
+    else if (btnp(BTN_SELECT)) { sfx_play(SFX_PAUSE); go(S_NOTE, room, -2); }
+  }
+  if (dlg_after == 2 && !dlg_open) { dlg_after = 0; go(S_ACCUSE, 0, 0); }
+  draw_play();
+}
+
+// ---------------------------------------------------------------- the other screens' updates
+btable star_x = { 10, 34, 52, 100, 146, 70 };
+btable star_y = { 44, 62, 38, 56, 90, 92 };
+func title_frame() {
+  spr_begin(0);
+  spr(122, 40, T + art_moon, SPR_32X32 | 7);
+  for (var i = 0; i < 6; i++) {
+    var sx = peek8(star_x + i); var sy = peek8(star_y + i);
+    var twinkle = (((frames() >> 4) + i) & 3) == 0;
+    spr(sx, sy, T + (twinkle ? art_star2 : art_star), 6);
+  }
+  spr_end();
+  var go_on = 0;
+  if (has_save && (btnp(BTN_UP) || btnp(BTN_DOWN))) { newconf = 0; fill_cells(0, 16, 20, 1, 0); menu_i = !menu_i; sfx_play(SFX_SELECT); menu_draw(); }
+  if (newconf && btnp(BTN_B)) { newconf = 0; fill_cells(0, 16, 20, 1, 0); sfx_play(SFX_BACK); return; }
+  if (btnp(BTN_START) || btnp(BTN_A)) {
+    srand(frames(), 0x1D2B);
+    if (menu_i == 0 && has_save && !newconf && !(fl & F_DONE)) { newconf = 1; sfx_play(SFX_HIT); text(0, 16, "ERASE SAVE? A:Y B:N"); return; }
+    newconf = 0;
+    if (menu_i == 0) { new_game(); intro_p = 0; sfx_play(SFX_POWER); go(S_INTRO, 0, 0); }
+    else { sfx_play(SFX_POWER); room = 0; face = 0; hx = 64 * 4; hy = 80 * 4; go(S_PLAY, 0, -1); }
+  }
+}
+func intro_frame() {
+  spr_begin(0);
+  spr(124, 100, T + art_moon, SPR_32X32 | 7);
+  spr_end();
+  if (btnp(BTN_A) || btnp(BTN_START)) {
+    sfx_play(SFX_SELECT);
+    intro_p++;
+    if (intro_p >= 4) { room = 0; face = 0; hx = 64 * 4; hy = 80 * 4; go(S_PLAY, 0, -1); }
+    else { fill_cells(0, 0, 20, 16, 0); intro_draw(); }
+  }
+}
+func accuse_frame() {
+  spr_begin(0);
+  spr(16, 48, T + art_pim_0 + (((frames() >> 5) & 1) * 4), SPR_16X16 | 3);
+  spr(68, 48, T + art_vale_0 + (((frames() >> 5) & 1) * 4), SPR_16X16 | 2);
+  spr(120, 48, T + art_rook_0 + (((frames() >> 5) & 1) * 4), SPR_16X16 | 4);
+  spr_end();
+  if (dlg_open) { dlg_tick(); return; }
+  if (btnp(BTN_LEFT) && sel > 0) { sel--; sfx_play(SFX_SELECT); accuse_draw(); }
+  if (btnp(BTN_RIGHT) && sel < 2) { sel++; sfx_play(SFX_SELECT); accuse_draw(); }
+  if (btnp(BTN_SELECT)) { sfx_play(SFX_PAUSE); go(S_NOTE, room, -3); }
+  if (btnp(BTN_A)) {
+    if (sel == 0) { wrong++; save_pending = 1; sfx_play(SFX_HIT); say(1, S_T56); }
+    else if (sel == 1) { wrong++; save_pending = 1; sfx_play(SFX_HIT); say(1, S_T57); }
+    else {
+      sfx_play(SFX_WIN);
+      dlg_after = 1;
+      say(4, S_T58);
+    }
+  }
+}
+func end_frame() {
+  spr_begin(0);
+  spr(122, 10 + ((frames() >> 6) & 1), T + art_moon, SPR_32X32 | 7);
+  spr(16 + (frames() >> 1) % 100, 44, T + art_star, 6);
+  spr_end();
+  if (btnp(BTN_START)) { sfx_play(SFX_SELECT); has_save = 1; menu_i = 0; go(S_TITLE, 0, 0); }
+}
+
+func init() {
+  load_font(0);
+  select_bank(bankof(art));
+  load_tiles(art, T, art_COUNT);
+  bg_pal(1, 0x643, 0xB84, 0x742, 0x210);
+  bg_pal(2, 0x643, 0xEC9, 0xB33, 0x512);
+  bg_pal(3, 0x643, 0xDDE, 0x89B, 0x224);
+  bg_pal(4, 0x643, 0xDD8, 0x5B5, 0x142);
+  bg_pal(5, 0x643, 0xFB3, 0x66C, 0x214);
+  bg_pal(6, 0x113, 0x67A, 0xABE, 0xFFD);
+  bg_pal(7, 0x113, 0xFC3, 0xBCE, 0xFFF);
+  obj_pal(0, 0, 0xFB8, 0x49A, 0x311);
+  obj_pal(1, 0, 0xFB8, 0x94B, 0x435);
+  obj_pal(2, 0, 0xFB8, 0xC33, 0x321);
+  obj_pal(3, 0, 0xFB8, 0x68E, 0x323);
+  obj_pal(4, 0, 0xFB8, 0x494, 0x221);
+  obj_pal(5, 0, 0xFFE, 0xD83, 0x321);
+  obj_pal(6, 0, 0xFF8, 0xFFF, 0x88A);
+  obj_pal(7, 0, 0xFFC, 0xBB9, 0x778);
+  hide_all_sprites();
+  master_volume(9);
+  load_game();
+  thunder_t = 900;
+  menu_i = has_save ? 1 : 0;
+  fade_save();
+  state = S_TITLE;
+  set_theme(6);
+  title_draw();
+  lcd(LCD_BG | LCD_OBJ);
+  window_pos(0, 144);
+  fade_to(4, 3);
+  play_music(M_TITLE);
+}
+
+func frame() {
+  music_update(); sfx_update(); fade_update();
+  if (pk) { if (!fade_busy()) { run_pending(); } return; }
+  if (state == S_PLAY) { play_frame(); }
+  else if (state == S_TITLE) { title_frame(); }
+  else if (state == S_INTRO) { intro_frame(); }
+  else if (state == S_LOCK) { lock_tick(); }
+  else if (state == S_NOTE) { if (btnp(BTN_B) || btnp(BTN_SELECT)) { sfx_play(SFX_BACK); if (tfrom == -3) { go(S_ACCUSE, 0, 0); } else { go(S_PLAY, room, -2); } } }
+  else if (state == S_PAUSE) {
+    if (btnp(BTN_START)) { sfx_play(SFX_PAUSE); go(S_PLAY, room, -2); }
+    else if (btnp(BTN_B)) { sfx_play(SFX_BACK); has_save = 1; menu_i = 1; go(S_TITLE, 0, 0); }
+    else if (btnp(BTN_SELECT)) { sfx_play(SFX_PAUSE); go(S_NOTE, room, -2); }
+  }
+  else if (state == S_ACCUSE) { accuse_frame(); }
+  else if (state == S_END) { end_frame(); }
+  if (save_pending && !fade_busy()) { save_pending = 0; save_game(); }
+}

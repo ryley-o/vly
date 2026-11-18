@@ -1,0 +1,19 @@
+group,part,qty,proto_usd,vol1k_usd,confidence,notes
+console,RP2350A microcontroller (QFN-60),1,1.20,0.95,verified,"list $0.80-1.10 official, $1.20 single at SparkFun, about $1.00 at 1k on LCSC. 520 KB RAM, PIO for the display, a second flash chip-select for the cartridge"
+console,Boot flash 2 MB QSPI (W25Q16 class),1,0.50,0.35,estimate,"firmware and menu only; games live on the cartridge"
+console,12 MHz crystal and load capacitors,1,0.40,0.20,estimate,
+console,"3.5in 480x320 TFT module, 2x pixels = 320x288 picture",1,9.00,6.00,unverified,"the biggest line and the least certain; get three quotes. 2.4in 320x240 modules were seen at $9-11 retail"
+console,6x6 tact switches and a rubber d-pad,8,1.00,0.40,estimate,
+console,PAM8302A class-D amplifier and 28 mm speaker,1,1.60,1.00,estimate,
+console,2 x AA cell holder with contacts,1,0.80,0.45,estimate,"cells (not included in the box) drop in through a door in the back; no lithium, so no battery shipping rules; the console does not charge NiMH"
+console,3.3 V boost converter for the cells,1,1.00,0.60,estimate,"2 AA cells give 1.8-3.2 V; the boost holds 3.3 V until the cells are flat"
+console,Power slide switch,1,0.30,0.15,estimate,"there is no USB port: firmware is programmed at the factory through test pads"
+console,8-pin cartridge connector (card edge or pogo),1,1.50,0.60,estimate,
+console,Main PCB 2-layer about 80 x 140 mm,1,3.00,1.50,estimate,"prototype price is per board in a batch of five"
+console,SMT assembly,1,0.00,2.50,estimate,"prototype boards are hand-built: dev board plus breakouts, see the kit list"
+console,Enclosure: 3D printed (prototype) or moulded (volume),1,1.60,1.00,estimate,"moulding needs tooling of roughly 8-15k USD; not before about 2000 units"
+cartridge,SPI NOR flash 16 Mbit (W25Q16 class),1,0.95,0.70,estimate,"2 MB: the first 1 MB is the game (the VLY-1 ROM limit), the top 64 KB holds the save; the 8 Mbit part was seen at $0.60-0.62 at 1k on LCSC, 16 Mbit is priced a little above it"
+cartridge,"PCB 1.0 mm 2-layer, 8 gold fingers (ENIG)",1,0.70,0.25,estimate,
+cartridge,100 nF capacitor,1,0.02,0.01,estimate,
+cartridge,Shell: 3D printed PLA about 8 g (prototype) or moulded,1,0.25,0.15,estimate,
+cartridge,Label sticker,1,0.10,0.05,estimate,

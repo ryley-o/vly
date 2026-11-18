@@ -1,0 +1,203 @@
+{
+  "name": "thies-world",
+  "entry": "src/main.vly",
+  "out": "build/thies-world.vlc",
+  "tests": [
+    {
+      "name": "title screen: the name in bricks, a parade along the grass",
+      "frames": 30,
+      "expect": {
+        "words": {
+          "state": 0,
+          "has_save": 0
+        },
+        "frameHash": "a37ebb4f168dcce90d7a4003a6d2bc7f008d6bd00b959fa7f036b9755754a3ea"
+      }
+    },
+    {
+      "name": "START builds a world over a few frames without ever overrunning, then play begins at home",
+      "frames": 70,
+      "input": "START@40",
+      "expect": {
+        "words": {
+          "state": 3,
+          "sel": 12,
+          "found": 3,
+          "tut": 0
+        },
+        "frameHash": "f0ffe0bb7eed6774af6858aaa6f519c406a204c161a5854411c0f0ac9dc5caf9",
+        "maxCycles": 90000
+      }
+    },
+    {
+      "name": "tap B builds ahead, tapping again stacks a wall three high, DOWN + tap lifts the hero onto a new block",
+      "frames": 130,
+      "input": "START@40, B@60, B@70, B@80, DOWN+B@100",
+      "expect": {
+        "words": {
+          "py": 144,
+          "ed_n": 4
+        },
+        "bytes": {
+          "world[641]": 12,
+          "world[577]": 12,
+          "world[513]": 12,
+          "world[640]": 12
+        },
+        "frameHash": "ea4c0c0bf6b61ae4e111fed4201061f98d94639811add53e854b44f4ef0ffb69"
+      }
+    },
+    {
+      "name": "holding B digs; the first grass dug is yours to build with from then on",
+      "frames": 150,
+      "input": "START@40, DOWN+B@70-90",
+      "expect": {
+        "words": {
+          "found": 4,
+          "unlocked": 4230
+        },
+        "bytes": {
+          "world[704]": 0
+        }
+      }
+    },
+    {
+      "name": "a build press held too long does not dig its own block back out",
+      "frames": 150,
+      "input": "START@40, B@60-140",
+      "expect": {
+        "bytes": {
+          "world[641]": 12
+        }
+      }
+    },
+    {
+      "name": "while B is held the D-pad aims in eight directions: DOWN+RIGHT digs the diagonal block, then the cursor carries on to the next one along the line",
+      "frames": 140,
+      "input": "START@40, DOWN+RIGHT+B@70-130",
+      "expect": {
+        "words": {
+          "px": 0,
+          "ed_n": 3
+        },
+        "bytes": {
+          "world[705]": 0,
+          "world[770]": 0,
+          "world[835]": 0
+        },
+        "frameHash": "0dd0a115f164c5baac771c2f2534fc1696838a632a8d037269c81c939ca9416a"
+      }
+    },
+    {
+      "name": "walking right opens the chest on the grass and it holds the next block you do not own yet",
+      "frames": 220,
+      "input": "START@40, RIGHT@60-200",
+      "expect": {
+        "words": {
+          "chest_open": 1,
+          "found": 4,
+          "unlocked": 4740,
+          "tut": 4
+        },
+        "frameHash": "c643bf37d065a6694cc412fb157f9523714cdde8b9e2728b6b585005a9a87a51"
+      }
+    },
+    {
+      "name": "SELECT moves to the next block you own",
+      "frames": 100,
+      "input": "START@40, SELECT@70, SELECT@80",
+      "expect": {
+        "words": {
+          "sel": 7
+        }
+      }
+    },
+    {
+      "name": "UP climbs a tree trunk through the leaves; the treetop holds the hero up",
+      "frames": 340,
+      "input": "START@40, RIGHT@60-190, UP@202-330",
+      "expect": {
+        "words": {
+          "py": 64,
+          "grounded": 1,
+          "climb": 0
+        },
+        "frameHash": "78cf0266c52afe3bd207cb0d944026696416cabf32c29d70c295c6971daa1687"
+      }
+    },
+    {
+      "name": "START pauses and saves; the save begins with the world's signature",
+      "frames": 120,
+      "input": "START@40, B@60, START@80",
+      "expect": {
+        "words": {
+          "state": 4
+        },
+        "saves": 2,
+        "saveWords": {
+          "0": 22356
+        },
+        "frameHash": "91e2759511a696f552ba37d40bb379266f419976d5a5feb81454f46cac7dd88b",
+        "maxCycles": 90000
+      }
+    },
+    {
+      "name": "a saved world comes back exactly: the wall, the lifted hero, the chosen block",
+      "save": "tests/built.sav",
+      "frames": 60,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 3,
+          "has_save": 1,
+          "py": 144,
+          "sel": 12,
+          "ed_n": 4
+        },
+        "bytes": {
+          "world[641]": 12,
+          "world[577]": 12,
+          "world[513]": 12,
+          "world[640]": 12
+        },
+        "frameHash": "1c5122183589c6ddbab741111862a4a642c25f0c29da13d0410ede9c7ab6d6b6",
+        "maxCycles": 90000
+      }
+    },
+    {
+      "name": "a long, messy session (walking, jumping, digging, building, pausing) never faults or overruns",
+      "frames": 4000,
+      "input": "START@40, RIGHT@60-600, A@100-3900/37, B@300-3900/53, LEFT@700-1400, DOWN+B@1500-1700, SELECT@900-3900/211, UP@1750-1900, RIGHT@1900-2800, START@2900, START@2960, LEFT@3000-3900, DOWN@3300-3400",
+      "expect": {
+        "words": {
+          "state": 3
+        },
+        "maxCycles": 100000
+      }
+    },
+    {
+      "name": "the world is endless: a long walk east keeps generating ground without a fault, an overrun, or a wall",
+      "frames": 4000,
+      "input": "START@40, RIGHT@60-4000, A@100-4000/45",
+      "expect": {
+        "words": {
+          "state": 3
+        },
+        "maxCycles": 100000,
+        "frameHash": "5cf0d71cca14a53bf4703c2b991191a1933f6ed22e83eee8aeffc5877225e0b7"
+      }
+    },
+    {
+      "name": "and west",
+      "frames": 2500,
+      "input": "START@40, LEFT@60-2500, A@100-2500/45",
+      "expect": {
+        "words": {
+          "state": 3
+        },
+        "maxCycles": 100000,
+        "frameHash": "f9c9806354b0a914109763dbc0c247b93630a7ba1e06a2bb2c2d278746541a42"
+      }
+    }
+  ]
+}

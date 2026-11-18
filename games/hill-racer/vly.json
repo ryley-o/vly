@@ -1,0 +1,151 @@
+{
+  "name": "hill-racer",
+  "entry": "src/main.vly",
+  "out": "build/hill-racer.vlc",
+  "tests": [
+    {
+      "name": "title screen: the name, the track picker, and a truck on the grass",
+      "frames": 30,
+      "expect": {
+        "words": {
+          "state": 0,
+          "track": 0,
+          "unlocked": 1
+        },
+        "frameHash": "d0f4323a0baafd5bca1059d825cc10812527e2713b3df14189b5904183501f3a",
+        "maxCycles": 60000
+      }
+    },
+    {
+      "name": "START spreads loading over frames, never overrunning the frame budget",
+      "frames": 100,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 1
+        },
+        "frameHash": "658d115a56299e084fa1ad528148b4696e1bfca1dc1cac04c9f278397e675013",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "after the countdown the race begins, with the HUD in the window layer and the rival beside you",
+      "frames": 400,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 3,
+          "t_total": 45
+        },
+        "frameHash": "7ab03b183a6947a619c27ea13d975b60e7ab06a93618d01922229169eebc610a",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "START pauses: the race freezes, and the picture is the same a second later",
+      "frames": 410,
+      "input": "START@30, A@330-2000, START@400",
+      "expect": {
+        "words": {
+          "state": 4,
+          "tx": 135,
+          "t_total": 45
+        },
+        "frameHash": "3db7015b2f61430162a40a3bb964b9710eb7e73db89e933f6b8a9f8ab113801b"
+      }
+    },
+    {
+      "name": "paused for a whole second more: nothing moves",
+      "frames": 470,
+      "input": "START@30, A@330-2000, START@400",
+      "expect": {
+        "words": {
+          "state": 4,
+          "tx": 135,
+          "t_total": 45
+        }
+      }
+    },
+    {
+      "name": "holding gas and never tilting crashes at ramps and costs time, but the race goes on",
+      "frames": 2200,
+      "input": "START@30, A@330-2200",
+      "expect": {
+        "words": {
+          "state": 3,
+          "penalty": 120
+        },
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a locked track cannot be started",
+      "frames": 80,
+      "input": "RIGHT@10, RIGHT@20, START@40",
+      "expect": {
+        "words": {
+          "state": 0,
+          "track": 2
+        },
+        "frameHash": "b448b4f9f2edf040f9a24febbc23ef04c3baa2329fd672377256488b1d44bf2f"
+      }
+    },
+    {
+      "name": "a bot wins track 1 (recorded by tests/bot.mjs): first place, the best time and the next track are saved",
+      "frames": 5100,
+      "inputFile": "tests/track1.input",
+      "expect": {
+        "words": {
+          "state": 6,
+          "place": 1,
+          "t_total": 4681
+        },
+        "saves": 1,
+        "saveWords": {
+          "2": 4681,
+          "8": 2
+        },
+        "frameHash": "c7570d0413df61b2f2eee6a774a2d840885860fe71b442c26f381800540a06f9",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a bot wins track 2 with its save loaded: track 3 opens",
+      "frames": 6300,
+      "save": "tests/after-track1.sav",
+      "inputFile": "tests/track2.input",
+      "expect": {
+        "words": {
+          "state": 6,
+          "place": 1,
+          "t_total": 5805,
+          "unlocked": 3
+        },
+        "saves": 1,
+        "saveWords": {
+          "4": 5805,
+          "8": 3
+        },
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a bot wins the long track 3 in under two minutes",
+      "frames": 7350,
+      "save": "tests/after-track2.sav",
+      "inputFile": "tests/track3.input",
+      "expect": {
+        "words": {
+          "state": 6,
+          "place": 1,
+          "t_total": 6831
+        },
+        "saves": 1,
+        "saveWords": {
+          "6": 6831
+        },
+        "maxCycles": 80000
+      }
+    }
+  ]
+}

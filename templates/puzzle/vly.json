@@ -1,0 +1,137 @@
+{
+  "name": "{{name}}",
+  "entry": "src/main.vly",
+  "out": "build/{{name}}.vlc",
+  "tests": [
+    {
+      "name": "title screen",
+      "frames": 20,
+      "expect": {
+        "words": {
+          "state": 0,
+          "progress": 0
+        },
+        "frameHash": "f2b128f76061dfec5f01ea30c887195d87cf8dcee589df915d9823bb69e1818a"
+      }
+    },
+    {
+      "name": "START loads level 1 with one crate to place",
+      "frames": 20,
+      "input": "START@5",
+      "expect": {
+        "words": {
+          "state": 1,
+          "level": 0,
+          "left": 1,
+          "moves": 0
+        },
+        "frameHash": "da61c189d5f0e1d008f07e76d6777906598a8161d6eed1fa3794bf141e395382"
+      }
+    },
+    {
+      "name": "walking into a wall does not count as a move",
+      "frames": 30,
+      "input": "START@5, UP@10, LEFT@14",
+      "expect": {
+        "words": {
+          "moves": 0,
+          "left": 1
+        }
+      }
+    },
+    {
+      "name": "pushing and undoing",
+      "frames": 40,
+      "input": "START@5, RIGHT@10, RIGHT@14, B@18, B@22",
+      "expect": {
+        "words": {
+          "moves": 0,
+          "left": 1
+        }
+      }
+    },
+    {
+      "name": "SELECT restarts the level",
+      "frames": 40,
+      "input": "START@5, RIGHT@10, RIGHT@14, SELECT@20",
+      "expect": {
+        "words": {
+          "moves": 0,
+          "left": 1,
+          "state": 1
+        }
+      }
+    },
+    {
+      "name": "level 1 is solved in its 4 move optimum",
+      "frames": 28,
+      "input": "START@5, RIGHT@10, RIGHT@13, RIGHT@16, RIGHT@19",
+      "expect": {
+        "words": {
+          "state": 2,
+          "level": 0,
+          "moves": 4,
+          "left": 0,
+          "progress": 1
+        },
+        "frameHash": "80a8ca162297461d702810a8c039e83ef038de2073733460597ad2c805c39fff",
+        "maxCycles": 60000
+      }
+    },
+    {
+      "name": "level 4 is solved in its 24 move optimum",
+      "frames": 166,
+      "input": "START@5, RIGHT@10, RIGHT@13, RIGHT@16, RIGHT@19, A@22, RIGHT@26, DOWN@29, UP@32, RIGHT@35, DOWN@38, A@41, DOWN@45, DOWN@48, LEFT@51, LEFT@54, UP@57, UP@60, RIGHT@63, DOWN@66, UP@69, UP@72, RIGHT@75, DOWN@78, DOWN@81, A@84, UP@88, UP@91, LEFT@94, UP@97, RIGHT@100, DOWN@103, DOWN@106, DOWN@109, RIGHT@112, RIGHT@115, UP@118, RIGHT@121, UP@124, UP@127, LEFT@130, DOWN@133, DOWN@136, UP@139, LEFT@142, LEFT@145, UP@148, LEFT@151, DOWN@154, DOWN@157",
+      "expect": {
+        "words": {
+          "state": 2,
+          "level": 3,
+          "moves": 24,
+          "left": 0,
+          "progress": 4
+        },
+        "frameHash": "97e827f7b360339e5d3457d308a00c94c275a8312883dccbb88bbaa1b97b3370",
+        "maxCycles": 60000
+      }
+    },
+    {
+      "name": "level 7 is solved in its 29 move optimum",
+      "frames": 454,
+      "input": "START@5, RIGHT@10, RIGHT@13, RIGHT@16, RIGHT@19, A@22, RIGHT@26, DOWN@29, UP@32, RIGHT@35, DOWN@38, A@41, DOWN@45, DOWN@48, LEFT@51, LEFT@54, UP@57, UP@60, RIGHT@63, DOWN@66, UP@69, UP@72, RIGHT@75, DOWN@78, DOWN@81, A@84, UP@88, UP@91, LEFT@94, UP@97, RIGHT@100, DOWN@103, DOWN@106, DOWN@109, RIGHT@112, RIGHT@115, UP@118, RIGHT@121, UP@124, UP@127, LEFT@130, DOWN@133, DOWN@136, UP@139, LEFT@142, LEFT@145, UP@148, LEFT@151, DOWN@154, DOWN@157, A@160, LEFT@164, DOWN@167, DOWN@170, DOWN@173, DOWN@176, LEFT@179, UP@182, UP@185, RIGHT@188, RIGHT@191, RIGHT@194, DOWN@197, RIGHT@200, RIGHT@203, DOWN@206, RIGHT@209, UP@212, UP@215, UP@218, UP@221, LEFT@224, DOWN@227, UP@230, RIGHT@233, RIGHT@236, UP@239, LEFT@242, LEFT@245, LEFT@248, LEFT@251, LEFT@254, LEFT@257, A@260, LEFT@264, DOWN@267, DOWN@270, DOWN@273, DOWN@276, RIGHT@279, UP@282, RIGHT@285, UP@288, LEFT@291, RIGHT@294, RIGHT@297, UP@300, UP@303, UP@306, LEFT@309, LEFT@312, LEFT@315, LEFT@318, RIGHT@321, RIGHT@324, RIGHT@327, RIGHT@330, DOWN@333, DOWN@336, RIGHT@339, UP@342, RIGHT@345, UP@348, LEFT@351, LEFT@354, A@357, LEFT@361, LEFT@364, LEFT@367, LEFT@370, LEFT@373, UP@376, LEFT@379, UP@382, UP@385, UP@388, RIGHT@391, LEFT@394, DOWN@397, DOWN@400, RIGHT@403, RIGHT@406, RIGHT@409, RIGHT@412, LEFT@415, LEFT@418, UP@421, RIGHT@424, RIGHT@427, RIGHT@430, DOWN@433, DOWN@436, UP@439, RIGHT@442, UP@445",
+      "expect": {
+        "words": {
+          "state": 2,
+          "level": 6,
+          "moves": 29,
+          "left": 0,
+          "progress": 7
+        },
+        "frameHash": "99a03d4e2f7306981a9212decf42d1dc3348035d7738eb27d277e365ab25b292",
+        "maxCycles": 60000
+      }
+    },
+    {
+      "name": "all seven levels solved leads to the end screen and a full save",
+      "frames": 468,
+      "input": "START@5, RIGHT@10, RIGHT@13, RIGHT@16, RIGHT@19, A@22, RIGHT@26, DOWN@29, UP@32, RIGHT@35, DOWN@38, A@41, DOWN@45, DOWN@48, LEFT@51, LEFT@54, UP@57, UP@60, RIGHT@63, DOWN@66, UP@69, UP@72, RIGHT@75, DOWN@78, DOWN@81, A@84, UP@88, UP@91, LEFT@94, UP@97, RIGHT@100, DOWN@103, DOWN@106, DOWN@109, RIGHT@112, RIGHT@115, UP@118, RIGHT@121, UP@124, UP@127, LEFT@130, DOWN@133, DOWN@136, UP@139, LEFT@142, LEFT@145, UP@148, LEFT@151, DOWN@154, DOWN@157, A@160, LEFT@164, DOWN@167, DOWN@170, DOWN@173, DOWN@176, LEFT@179, UP@182, UP@185, RIGHT@188, RIGHT@191, RIGHT@194, DOWN@197, RIGHT@200, RIGHT@203, DOWN@206, RIGHT@209, UP@212, UP@215, UP@218, UP@221, LEFT@224, DOWN@227, UP@230, RIGHT@233, RIGHT@236, UP@239, LEFT@242, LEFT@245, LEFT@248, LEFT@251, LEFT@254, LEFT@257, A@260, LEFT@264, DOWN@267, DOWN@270, DOWN@273, DOWN@276, RIGHT@279, UP@282, RIGHT@285, UP@288, LEFT@291, RIGHT@294, RIGHT@297, UP@300, UP@303, UP@306, LEFT@309, LEFT@312, LEFT@315, LEFT@318, RIGHT@321, RIGHT@324, RIGHT@327, RIGHT@330, DOWN@333, DOWN@336, RIGHT@339, UP@342, RIGHT@345, UP@348, LEFT@351, LEFT@354, A@357, LEFT@361, LEFT@364, LEFT@367, LEFT@370, LEFT@373, UP@376, LEFT@379, UP@382, UP@385, UP@388, RIGHT@391, LEFT@394, DOWN@397, DOWN@400, RIGHT@403, RIGHT@406, RIGHT@409, RIGHT@412, LEFT@415, LEFT@418, UP@421, RIGHT@424, RIGHT@427, RIGHT@430, DOWN@433, DOWN@436, UP@439, RIGHT@442, UP@445, A@452",
+      "expect": {
+        "words": {
+          "state": 3,
+          "progress": 7
+        },
+        "saveWords": {
+          "0": 7,
+          "2": 4,
+          "4": 5,
+          "6": 13,
+          "8": 24,
+          "10": 32,
+          "12": 31,
+          "14": 29
+        },
+        "frameHash": "341e7963981e59660fa4be63f437e82a07fb1ccf458acfe1c8144ef31751ac9c",
+        "maxCycles": 60000
+      }
+    }
+  ]
+}

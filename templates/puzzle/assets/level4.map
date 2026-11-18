@@ -1,0 +1,16 @@
+legend:
+  // tile RAM offset T + the art tile; bits 12-14 pick the palette: 0 world, 1 crate, 2 crate on a goal
+  _ = T + art_void
+  # = T + art_wall
+  . = T + art_floor
+  g = T + art_goal
+  X = (T + art_crate) | (1 << 12)
+  Y = (T + art_crate) | (2 << 12)
+  P = T + art_floor, marker
+map:
+#######
+#..g..#
+#.XXX.#
+#..#..#
+#gPgg.#
+#######

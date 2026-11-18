@@ -1,0 +1,334 @@
+{
+  "name": "midnight-nightingale",
+  "entry": "src/main.vly",
+  "out": "build/midnight-nightingale.vlc",
+  "tests": [
+    {
+      "name": "title screen: new game selected, no save",
+      "frames": 60,
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 0,
+          "has_save": 0,
+          "menu_i": 0
+        },
+        "frameHash": "b5c9a86e1f1f30ee38ff8769d98c53239bde471a3ae799887d749dd81cc97a5f"
+      }
+    },
+    {
+      "name": "START opens the story pages",
+      "frames": 90,
+      "input": "START@20",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 1
+        },
+        "frameHash": "a6f4e458e8aab53fb4d8b2099392e8f0a63365b219deef48cd8df6c14339d5ef"
+      }
+    },
+    {
+      "name": "story pages lead to the hall, nothing found yet",
+      "frames": 330,
+      "input": "START@20, A@80, A@140, A@200, A@260",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 2,
+          "room": 0,
+          "fl": 0,
+          "cl": 0
+        },
+        "frameHash": "a6cd8dc15b7df1b746a25a9ea629d321ca39de0a848c55fd95c78c6e0ef12c8d"
+      }
+    },
+    {
+      "name": "START pauses and shows the goal",
+      "frames": 400,
+      "input": "START@20, A@80, A@140, A@200, A@260, START@340",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 5
+        },
+        "frameHash": "d7b92b38ac93bea16934e4b0ad69afa5d0e4ad18af0683983f65e911561c0208"
+      }
+    },
+    {
+      "name": "SELECT opens the notebook, B closes it",
+      "frames": 470,
+      "input": "START@20, A@80, A@140, A@200, A@260, SELECT@340, B@400",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 2,
+          "room": 0
+        },
+        "frameHash": "9a11c0df02b7ee5f87f8a7b5b824b133963036eb3854bb222b660e6877b6c6b4"
+      }
+    },
+    {
+      "name": "talking to Odile starts the case (typewriter dialogue open or done)",
+      "frames": 200,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "fl": 1
+        }
+      }
+    },
+    {
+      "name": "the rug hides a brass key",
+      "frames": 530,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "fl": 3
+        }
+      }
+    },
+    {
+      "name": "the desk drawer holds the letter (clue 1)",
+      "frames": 620,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "fl": 7,
+          "cl": 1
+        },
+        "frameHash": "7714cbac024d79e34e8c9d33c4ea6e778235fbba29e4d217ce96945d42897b27"
+      }
+    },
+    {
+      "name": "the empty case gives ink prints and the time 9:50",
+      "frames": 810,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "cl": 7
+        }
+      }
+    },
+    {
+      "name": "the safe lock screen is open (code 7-3-2)",
+      "frames": 975,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 3,
+          "lk_id": 0
+        },
+        "frameHash": "9fe39112df26af2763f0594da4676cb8e5caf52632d19ea81e9f4e19e3f8dc3f"
+      }
+    },
+    {
+      "name": "safe solved: silver key, back in the study",
+      "frames": 1010,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 2,
+          "room": 1,
+          "fl": 15
+        }
+      }
+    },
+    {
+      "name": "the library door opens with the silver key",
+      "frames": 1170,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "fl": 31
+        }
+      }
+    },
+    {
+      "name": "rainbow books solved: brass gear",
+      "frames": 1490,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "fl": 63,
+          "cl": 103
+        }
+      }
+    },
+    {
+      "name": "pie riddle solved: clock room key",
+      "frames": 2130,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "fl": 127
+        }
+      }
+    },
+    {
+      "name": "clock room door opens",
+      "frames": 2560,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "fl": 255
+        }
+      }
+    },
+    {
+      "name": "time 9:50 set: stairs to the attic appear",
+      "frames": 2930,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "fl": 1023
+        }
+      }
+    },
+    {
+      "name": "trunk opened: the Nightingale is found",
+      "frames": 3100,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "fl": 2047,
+          "room": 5,
+          "cl": 255
+        },
+        "frameHash": "a8fd2e78a831e046e548454d1f0863dd7c3f29bc8e5db3cfe1b1d3536a292462"
+      }
+    },
+    {
+      "name": "Odile calls the accusation (all proof gathered)",
+      "frames": 3400,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 6
+        },
+        "frameHash": "7a3b9e30c6f43b45f23340fb3499f327feca9b9d2bf2ff65ba59918178765c6d"
+      }
+    },
+    {
+      "name": "full run: accuse Rook, case closed, saved",
+      "frames": 3990,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 7,
+          "fl": 4095,
+          "cl": 255,
+          "wrong": 0,
+          "best": 1
+        },
+        "frameHash": "96725f1fa9efa13a853271f44b30b819c19ed802c762e596c999711bc39afd76",
+        "saveWords": {
+          "0": 4095,
+          "2": 255
+        }
+      }
+    },
+    {
+      "name": "full run with two wrong accusations first",
+      "frames": 4300,
+      "inputFile": "tests/wrong.input",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 7,
+          "fl": 4095,
+          "wrong": 2,
+          "best": 3
+        },
+        "frameHash": "bed1cdd8dd76c783bbeccec0e2e6f347877fe92ae9c261d4cfeb7d81134d68e9"
+      }
+    },
+    {
+      "name": "continue from a finished save: title offers CONTINUE",
+      "frames": 40,
+      "save": "tests/won.sav",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "has_save": 1,
+          "menu_i": 1,
+          "best": 1
+        },
+        "frameHash": "13352db91429a96f6925f92c42003b026caa2da0826f155b8b1c52bcab0fe9ba"
+      }
+    },
+    {
+      "name": "CONTINUE returns to the hall with progress kept",
+      "frames": 200,
+      "save": "tests/won.sav",
+      "input": "START@30",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 2,
+          "room": 0,
+          "fl": 4095
+        }
+      }
+    },
+    {
+      "name": "NEW GAME over unfinished progress asks first (save kept)",
+      "frames": 100,
+      "save": "tests/mid.sav",
+      "input": "UP@40, START@60",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 0,
+          "newconf": 1,
+          "menu_i": 0,
+          "fl": 31
+        },
+        "frameHash": "a08781ea59ddaf426231561d67fe6f9092aeaac0d57e455a03e4e53def9515ba"
+      }
+    },
+    {
+      "name": "B cancels the erase question",
+      "frames": 140,
+      "save": "tests/mid.sav",
+      "input": "UP@40, START@60, B@90",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 0,
+          "newconf": 0,
+          "fl": 31
+        }
+      }
+    },
+    {
+      "name": "pause then B quits to the title with CONTINUE",
+      "frames": 520,
+      "save": "tests/mid.sav",
+      "input": "START@30, START@200, B@260",
+      "expect": {
+        "maxCycles": 80000,
+        "words": {
+          "state": 0,
+          "has_save": 1,
+          "menu_i": 1
+        },
+        "frameHash": "525d93ba69096b3755d3b850e412173128c7630c26937af00c227b2e6f718274"
+      }
+    }
+  ]
+}

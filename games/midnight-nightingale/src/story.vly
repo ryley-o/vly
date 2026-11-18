@@ -1,0 +1,61 @@
+// Room maps (10 x 8 blocks of 16 x 16 pixels) and Odile's hints.
+//   # wall  w window  . floor  , rug  digits = doors to that room number
+//   letters are furniture you can look at (see art_of in main.vly); O V R M are people.
+table maprows = {
+  // 0 GRAND HALL
+  "#w#F#4#Pw#",
+  "#........#",
+  "#.O..HV..#",
+  "1..,,,,..2",
+  "#..,,,,..#",
+  "#T.,,,,.U#",
+  "#p......p#",
+  "####3#####",
+  // 1 THE STUDY
+  "#SwmwKA#w#",
+  "#........#",
+  "#.D..E.B.#",
+  "#........0",
+  "#.rr.....#",
+  "#B......p#",
+  "#........#",
+  "##########",
+  // 2 THE LIBRARY
+  "#LLYQLwLL#",
+  "#........#",
+  "#...R....#",
+  "0........#",
+  "#.,,,,...#",
+  "#........#",
+  "#L......p#",
+  "##########",
+  // 3 THE KITCHEN
+  "#wNI0Ck#w#",
+  "#........#",
+  "#.t...M..#",
+  "#........#",
+  "#.......b#",
+  "#........#",
+  "#b......b#",
+  "##########",
+  // 4 CLOCK ROOM
+  "#wGxX#G5w#",
+  "#........#",
+  "#........#",
+  "#...,,...#",
+  "#...,,...#",
+  "#.W....W.#",
+  "#........#",
+  "#####0####",
+  // 5 THE ATTIC
+  "#w##o##yw#",
+  "#........#",
+  "#.d..Z...#",
+  "#........#",
+  "#..h...h.#",
+  "#........#",
+  "#.y....d.#",
+  "####4#####"
+};
+table names = { "", "ODILE", "CAPT. VALE", "MRS. PIM", "DR. ROOK" };
+table hints = { 0, S_T64, S_T65, S_T66, S_T67, S_T68, S_T69, S_T70, S_T71, S_T72, S_T73, 0 };

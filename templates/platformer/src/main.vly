@@ -1,0 +1,270 @@
+// {{name}}: a platformer. D-pad moves, A jumps (hold for a higher jump). Collect coins, stomp enemies by landing on
+// them, avoid spikes and pits, reach the flag. Three levels drawn as ASCII art in assets/*.map.
+// Shows: tilemaps with spawn markers, pixel-stepped tile collision, fixed-point physics (1/16 pixel), coyote time and
+// jump buffering, sprite animation, patrolling enemies, a window-layer HUD, sound, and saved progress.
+
+import "std/tunes";
+import "std/anim";
+
+tileset gfx = "../assets/gfx.tiles";
+tilemap lv1 = "../assets/level1.map";
+tilemap lv2 = "../assets/level2.map";
+tilemap lv3 = "../assets/level3.map";
+
+const T = 100;                       // the art tiles live at 100.. in tile RAM (the font is at 0..94)
+const GRAV = 4;                      // physics units are 1/16 pixel per frame (per frame squared)
+const MAXFALL = 64;
+const JUMPV = -58;
+const ACC = 3;
+const MAXV = 24;
+const FRIC = 2;
+const NLEVELS = 3;
+
+const S_TITLE = 0; const S_PLAY = 1; const S_CLEAR = 2; const S_OVER = 3; const S_WIN = 4;
+
+var state;
+var level;
+var px; var py;                      // hero position in whole pixels (top-left of the 16x16 sprite)
+var fx; var fy;                      // sub-pixel remainders
+var vx; var vy;
+var face;                            // 1 when facing left
+var grounded;
+var coyote;                          // frames since the hero left the ground (a jump is still allowed for a few)
+var jump_buf;                        // frames since A was pressed (a jump is remembered for a few)
+var anim_t;
+var coins; var lives; var score;
+var best;                            // furthest level reached, kept in the save
+var timer;
+var hurt;                            // set by touch() when spikes are touched
+var goal;                            // set by touch() at the flag
+var beep;
+var ex[4]; var ey[4]; var edir[4]; var ealive[4];
+var ecount;
+
+// ---------- level data (one function per marker list because each tilemap is its own symbol) ----------
+func level_map(n) { if (n == 0) { return lv1; } if (n == 1) { return lv2; } return lv3; }
+func start_x(n) { if (n == 0) { return lv1_P_X; } if (n == 1) { return lv2_P_X; } return lv3_P_X; }
+func start_y(n) { if (n == 0) { return lv1_P_Y; } if (n == 1) { return lv2_P_Y; } return lv3_P_Y; }
+func enemy_count(n) { if (n == 0) { return lv1_E_COUNT; } if (n == 1) { return lv2_E_COUNT; } return lv3_E_COUNT; }
+func enemy_cell(n, i, k) {            // k = 0: column, 1: row
+  if (n == 0) { return lv1_E_list[i * 2 + k]; }
+  if (n == 1) { return lv2_E_list[i * 2 + k]; }
+  return lv3_E_list[i * 2 + k];
+}
+
+// ---------- collision against the background map ----------
+func solid_cell(tx, ty) {
+  if (tx < 0 || tx >= 32) { return 1; }          // the level has walls at both edges
+  if (ty < 0 || ty >= 17) { return 0; }
+  var t = get_cell(tx, ty) & 0x1FF;
+  return t == T + gfx_grass || t == T + gfx_dirt || t == T + gfx_brick;
+}
+func rect_solid(x, y, w, h) {
+  for (var ty = y >> 3; ty <= (y + h - 1) >> 3; ty++) {
+    for (var tx = x >> 3; tx <= (x + w - 1) >> 3; tx++) {
+      if (solid_cell(tx, ty)) { return 1; }
+    }
+  }
+  return 0;
+}
+func sound(hz, frames) { sfx_tone(1, hz, 10, 2, frames); beep = frames; }      // effects on channel 1; the music has 0 and 2
+// Look at every map cell the hero overlaps: collect coins, notice spikes and the flag.
+func touch() {
+  for (var ty = (py + 2) >> 3; ty <= (py + 15) >> 3; ty++) {
+    for (var tx = (px + 3) >> 3; tx <= (px + 12) >> 3; tx++) {
+      if (tx >= 0 && tx < 32 && ty >= 0 && ty < 17) {
+        var t = get_cell(tx, ty) & 0x1FF;
+        if (t == T + gfx_coin) { set_cell(tx, ty, T + gfx_sky); coins++; score += 10; sound(1318, 4); }
+        if (t == T + gfx_spikes) { hurt = 1; }
+        if (t == T + gfx_flag || t == T + gfx_pole) { goal = 1; }
+      }
+    }
+  }
+}
+
+// ---------- loading and respawning ----------
+func respawn() {
+  px = start_x(level) * 8 - 4;
+  py = start_y(level) * 8 - 8;
+  fx = 0; fy = 0; vx = 0; vy = 0; coyote = 0; jump_buf = 0;
+}
+func spawn_enemies() {
+  ecount = min(4, enemy_count(level));
+  for (var i = 0; i < 4; i++) {
+    ealive[i] = i < ecount;
+    if (i < ecount) { ex[i] = enemy_cell(level, i, 0) * 8; ey[i] = enemy_cell(level, i, 1) * 8; edir[i] = 1; }
+    hide_sprite(1 + i);
+  }
+}
+func load_level(n) {
+  level = n;
+  clear_bg();
+  load_map(level_map(n), 32, 17, 0, 0);
+  respawn();
+  spawn_enemies();
+  goal = 0; hurt = 0;
+}
+// The HUD lives in the window layer (one row at the bottom of the screen), so it does not scroll with the level.
+func draw_hud() {
+  wtext(0, 0, "COINS"); wprint_u(6, 0, coins);
+  wtext(12, 0, "LV"); wprint_u(15, 0, level + 1);
+  wtext(17, 0, "HP"); wprint_u(19, 0, lives);
+}
+
+// ---------- one frame of play ----------
+func hero_step() {
+  // input and acceleration
+  var dir = btn(BTN_RIGHT) - btn(BTN_LEFT);
+  if (dir > 0) { vx = min(vx + ACC, MAXV); face = 0; }
+  else if (dir < 0) { vx = max(vx - ACC, 0 - MAXV); face = 1; }
+  else { vx = approach(vx, 0, FRIC); }
+  if (btnp(BTN_A)) { jump_buf = 6; }
+  if (jump_buf > 0) { jump_buf--; }
+  if (grounded) { coyote = 6; } else if (coyote > 0) { coyote--; }
+  if (jump_buf > 0 && coyote > 0) { vy = JUMPV; jump_buf = 0; coyote = 0; grounded = 0; sound(660, 6); }
+  if (vy < -16 && !btn(BTN_A)) { vy = -16; }     // let go early for a short hop
+  vy = min(vy + GRAV, MAXFALL);
+
+  // horizontal move, one pixel at a time so we stop exactly at walls
+  fx += vx;
+  var dx = fx >> 4;
+  fx = fx - (dx << 4);
+  while (dx != 0) {
+    var s = sign(dx);
+    if (rect_solid(px + s + 3, py + 2, 10, 14)) { vx = 0; fx = 0; break; }
+    px = px + s; dx = dx - s;
+  }
+  // vertical move
+  fy += vy;
+  var dy = fy >> 4;
+  fy = fy - (dy << 4);
+  while (dy != 0) {
+    var s2 = sign(dy);
+    if (rect_solid(px + 3, py + s2 + 2, 10, 14)) { vy = 0; fy = 0; break; }
+    py = py + s2; dy = dy - s2;
+  }
+  grounded = rect_solid(px + 3, py + 16, 10, 1);
+  touch();
+  if (py > 150) { hurt = 1; }                    // fell into a pit
+}
+
+func enemies_step() {
+  for (var i = 0; i < 4; i++) {
+    if (ealive[i]) {
+      if ((frames() & 1) == 0) {
+        var nx = ex[i] + edir[i];
+        var front = nx + 4 + edir[i] * 4;
+        var wall = solid_cell(front >> 3, (ey[i] + 4) >> 3);
+        var floor_ = solid_cell(front >> 3, (ey[i] + 8) >> 3);
+        if (wall || !floor_) { edir[i] = 0 - edir[i]; } else { ex[i] = nx; }
+      }
+      if (overlap(px + 3, py + 2, 10, 14, ex[i], ey[i], 8, 8)) {
+        if (vy > 0 && py + 12 < ey[i]) { ealive[i] = 0; vy = JUMPV / 2; score += 100; sound(880, 5); }
+        else { hurt = 1; }
+      }
+    }
+  }
+}
+
+func draw_sprites() {
+  var camx = clamp(px - 72, 0, 96);
+  scroll(camx, 0);
+  var frame_tile = T + gfx_hero_idle;
+  if (!grounded) { frame_tile = T + gfx_hero_jump; }
+  else if (abs(vx) > 2) { if (anim_frame(anim_t, 2, 5) == 0) { frame_tile = T + gfx_hero_walk1; } else { frame_tile = T + gfx_hero_walk2; } }
+  var attr = SPR_16X16;
+  if (face) { attr = attr | SPR_FLIPX; }
+  sprite(0, px - camx, py, frame_tile, attr);
+  for (var i = 0; i < 4; i++) {
+    if (ealive[i]) {
+      var et = T + gfx_enemy_a;
+      if (anim_frame(anim_t, 2, 8) == 1) { et = T + gfx_enemy_b; }
+      sprite(1 + i, ex[i] - camx, ey[i], et, 1);
+    } else { hide_sprite(1 + i); }
+  }
+  anim_t++;
+}
+
+func new_game() {
+  coins = 0; lives = 3; score = 0;
+  load_level(0);
+  state = S_PLAY;
+  draw_hud();
+}
+
+func title() {
+  scroll(0, 0);
+  clear_win();
+  text(5, 4, "HOP");
+  text(2, 7, "D-pad move  A jump");
+  text(4, 9, "Collect coins!");
+  text(4, 12, "PRESS START");
+  text(3, 14, "FURTHEST LEVEL"); print_u(18, 14, best);
+  if (btnp(BTN_START)) { new_game(); }
+}
+
+func frame() {
+  music_update(); sfx_update();
+  if (beep > 0) { beep--; if (beep == 0) { tone_off(1); } }
+  if (state == S_TITLE) { title(); return; }
+  if (state == S_PLAY) {
+    hero_step();
+    enemies_step();
+    draw_sprites();
+    draw_hud();
+    if (hurt) {
+      lives--;
+      sound(220, 12);
+      if (lives == 0) { state = S_OVER; timer = 120; hide_all_sprites(); scroll(0, 0); clear_bg(); text(6, 7, "GAME OVER"); }
+      else { hurt = 0; respawn(); }
+    }
+    if (goal) {
+      sound(1046, 20);
+      timer = 100;
+      hide_all_sprites();
+      state = S_CLEAR;
+      best = max(best, level + 1);
+      save_set(0, best); save_seal(); save_commit();
+      scroll(0, 0); clear_bg(); text(4, 7, "LEVEL CLEAR!");
+    }
+    return;
+  }
+  if (state == S_CLEAR) {
+    timer--;
+    if (timer == 0) {
+      if (level + 1 < NLEVELS) { load_level(level + 1); state = S_PLAY; draw_hud(); }
+      else { state = S_WIN; timer = 200; clear_bg(); clear_win(); }
+    }
+    return;
+  }
+  if (state == S_WIN) {
+    text(3, 6, "YOU DID IT!"); text(3, 8, "COINS"); print_u(9, 8, coins); text(3, 10, "SCORE"); print_u(9, 10, score);
+    timer--;
+    if (timer == 0 || btnp(BTN_START)) { state = S_TITLE; clear_bg(); }
+    return;
+  }
+  if (state == S_OVER) {
+    timer--;
+    if (timer == 0) { state = S_TITLE; clear_bg(); hide_all_sprites(); }
+  }
+}
+
+func init() {
+  load_font(0);
+  load_tiles(gfx, T, gfx_COUNT);
+  bg_pal(0, rgb(9, 13, 15), rgb(15, 15, 15), rgb(6, 10, 13), rgb(2, 4, 9));      // sky and text
+  bg_pal(1, rgb(5, 3, 1), rgb(9, 6, 2), rgb(8, 14, 3), rgb(3, 8, 2));            // ground
+  bg_pal(2, rgb(9, 13, 15), rgb(15, 15, 10), rgb(15, 12, 2), rgb(8, 5, 0));      // coins
+  bg_pal(3, rgb(9, 13, 15), rgb(15, 15, 15), rgb(12, 12, 13), rgb(5, 5, 6));     // spikes
+  bg_pal(4, rgb(9, 13, 15), rgb(12, 7, 3), rgb(7, 3, 1), rgb(3, 1, 0));          // bricks
+  bg_pal(5, rgb(9, 13, 15), rgb(15, 15, 15), rgb(13, 3, 3), rgb(13, 3, 3));      // flag
+  obj_pal(0, 0, rgb(15, 14, 10), rgb(15, 8, 2), rgb(5, 1, 0));                   // hero
+  obj_pal(1, 0, rgb(14, 10, 15), rgb(9, 4, 12), rgb(3, 1, 5));                   // enemies
+  hide_all_sprites();
+  master_volume(8);
+  tune_play(TUNE_ADVENTURE);
+  if (save_loaded() && save_valid()) { best = save_get(0); }
+  window_pos(0, 136);
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+  state = S_TITLE;
+}

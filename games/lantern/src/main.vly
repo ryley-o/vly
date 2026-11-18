@@ -1,0 +1,500 @@
+// THE DRY WELL: a small top-down adventure. The village well has run dry because the Slime King drank it.
+//
+//   D-pad  walk (walk off the edge of the screen to reach the next one)     A  swing the sword (once you have it)
+//   START  begin / continue         SELECT  music on or off
+//
+// Find the old man, take the sword, cut through the bushes to the chest, use the key on the locked door, cross the
+// dungeon and beat the Slime King. Slimes drop hearts and gems. Progress is saved by itself.
+//
+// Shows: screens built from a text map (one character per 16x16 block, drawn as four background cells), quest
+// progress packed into one saved byte, a 32x32 boss sprite, hit flashes and knock-back, std/music.
+
+import "std/music";
+import "rooms.vly";
+
+tileset art bank 3 = "../assets/art.tiles";
+
+const T = 100;
+const S_TITLE = 0; const S_PLAY = 1; const S_DEAD = 2; const S_WIN = 3;
+const F_SWORD = 1; const F_CHEST = 2; const F_KEY = 4; const F_DOOR = 8; const F_KING = 16;
+const MAXHP = 3;
+const NEN = 6;
+// Characters in the room maps:  . grass  , flowers  T tree  R rock  ~ water  b bush (the sword cuts it)  : path
+//   D locked door  N open doorway  # dungeon wall  _ dungeon floor  X dungeon exit
+//   and, turned into floor when a room is entered: s slime  a bat  K the Slime King  h a heart
+//   M (the old man) and C (the chest) stay where they are.
+
+byte rg[80];                          // the room as it is now (bushes get cut, doors open)
+var state; var room; var hx; var hy; var face; var hp; var inv; var swing; var anim; var moving;
+var kbx; var kby; var kbt;            // knock-back
+var flags; var gems; var has_save;
+var toast_t; var hud_dirty; var beep; var nbeep; var timer; var menu_i; var muted; var title_t;
+var et[6]; var ex[6]; var ey[6]; var ehp[6]; var edir[6]; var etm[6]; var eflash[6];
+var it_t[3]; var it_x[3]; var it_y[3]; var it_life[3];
+var poof_x; var poof_y; var poof_t;
+var npc_x; var npc_y; var chest_x; var chest_y; var save_stage;
+
+// ---------- music ----------
+btable song_over = {
+  N_C5, 2, N_E5, 2, N_G5, 2, N_E5, 2, N_F5, 2, N_A5, 2, N_G5, 4, N_E5, 2, N_G5, 2, N_C6, 2, N_G5, 2, N_D5, 2, N_F5, 2, N_E5, 4,
+  N_A4, 2, N_C5, 2, N_E5, 2, N_C5, 2, N_G4, 2, N_B4, 2, N_D5, 4, N_E5, 2, N_D5, 2, N_C5, 2, N_B4, 2, N_C5, 6, 0, 2,
+  MUS_LOOP
+};
+btable bass_over = {
+  N_C3, 4, N_G3, 4, N_F3, 4, N_G3, 4, N_C3, 4, N_G3, 4, N_F3, 4, N_G3, 4,
+  N_A2, 4, N_E3, 4, N_G2, 4, N_D3, 4, N_C3, 4, N_G3, 4, N_C3, 4, N_G2, 4,
+  MUS_LOOP
+};
+btable song_dun = {
+  N_A3, 4, 0, 2, N_C4, 2, N_E4, 4, N_DS4, 2, N_D4, 2, N_A3, 4, 0, 4, N_G3, 4, 0, 2, N_B3, 2, N_D4, 4, N_CS4, 2, N_C4, 2, N_G3, 4, 0, 4,
+  MUS_LOOP
+};
+btable bass_dun = { N_A2, 8, N_A2, 8, N_G2, 8, N_G2, 8, MUS_LOOP };
+btable song_win = { N_C5, 2, N_E5, 2, N_G5, 2, N_C6, 6, N_G5, 2, N_C6, 8, MUS_END };
+func play_music(dungeon) {
+  music_stop_all();
+  music_tempo(dungeon ? 9 : 7);
+  music_play(0, 0, dungeon ? song_dun : song_over, dungeon ? 6 : 7);
+  music_duty(0, 1);
+  music_play(1, 2, dungeon ? bass_dun : bass_over, 9);
+  music_mute(muted);
+}
+func blip(hz, frames) { tone(1, hz, 9, 2); beep = frames; }
+func crunch(rate, frames) { tone(3, rate, 12, 0); nbeep = frames; }
+
+// ---------- the room ----------
+func solid_char(c) {
+  return c == 'T' || c == 'R' || c == '~' || c == 'b' || c == 'D' || c == '#' || c == 'M' || c == 'C';
+}
+func cell_at(x, y) {                  // the character at a pixel; outside the room counts as open (that is how you leave)
+  if (x < 0 || y < 0 || x >= 160 || y >= 128) { return '.'; }
+  return rg[(y >> 4) * 10 + (x >> 4)];
+}
+func put_block(bx, by) {
+  var c = rg[by * 10 + bx];
+  var t = T + art_grass;
+  var p = 1;
+  if (c == 'T') { t = T + art_tree; }
+  else if (c == 'R') { t = T + art_rock; p = 3; }
+  else if (c == '~') { t = T + art_water; p = 4; }
+  else if (c == 'b') { t = T + art_bush; }
+  else if (c == ':') { t = T + art_path; p = 2; }
+  else if (c == ',') { t = T + art_flowers; p = 7; }
+  else if (c == 'D') { t = T + art_door; p = 5; }
+  else if (c == '#') { t = T + art_dwall; p = 3; }
+  else if (c == '_' || c == 'N' || c == 'X') { t = T + art_dfloor; p = 3; }
+  var a = BG_MAP + (((by << 1) << 5) + (bx << 1)) * 2;
+  poke(a, t | (p << 12)); poke(a + 2, (t + 1) | (p << 12));
+  poke(a + 64, (t + 2) | (p << 12)); poke(a + 66, (t + 3) | (p << 12));
+}
+func spawn(type, x, y, hpn) {
+  for (var i = 0; i < NEN; i++) {
+    if (et[i] == 0) { et[i] = type; ex[i] = x; ey[i] = y; ehp[i] = hpn; edir[i] = rand(4); etm[i] = rand(60); eflash[i] = 0; return; }
+  }
+}
+func drop(type, x, y) {
+  for (var i = 0; i < 3; i++) {
+    if (it_t[i] == 0) { it_t[i] = type; it_x[i] = x + 4; it_y[i] = y + 4; it_life[i] = 600; return; }
+  }
+}
+func load_room(r) {
+  room = r;
+  for (var i = 0; i < NEN; i++) { et[i] = 0; }
+  for (var i = 0; i < 3; i++) { it_t[i] = 0; }
+  npc_x = -1; chest_x = -1;
+  var s = rooms[r];
+  var floor = r >= 6 ? '_' : '.';
+  for (var i = 0; i < 80; i++) {
+    var c = peek8(s + i);
+    var bx = i % 10;
+    var by = i / 10;
+    if (c == 's') { spawn(1, bx * 16, by * 16, 2); c = floor; }
+    else if (c == 'a') { spawn(2, bx * 16, by * 16, 1); c = floor; }
+    else if (c == 'K') { if (!(flags & F_KING)) { spawn(3, bx * 16, by * 16, 6); } c = floor; }
+    else if (c == 'h') { drop(1, bx * 16, by * 16); c = floor; }
+    else if (c == 'M') { npc_x = bx * 16; npc_y = by * 16; }
+    else if (c == 'C') { chest_x = bx * 16; chest_y = by * 16; }
+    else if (c == 'D' && (flags & F_DOOR)) { c = 'N'; }
+    rg[i] = c;
+  }
+  for (var by = 0; by < 8; by++) { for (var bx = 0; bx < 10; bx++) { put_block(bx, by); } }
+}
+
+// ---------- the hero ----------
+func hero_blocked(x, y) {
+  return solid_char(cell_at(x + 3, y + 8)) || solid_char(cell_at(x + 12, y + 8)) || solid_char(cell_at(x + 3, y + 15)) || solid_char(cell_at(x + 12, y + 15));
+}
+func say(s) {
+  wtext(0, 1, "                    ");
+  wtext(0, 1, s);
+  toast_t = 200;
+}
+func draw_hud() {
+  for (var i = 0; i < MAXHP; i++) {
+    set_wcell(1 + i, 0, (T + (i < hp ? art_heart_full : art_heart_empty)) | (6 << 12));
+  }
+  set_wcell(6, 0, (T + art_gem_icon) | (5 << 12));
+  wprint_u(7, 0, gems);
+  if (flags & F_SWORD) { set_wcell(16, 0, (T + art_sword_icon) | (5 << 12)); } else { set_wcell(16, 0, 0); }
+  if (flags & F_KEY) { set_wcell(18, 0, (T + art_key_icon) | (5 << 12)); } else { set_wcell(18, 0, 0); }
+  hud_dirty = 0;
+}
+func save_game() {
+  save_set8(0, 'D'); save_set8(1, 'W');
+  save_set8(2, flags);
+  save_set(4, gems);
+  save_set8(6, hp);
+  save_set8(7, room);
+  save_seal(); save_commit();
+}
+func request_save() { save_stage = 1; }
+func hurt(dx, dy) {
+  if (inv > 0 || state != S_PLAY) { return; }
+  hp--;
+  inv = 70;
+  kbx = dx; kby = dy; kbt = 8;
+  crunch(2500, 8);
+  hud_dirty = 1;
+  if (hp <= 0) { state = S_DEAD; timer = 120; hide_all_sprites(); music_stop_all(); blip(110, 40); say("OH NO!"); }
+}
+func move_hero(dx, dy) {
+  var steps = 2;
+  while (steps > 0) {
+    if (dx != 0 && !hero_blocked(hx + dx, hy)) { hx = hx + dx; }
+    if (dy != 0 && !hero_blocked(hx, hy + dy)) { hy = hy + dy; }
+    steps--;
+  }
+}
+func enter(r, x, y) {
+  load_room(r);
+  hx = x; hy = y;
+  play_music(r >= 6);
+  request_save();
+}
+func edge_check() {
+  var d = -1;
+  if (hx + 8 < 0) { d = 2; }
+  else if (hx + 8 >= 160) { d = 3; }
+  else if (hy + 8 < 0) { d = 0; }
+  else if (hy + 8 >= 128) { d = 1; }
+  if (d < 0) { return; }
+  var n = nbr[room * 4 + d];
+  if (n == 255) { return; }
+  var nx = hx; var ny = hy;
+  if (d == 2) { nx = 142; } else if (d == 3) { nx = -2; } else if (d == 0) { ny = 112; } else { ny = -6; }
+  enter(n, nx, ny);
+}
+// What the hero is facing: two probe points across the hero's width, so being a little off-center still counts.
+func probe_x(k) { if (face == 2) { return hx; } if (face == 3) { return hx + 16; } return hx + 4 + k * 8; }
+func probe_y(k) { if (face == 0) { return hy + 4; } if (face == 1) { return hy + 20; } return hy + 6 + k * 8; }
+// The index (0-79) of the first block in front that is `c`, or -1.
+func front_find(c) {
+  for (var k = 0; k < 2; k++) {
+    var x = probe_x(k); var y = probe_y(k);
+    if (x >= 0 && y >= 0 && x < 160 && y < 128 && rg[(y >> 4) * 10 + (x >> 4)] == c) { return (y >> 4) * 10 + (x >> 4); }
+  }
+  return -1;
+}
+func world_touch() {
+  if (front_find('M') >= 0) {
+    if (!(flags & F_SWORD)) { flags = flags | F_SWORD; hud_dirty = 1; say("TAKE THIS! PRESS A"); blip(1568, 10); request_save(); }
+    else if (toast_t == 0) { say(flags & F_KING ? "THE WELL IS FULL!" : "THE KING HIDES BELOW"); }
+  }
+  if (front_find('C') >= 0 && !(flags & F_CHEST)) {
+    flags = flags | F_CHEST | F_KEY; hud_dirty = 1; say("YOU FOUND A KEY!"); blip(1318, 12); request_save();
+  }
+  if (front_find('D') >= 0) {
+    if (flags & F_KEY) {
+      flags = (flags | F_DOOR) & ~F_KEY; hud_dirty = 1;
+      for (var i = 0; i < 80; i++) { if (rg[i] == 'D') { rg[i] = 'N'; put_block(i % 10, i / 10); } }
+      say("THE DOOR OPENS"); crunch(900, 14); request_save();
+    } else if (toast_t == 0) { say("LOCKED. FIND A KEY"); }
+  }
+  // warps: stepping onto a doorway
+  var f = cell_at(hx + 8, hy + 12);
+  if (f == 'N' && room == 2) { enter(6, 72, 96); }
+  else if (f == 'X' && room == 6) { enter(2, 72, 24); }
+}
+func swing_sword() {
+  if (btnp(BTN_A) && (flags & F_SWORD) && swing == 0) { swing = 12; blip(880, 3); }
+  if (swing > 0) {
+    swing--;
+    // the blade covers a square in front of the hero
+    var sx = hx; var sy = hy;
+    if (face == 0) { sy = hy - 10; } else if (face == 1) { sy = hy + 12; } else if (face == 2) { sx = hx - 12; } else { sx = hx + 12; }
+    if (swing == 9) {
+      var bi = front_find('b');
+      if (bi >= 0) {
+        rg[bi] = '.'; put_block(bi % 10, bi / 10);
+        poof_x = (bi % 10) * 16; poof_y = (bi / 10) * 16; poof_t = 10; crunch(3000, 5);
+      }
+    }
+    for (var i = 0; i < NEN; i++) {
+      if (et[i] != 0 && eflash[i] == 0) {
+        var sz = et[i] == 3 ? 28 : 12;
+        if (overlap(sx + 2, sy + 2, 12, 12, ex[i] + 2, ey[i] + 2, sz, sz)) { hit_enemy(i); }
+      }
+    }
+  }
+}
+func hit_enemy(i) {
+  ehp[i]--;
+  eflash[i] = 24;
+  crunch(1800, 6);
+  for (var k = 0; k < 6; k++) { push(i, face); }       // knock it back, the way the hero faces
+  if (ehp[i] <= 0) {
+    poof_x = ex[i]; poof_y = ey[i]; poof_t = 14;
+    var t = et[i];
+    et[i] = 0;
+    if (t == 3) {
+      flags = flags | F_KING; request_save();
+      state = S_WIN; timer = 150; hide_all_sprites(); music_stop_all(); music_play(2, 1, song_win, 10); crunch(600, 60);
+    } else {
+      var r = rand(4);
+      if (r == 0 && hp < MAXHP) { drop(1, ex[i], ey[i]); } else if (r < 3) { drop(2, ex[i], ey[i]); }
+    }
+  }
+}
+
+// ---------- enemies ----------
+func eblocked(i, x, y) {
+  var w = et[i] == 3 ? 28 : 13;
+  var top = et[i] == 3 ? 6 : 5;
+  var bot = et[i] == 3 ? 29 : 14;
+  return solid_char(cell_at(x + 2, y + top)) || solid_char(cell_at(x + w, y + top)) || solid_char(cell_at(x + 2, y + bot)) || solid_char(cell_at(x + w, y + bot));
+}
+func push(i, d) {
+  var dx = (d == 3) - (d == 2);
+  var dy = (d == 1) - (d == 0);
+  if (!eblocked(i, ex[i] + dx, ey[i] + dy)) { ex[i] += dx; ey[i] += dy; }
+}
+func dir_to(i) {
+  var dx = hx - ex[i];
+  var dy = hy - ey[i];
+  if (abs(dx) > abs(dy)) { if (dx > 0) { return 3; } return 2; }
+  if (dy > 0) { return 1; }
+  return 0;
+}
+func enemies_update() {
+  for (var i = 0; i < NEN; i++) {
+    var t = et[i];
+    if (t == 0) { continue; }
+    if (eflash[i] > 0) { eflash[i]--; }
+    etm[i]++;
+    var sp = 0;
+    if (t == 1) {
+      // hop: wait, then take a short jump toward the hero (or anywhere)
+      if (etm[i] == 50) { if (rand(2)) { edir[i] = dir_to(i); } else { edir[i] = rand(4); } }
+      if (etm[i] >= 50 && (etm[i] & 1)) { sp = 1; }
+      if (etm[i] >= 80) { etm[i] = rand(20); }
+    } else if (t == 2) {
+      if (etm[i] % 40 == 0) { if (rand(2)) { edir[i] = dir_to(i); } else { edir[i] = rand(4); } }
+      sp = 1;
+      if (etm[i] & 1) { push(i, (edir[i] + 1 + (etm[i] >> 5)) & 3); }
+    } else {
+      // the king creeps toward the hero and every so often lunges
+      if (etm[i] % 3 == 0) { edir[i] = dir_to(i); sp = 1; }
+      if (etm[i] % 150 > 120) { sp = 2; edir[i] = dir_to(i); }
+    }
+    for (var k = 0; k < sp; k++) { push(i, edir[i]); }
+    // touching the hero hurts
+    var sz = 11;
+    if (t == 3) { sz = 26; }
+    if (overlap(hx + 3, hy + 6, 10, 9, ex[i] + 2, ey[i] + 3, sz, sz)) {
+      var kx = 2; var ky = 2;
+      if (hx < ex[i]) { kx = -2; }
+      if (hy < ey[i]) { ky = -2; }
+      hurt(kx, ky);
+    }
+  }
+}
+func items_update() {
+  for (var i = 0; i < 3; i++) {
+    if (it_t[i] != 0) {
+      it_life[i]--;
+      if (it_life[i] == 0) { it_t[i] = 0; }
+      else if (overlap(hx + 3, hy + 6, 10, 10, it_x[i], it_y[i], 8, 8)) {
+        if (it_t[i] == 1) { hp = min(MAXHP, hp + 1); blip(1318, 6); } else { gems = min(99, gems + 1); blip(1760, 4); }
+        it_t[i] = 0; hud_dirty = 1; request_save();
+      }
+    }
+  }
+}
+
+// ---------- drawing ----------
+func draw_sprites() {
+  // hero (blinks while invulnerable)
+  var tile = T + art_hero_d1;
+  var attr = SPR_16X16;
+  var step = moving && ((anim >> 3) & 1);
+  if (face == 0) { tile = T + art_hero_u1; if (step) { tile = T + art_hero_u2; } }
+  else if (face == 1) { tile = T + art_hero_d1; if (step) { tile = T + art_hero_d2; } }
+  else { tile = T + art_hero_s1; if (step) { tile = T + art_hero_s2; } if (face == 2) { attr = attr | SPR_FLIPX; } }
+  if (inv > 0 && ((inv >> 2) & 1)) { hide_sprite(0); } else { sprite(0, hx, hy, tile, attr); }
+  // sword
+  if (swing > 0) {
+    var st = T + art_sword_r; var sa = 5; var sx = hx; var sy = hy;
+    if (face == 0) { st = T + art_sword_u; sy = hy - 12; }
+    else if (face == 1) { st = T + art_sword_u; sa = sa | SPR_FLIPY; sy = hy + 12; }
+    else if (face == 2) { sa = sa | SPR_FLIPX; sx = hx - 12; }
+    else { sx = hx + 12; }
+    sprite(1, sx, sy, st, SPR_16X16 | sa);
+  } else { hide_sprite(1); }
+  // enemies
+  for (var i = 0; i < NEN; i++) {
+    var t = et[i];
+    if (t == 0 || (eflash[i] > 0 && ((eflash[i] >> 1) & 1))) { hide_sprite(2 + i); }
+    else if (t == 1) { sprite(2 + i, ex[i], ey[i], T + art_slime1 + (((anim + i * 5) >> 4) & 1) * 4, SPR_16X16 | 1); }
+    else if (t == 2) { sprite(2 + i, ex[i], ey[i], T + art_bat1 + (((anim + i * 3) >> 3) & 1) * 4, SPR_16X16 | 2); }
+    else { sprite(2 + i, ex[i], ey[i], T + art_king, SPR_32X32 | 3); }
+  }
+  // pickups
+  for (var i = 0; i < 3; i++) {
+    if (it_t[i] == 0 || (it_life[i] < 120 && ((it_life[i] >> 2) & 1))) { hide_sprite(8 + i); }
+    else if (it_t[i] == 1) { sprite(8 + i, it_x[i], it_y[i], T + art_heart, 7); }
+    else { sprite(8 + i, it_x[i], it_y[i], T + art_gem, 5); }
+  }
+  // the old man and the chest
+  if (npc_x >= 0) { sprite(11, npc_x, npc_y, T + art_oldman, SPR_16X16 | 4); } else { hide_sprite(11); }
+  if (chest_x >= 0) {
+    if (flags & F_CHEST) { sprite(12, chest_x, chest_y, T + art_chest_open, SPR_16X16 | 6); } else { sprite(12, chest_x, chest_y, T + art_chest, SPR_16X16 | 6); }
+  } else { hide_sprite(12); }
+  if (poof_t > 0) { poof_t--; sprite(13, poof_x + 4, poof_y + 4, T + art_poof, 5); } else { hide_sprite(13); }
+}
+
+// ---------- states ----------
+func hud_on() {
+  clear_win();
+  window_pos(0, 128);
+  text_pal = 0;
+  for (var c = 0; c < 20; c++) { set_wcell(c, 0, 0); set_wcell(c, 1, 0); }
+  draw_hud();
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+}
+func start_play(r, x, y) {
+  state = S_PLAY;
+  hide_all_sprites();
+  clear_bg();
+  inv = 0; swing = 0; kbt = 0; face = 1; poof_t = 0; toast_t = 0; hud_dirty = 1;
+  hud_on();
+  load_room(r);
+  hx = x; hy = y;
+  play_music(r >= 6);
+}
+func new_game() {
+  srand(frames(), 0xD0D0);
+  flags = 0; gems = 0; hp = MAXHP;
+  start_play(0, 72, 96);
+  say("AN OLD MAN WAITS...");
+}
+func continue_game() {
+  flags = save_get8(2); gems = save_get(4); hp = save_get8(6);
+  var r = save_get8(7);
+  if (hp < 2) { hp = MAXHP; }
+  srand(frames(), 0xD0D0);
+  start_play(r, 72, 96);
+  say("WELCOME BACK");
+}
+func draw_title() {
+  state = S_TITLE;
+  hide_all_sprites();
+  clear_bg(); clear_win();
+  scroll(0, 0);
+  window_pos(0, 144);
+  for (var bx = 0; bx < 10; bx++) {
+    for (var by = 5; by < 8; by++) { rg[by * 10 + bx] = by == 5 ? '.' : ','; put_block(bx, by); }
+  }
+  text_pal = 0;
+  text(4, 2, "THE DRY WELL");
+  text(2, 4, "A SMALL ADVENTURE");
+  menu_i = 0; title_t = 0;
+  lcd(LCD_BG | LCD_OBJ);
+  play_music(0);
+}
+func title_frame() {
+  title_t++;
+  if (has_save) {
+    text(5, 7, menu_i == 0 ? "> CONTINUE" : "  CONTINUE");
+    text(5, 8, menu_i == 1 ? "> NEW GAME " : "  NEW GAME ");
+    if (btnp(BTN_UP) || btnp(BTN_DOWN)) { menu_i = !menu_i; blip(660, 2); }
+  } else { text(4, 7, "PRESS  START"); }
+  var x = (title_t >> 1) % 200 - 20;
+  sprite(0, x, 80, T + art_hero_s1 + ((title_t >> 3) & 1) * 4, SPR_16X16);
+  sprite(1, x - 30, 84, T + art_slime1 + ((title_t >> 4) & 1) * 4, SPR_16X16 | 1);
+  if (btnp(BTN_START) || btnp(BTN_A)) {
+    if (has_save && menu_i == 0) { continue_game(); } else { new_game(); }
+  }
+}
+func play_frame() {
+  anim++;
+  // walking (knocked back instead while hurt)
+  var dx = btn(BTN_RIGHT) - btn(BTN_LEFT);
+  var dy = btn(BTN_DOWN) - btn(BTN_UP);
+  moving = 0;
+  if (kbt > 0) { kbt--; move_hero(kbx / 2, kby / 2); }
+  else if (swing < 6) {
+    if (dx != 0 || dy != 0) {
+      moving = 1;
+      if (dx != 0) { if (dx > 0) { face = 3; } else { face = 2; } }
+      else { if (dy > 0) { face = 1; } else { face = 0; } }
+      move_hero(dx, dy);
+    }
+  }
+  if (inv > 0) { inv--; }
+  swing_sword();
+  world_touch();
+  edge_check();
+  enemies_update();
+  items_update();
+  draw_sprites();
+  if (toast_t > 0) { toast_t--; if (toast_t == 0) { wtext(0, 1, "                    "); } }
+  if (hud_dirty) { draw_hud(); }
+}
+func win_screen() {
+  if (timer == 100) {
+    clear_bg(); clear_win(); window_pos(0, 144); text_pal = 0;
+    text(2, 5, "THE SLIME KING IS"); text(2, 6, "DEFEATED!");
+    text(2, 9, "THE WELL IS FULL"); text(2, 10, "OF WATER AGAIN.");
+    text(2, 13, "GEMS"); print_u(7, 13, gems);
+    text(2, 16, "PRESS START");
+  }
+  if (timer < 100 && btnp(BTN_START)) { draw_title(); }
+}
+func frame() {
+  if (btnp(BTN_SELECT)) { muted = !muted; music_mute(muted); }
+  if (state == S_TITLE) { title_frame(); }
+  else if (state == S_PLAY) { play_frame(); }
+  else if (state == S_DEAD) {
+    timer--;
+    if (timer == 0) { hp = MAXHP; start_play(0, 72, 96); say("TRY AGAIN"); }
+  } else { timer--; win_screen(); }
+  if (save_stage == 1) { save_game(); save_stage = 0; }
+  if (beep > 0) { beep--; if (beep == 0) { tone_off(1); } }
+  if (nbeep > 0) { nbeep--; if (nbeep == 0) { tone_off(3); } }
+  music_update();
+}
+func init() {
+  select_bank(bankof(art));
+  load_font(0);
+  load_tiles(art, T, art_COUNT);
+  bg_pal(0, rgb(1, 1, 4), rgb(8, 9, 12), rgb(11, 12, 15), rgb(15, 15, 15));       // HUD and text
+  bg_pal(1, rgb(7, 12, 4), rgb(10, 14, 6), rgb(3, 9, 3), rgb(1, 4, 2));           // grass, bushes, trees
+  bg_pal(2, rgb(7, 12, 4), rgb(14, 12, 7), rgb(11, 8, 3), rgb(5, 3, 1));          // paths, bridges
+  bg_pal(3, rgb(7, 12, 4), rgb(12, 12, 13), rgb(7, 7, 9), rgb(3, 3, 5));          // stone
+  bg_pal(4, rgb(11, 14, 15), rgb(3, 8, 14), rgb(2, 5, 11), rgb(1, 2, 7));         // water
+  bg_pal(5, rgb(1, 1, 4), rgb(15, 14, 7), rgb(13, 10, 2), rgb(5, 3, 1));          // doors, HUD icons
+  bg_pal(6, rgb(1, 1, 4), rgb(15, 4, 4), rgb(13, 8, 8), rgb(7, 1, 2));            // hearts
+  bg_pal(7, rgb(7, 12, 4), rgb(15, 15, 15), rgb(5, 10, 3), rgb(15, 13, 2));       // flowers
+  obj_pal(0, 0, rgb(15, 11, 8), rgb(4, 12, 5), rgb(3, 2, 2));                     // hero
+  obj_pal(1, 0, rgb(12, 15, 10), rgb(5, 13, 4), rgb(1, 6, 2));                    // slime
+  obj_pal(2, 0, rgb(12, 10, 15), rgb(7, 4, 11), rgb(3, 1, 5));                    // bat
+  obj_pal(3, 0, rgb(14, 15, 9), rgb(5, 12, 4), rgb(1, 4, 2));                     // the king
+  obj_pal(4, 0, rgb(15, 15, 15), rgb(5, 7, 13), rgb(2, 2, 5));                    // old man
+  obj_pal(5, 0, rgb(15, 15, 15), rgb(15, 12, 2), rgb(8, 8, 9));                   // sword, gems, poof
+  obj_pal(6, 0, rgb(15, 13, 3), rgb(10, 6, 2), rgb(4, 2, 1));                     // chest
+  obj_pal(7, 0, rgb(15, 10, 10), rgb(14, 3, 3), rgb(7, 1, 2));                    // hearts
+  hide_all_sprites();
+  master_volume(9);
+  has_save = save_loaded() && save_get8(0) == 'D' && save_get8(1) == 'W' && save_valid();
+  draw_title();
+}

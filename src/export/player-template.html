@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1d3a1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="__DESCRIPTION__">
+<title>__TITLE__</title>
+<style>
+:root { --bg: #12160f; --body: #1d3a1a; --btn: #2c4a2a; --btn-down: #6b9a4a; --ink: #cfe3b8; --red: #7a2a3a; --red-down: #b04a5e; color-scheme: dark; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px system-ui, sans-serif; overflow: hidden; }
+body { display: flex; align-items: center; justify-content: center; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+#device { background: var(--body); border-radius: 14px 14px 40px 14px; padding: 14px; display: flex; flex-direction: column; gap: 12px; max-width: 100vw; max-height: 100vh; box-shadow: 0 8px 0 rgba(0,0,0,.3); }
+#bezel { background: #0c1a0c; padding: 10px; border-radius: 8px; }
+canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; width: var(--w, 480px); height: calc(var(--w, 480px) * 144 / 160); background: #e0f0c8; }
+#title { font: 11px ui-monospace, Menlo, monospace; letter-spacing: .15em; color: #8fa878; margin: 0 4px; display: flex; justify-content: space-between; align-items: center; }
+#title button { background: none; border: 0; color: #8fa878; font: inherit; cursor: pointer; padding: 2px 6px; letter-spacing: inherit; }
+#pad { display: none; justify-content: space-between; align-items: center; user-select: none; -webkit-user-select: none; touch-action: none; }
+.dpad { display: grid; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); gap: 2px; }
+button.k { background: var(--btn); color: var(--ink); border: 0; border-radius: 8px; font: 700 13px ui-monospace, Menlo, monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
+button.k.down { background: var(--btn-down); }
+.ab { display: flex; gap: 12px; transform: rotate(-18deg); }
+.ab button.k { width: 54px; height: 54px; border-radius: 50%; background: var(--red); color: #f2d0d6; }
+.ab button.k.down { background: var(--red-down); }
+.ss { display: none; gap: 8px; justify-content: center; }
+.ss button.k { padding: 6px 14px; font-size: 11px; border-radius: 12px; }
+@media (pointer: coarse) { #pad { display: flex; } .ss { display: flex; } }
+#msg { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; background: rgba(0,0,0,.8); }
+#msg.show { display: flex; }
+</style>
+</head>
+<body>
+<div id="device">
+  <div id="bezel"><canvas id="screen" width="160" height="144" aria-label="__TITLE__"></canvas></div>
+  <div id="title"><span>__TITLE__</span><span><button id="snd" title="Toggle sound (M)">sound off</button><button id="fs" title="Fullscreen (F)">full</button></span></div>
+  <div id="pad"><div class="dpad"><span></span><button class="k" data-b="1" aria-label="Up">&#9650;</button><span></span><button class="k" data-b="4" aria-label="Left">&#9664;</button><span></span><button class="k" data-b="8" aria-label="Right">&#9654;</button><span></span><button class="k" data-b="2" aria-label="Down">&#9660;</button><span></span></div><div class="ab"><button class="k" data-b="32" aria-label="B">B</button><button class="k" data-b="16" aria-label="A">A</button></div></div>
+  <div class="ss"><button class="k" data-b="128">SELECT</button><button class="k" data-b="64">START</button></div>
+</div>
+<div id="msg"><div id="msgtext"></div></div>
+<script>
+(function () {
+  "use strict";
+  var WASM = "__WASM_BASE64__";
+  var ROM = "__ROM_BASE64__";
+  var SAVE_KEY = "vly-save:__ROM_ID__";
+  function b64(s) { var bin = atob(s), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+  var canvas = document.getElementById("screen"), ctx = canvas.getContext("2d"), img = ctx.createImageData(160, 144);
+  var keyMap = { ArrowUp: 1, ArrowDown: 2, ArrowLeft: 4, ArrowRight: 8, w: 1, s: 2, a: 4, d: 8, x: 16, k: 16, z: 32, j: 32, Enter: 64, " ": 64, Shift: 128, Backspace: 128 };
+  var keys = 0, touch = 0, latch = 0, soundOn = false, audio = null, nextTime = 0;
+  function fit() { var d = document.getElementById("device"); var cs = Math.min(Math.floor((innerWidth - 60) / 160), Math.floor((innerHeight - (matchMedia("(pointer: coarse)").matches ? 300 : 130)) / 144)); cs = Math.max(1, cs); document.documentElement.style.setProperty("--w", (160 * cs) + "px"); }
+  addEventListener("resize", fit); fit();
+  addEventListener("keydown", function (e) { var b = keyMap[e.key] || keyMap[(e.key || "").toLowerCase()]; if (b) { keys |= b; latch |= b; e.preventDefault(); } if ((e.key || "").toLowerCase() === "m") toggleSound(); if ((e.key || "").toLowerCase() === "f") fullscreen(); });
+  addEventListener("keyup", function (e) { var b = keyMap[e.key] || keyMap[(e.key || "").toLowerCase()]; if (b) { keys &= ~b; e.preventDefault(); } });
+  addEventListener("blur", function () { keys = 0; });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-b]"), function (el) {
+    var b = +el.dataset.b;
+    function dn(e) { e.preventDefault(); touch |= b; latch |= b; el.classList.add("down"); if (soundOn && audio && audio.state === "suspended") audio.resume(); }
+    function up(e) { e.preventDefault(); touch &= ~b; el.classList.remove("down"); }
+    el.addEventListener("pointerdown", function (e) { if (el.setPointerCapture) el.setPointerCapture(e.pointerId); dn(e); });
+    el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); el.addEventListener("lostpointercapture", up);
+    el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  });
+  function fullscreen() { var d = document.documentElement; if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(function () {}); }
+  document.getElementById("fs").onclick = fullscreen;
+  function toggleSound() {
+    soundOn = !soundOn;
+    document.getElementById("snd").textContent = soundOn ? "sound on" : "sound off";
+    if (soundOn && !audio) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) audio = new AC({ sampleRate: 44100 }); }
+    if (soundOn && audio) audio.resume();
+  }
+  document.getElementById("snd").onclick = toggleSound;
+  function show(t) { document.getElementById("msgtext").textContent = t; document.getElementById("msg").className = "show"; }
+
+  var saved = null;
+  try { var s = localStorage.getItem(SAVE_KEY); if (s) saved = b64(s); if (saved && saved.length !== 1024) saved = null; } catch (e) {}
+
+  WebAssembly.instantiate(b64(WASM), {}).then(function (r) {
+    var x = r.instance.exports, rom = b64(ROM);
+    var mem = new Uint8Array(x.memory.buffer);
+    mem.set(rom, x.vly_rom_ptr());
+    if (saved) mem.set(saved, x.vly_save_in_ptr());
+    var rc = x.vly_load(rom.length, saved ? 1 : 0);
+    if (rc) { show("This cartridge could not be loaded (error " + rc + ")."); return; }
+    x.vly_boot();
+    var lastSaves = 0, acc = 0, last = performance.now();
+    function draw() { var p = x.vly_render_rgba(); img.data.set(new Uint8Array(x.memory.buffer, p, 160 * 144 * 4)); ctx.putImageData(img, 0, 0); }
+    function pushAudio() {
+      var n = 735, p = x.vly_audio(n, 44100), s = new Int16Array(x.memory.buffer, p, n);
+      var buf = audio.createBuffer(1, n, 44100), ch = buf.getChannelData(0);
+      for (var i = 0; i < n; i++) ch[i] = s[i] / 32767;
+      var src = audio.createBufferSource(); src.buffer = buf; src.connect(audio.destination);
+      var now = audio.currentTime; if (nextTime < now + 0.02) nextTime = now + 0.05; if (nextTime > now + 0.3) return;
+      src.start(nextTime); nextTime += n / 44100;
+    }
+    function tick(now) {
+      acc += Math.min(100, now - last); last = now;
+      var steps = 0;
+      while (acc >= 1000 / 60 && steps < 4) {
+        acc -= 1000 / 60; steps++;
+        x.vly_frame(keys | touch | latch); latch = 0; // latched presses guarantee even a very quick tap lasts one frame
+        var n = x.vly_save_requests();
+        if (n !== lastSaves) {
+          lastSaves = n;
+          var snap = new Uint8Array(x.memory.buffer, x.vly_save_snapshot_ptr(), 1024), str = "";
+          for (var i = 0; i < 1024; i++) str += String.fromCharCode(snap[i]);
+          try { localStorage.setItem(SAVE_KEY, btoa(str)); } catch (e) {}
+        }
+        if (soundOn && audio) pushAudio();
+      }
+      if (steps) draw();
+      requestAnimationFrame(tick);
+    }
+    draw(); requestAnimationFrame(tick);
+  }, function (e) { show("This browser cannot run WebAssembly: " + e.message); });
+})();
+</script>
+</body>
+</html>

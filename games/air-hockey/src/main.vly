@@ -1,0 +1,559 @@
+// AIR HOCKEY for the VLY-1: you (red, left) against the computer (blue, right). First to 7 goals wins.
+//   D-PAD moves your mallet. START pauses. In menus: D-PAD + A to choose, B to go back.
+// Four computer levels (ROOKIE, PRO, CHAMP, LEGEND), a win/loss record per level in the save, music, sound for every event.
+import "std/sprites";
+import "std/fade";
+import "table_data.vly";
+import "physics.vly";
+import "ai.vly";
+import "sound.vly";
+
+tileset ta = "../assets/table.tiles";
+tileset bf = "../assets/big.tiles";
+tileset ob = "../assets/objs.tiles";
+
+const T_TAB = 100;                 // table tiles 100..158
+const T_BIG = 160;                 // big letters: 37 sprites of 4 tiles each, 160..307
+const T_OBJ = 310;                 // mallet (4 tiles), puck, confetti, spark, arrow
+
+const S_TITLE = 0; const S_MENU = 1; const S_VS = 2; const S_SERVE = 3; const S_PLAY = 4; const S_GOAL = 5; const S_PAUSE = 6; const S_WIN = 7;
+const WIN_SCORE = 7;
+const MAGIC = 0x4850;
+
+table lvl_name = { "ROOKIE", "PRO", "CHAMP", "LEGEND" };
+table lvl_desc = { "SLOW AND SLOPPY", "SOLID DEFENCE", "BANK SHOTS AND PUNCHES", "NO MERCY" };
+
+var state; var st_t;
+var score[2];
+var server;                         // who serves: 0 you, 1 CPU
+var sel;                            // level highlighted in the menu (and the last one played)
+var pend = -1;                      // state we are fading toward
+var attract;
+var rec_w[4]; var rec_l[4]; var best_speed;
+var shx; var shy; var shk;          // screen shake
+var flash;                          // goal flash frames left
+var goal_by;                        // 1 = you scored, 2 = CPU scored
+var win_by;                         // who won the match: 1 you, 2 CPU
+var shot_max;                       // fastest shot this match (1/8 px per frame)
+var new_record;
+var paused_from; var resuming;
+var go_t;                           // frames the GO banner stays
+var clock;                          // shot clock: frames the puck has lain still in one half
+var goal_why;                       // 0 a goal, 1 the shot clock ran out
+var blink_on;
+var conf_x[20]; var conf_y[20]; var conf_vx[20]; var conf_vy[20]; var conf_n;
+var seed_ready;
+
+// ---------------- helpers ----------------
+func slen(s) { var n = 0; while (peek8(s + n) != 0) { n++; } return n; }
+
+func draw_table() {
+  for (var r = 0; r < 18; r++) { copy(BG_MAP + r * 64, table_cells + r * 40, 40); }
+}
+func restore_table(c, r, w, h) {           // put table cells back after text was drawn over them
+  for (var y = r; y < r + h; y++) { copy(BG_MAP + (y * 32 + c) * 2, table_cells + (y * 20 + c) * 2, w * 2); }
+}
+func dark_screen() {                       // every cell blank on palette 2 (a row by hand, then copied: fill_cells of 1,024 cells costs 58,000 cycles)
+  for (var c = 0; c < 32; c++) { poke(BG_MAP + c * 2, 0x2000); }
+  for (var r = 1; r < 32; r++) { copy(BG_MAP + r * 64, BG_MAP, 64); }
+}
+func dark_box(c, r, w, h) { fill_cells(c, r, w, h, 0 | (2 << 12)); }
+func ctext(row, s, pal) {                  // centered text
+  text_pal = pal;
+  text((20 - slen(s)) / 2, row, s);
+  text_pal = 2;
+}
+func status(s) {                           // the strip along the bottom rail
+  dark_box(0, 17, 20, 1);
+  text_pal = 2;
+  text((20 - slen(s)) / 2, 17, s);
+}
+func hud() {
+  text_pal = 4; text(1, 0, "YOU");
+  text_pal = 3; text(5, 0, utoa(score[0]));
+  text_pal = 3; text(14, 0, utoa(score[1]));
+  text_pal = 5; text(16, 0, "CPU");
+  text_pal = 2;
+  text(7, 0, "      ");
+  var nm = lvl_name[level];
+  text(10 - slen(nm) / 2, 0, nm);
+}
+
+// big letters as sprites (16 x 16). Uses std/sprites slots, so call before other sprites.
+func big_char(x, y, c, pal) {
+  var k = -1;
+  if (c >= 48 && c <= 57) { k = c - 48; }
+  if (c >= 65 && c <= 90) { k = c - 55; }
+  if (c == 33) { k = 36; }
+  if (k >= 0) { spr(x, y, T_BIG + k * 4, SPR_16X16 | pal); }
+}
+func bigw(s) {                                  // width in pixels: 16 per letter, 8 per space
+  var w = 0; var i = 0; var c = peek8(s);
+  while (c != 0) { if (c == 32) { w += 8; } else { w += 16; } i++; c = peek8(s + i); }
+  return w;
+}
+func big(x, y, s, pal) {
+  var i = 0; var c = peek8(s);
+  while (c != 0) { if (c == 32) { x += 8; } else { big_char(x, y, c, pal); x += 16; } i++; c = peek8(s + i); }
+}
+func big_c(y, s, pal) { big(80 - bigw(s) / 2, y, s, pal); }
+func big_wave(y, s, pal, t) {
+  var x = 80 - bigw(s) / 2;
+  var i = 0; var c = peek8(s);
+  while (c != 0) { if (c == 32) { x += 8; } else { big_char(x, y + sin(t * 9 + i * 40) / 40, c, pal); x += 16; } i++; c = peek8(s + i); }
+}
+
+// ---------------- save ----------------
+func save_load() {
+  for (var i = 0; i < 4; i++) { rec_w[i] = 0; rec_l[i] = 0; }
+  best_speed = 0;
+  if (save_loaded() && save_valid() && save_get(0) == MAGIC) {
+    for (var j = 0; j < 4; j++) { rec_w[j] = save_get(2 + j * 2); rec_l[j] = save_get(10 + j * 2); }
+    best_speed = save_get(18);
+  }
+}
+func save_store() {
+  save_set(0, MAGIC);
+  for (var i = 0; i < 4; i++) { save_set(2 + i * 2, rec_w[i]); save_set(10 + i * 2, rec_l[i]); }
+  save_set(18, best_speed);
+  save_seal();
+  save_commit();
+}
+func unlocked(l) { return l < 3 || rec_w[2] > 0; }
+
+// ---------------- palettes ----------------
+func set_palettes() {
+  bg_pal(0, rgb(13, 14, 15), rgb(11, 12, 14), rgb(5, 9, 14), rgb(14, 3, 3));     // table: ice, air holes, blue lines, red line
+  bg_pal(1, rgb(1, 2, 5), rgb(9, 11, 13), rgb(5, 7, 11), rgb(14, 14, 15));         // rails
+  bg_pal(2, rgb(1, 2, 5), rgb(5, 7, 11), rgb(8, 10, 13), rgb(15, 15, 15));         // text, white on navy
+  bg_pal(3, rgb(1, 2, 5), rgb(5, 7, 11), rgb(8, 10, 13), rgb(15, 13, 3));          // text, gold
+  bg_pal(4, rgb(1, 2, 5), rgb(5, 7, 11), rgb(8, 10, 13), rgb(15, 6, 6));           // text, red
+  bg_pal(5, rgb(1, 2, 5), rgb(5, 7, 11), rgb(8, 10, 13), rgb(7, 10, 15));          // text, blue
+  bg_pal(6, rgb(2, 3, 6), rgb(9, 11, 13), rgb(13, 3, 3), rgb(15, 15, 15));         // net and red goal rails
+  obj_pal(0, 0, rgb(15, 12, 12), rgb(13, 2, 3), rgb(5, 0, 1));                      // your mallet
+  obj_pal(1, 0, rgb(11, 13, 15), rgb(3, 6, 14), rgb(0, 1, 5));                      // CPU mallet
+  obj_pal(2, 0, rgb(11, 11, 12), rgb(4, 4, 5), rgb(0, 0, 1));                       // puck
+  obj_pal(3, 0, rgb(12, 13, 15), rgb(9, 11, 14), rgb(6, 8, 12));                    // puck trail
+  obj_pal(4, 0, rgb(2, 1, 4), rgb(13, 10, 2), rgb(15, 14, 3));                      // big letters, gold
+  obj_pal(5, 0, rgb(2, 1, 4), rgb(14, 3, 3), rgb(15, 6, 6));                        // big letters, red
+  obj_pal(6, 0, rgb(2, 1, 4), rgb(3, 6, 14), rgb(7, 11, 15));                       // big letters, blue
+  obj_pal(7, 0, rgb(2, 1, 4), rgb(3, 12, 4), rgb(6, 15, 6));                        // confetti green
+}
+
+// ---------------- confetti ----------------
+func confetti(n) {
+  conf_n = n;
+  for (var i = 0; i < n; i++) {
+    conf_x[i] = 80 * 8 + rand_range(-60, 60);
+    conf_y[i] = 70 * 8 + rand_range(-30, 30);
+    conf_vx[i] = rand_range(-18, 18);
+    conf_vy[i] = rand_range(-30, -6);
+  }
+}
+func confetti_update() {
+  for (var i = 0; i < conf_n; i++) {
+    conf_x[i] += conf_vx[i];
+    conf_y[i] += conf_vy[i];
+    conf_vy[i] += 1;
+    conf_vx[i] -= conf_vx[i] / 32;
+    if (conf_y[i] > 150 * 8) { conf_y[i] = 150 * 8; conf_vy[i] = 0; conf_vx[i] = 0; }
+  }
+}
+func confetti_draw() {
+  for (var i = 0; i < conf_n; i++) {
+    var cx = conf_x[i] >> 3;
+    var cy = conf_y[i] >> 3;
+    if (cy < 128 || state == S_WIN) { spr(cx, cy, T_OBJ + 5 + ((i + frames() / 4) & 1), (4 + (i & 3)) | SPR_BEHIND); }
+  }
+}
+
+// ---------------- state changes ----------------
+func puck_launch_random() {
+  pux = 80 * 64; puy = 76 * 64;
+  var dir = 1; if (rand(2) == 0) { dir = -1; }
+  pvx = dir * rand_range(330, 520);
+  pvy = rand_range(-300, 300);
+  hist_fill();
+}
+func mallets_home() {
+  mx[0] = 24 * 64; my[0] = 76 * 64; mx[1] = 136 * 64; my[1] = 76 * 64;
+  for (var i = 0; i < 2; i++) { mvx[i] = 0; mvy[i] = 0; }
+}
+
+func enter_title() {
+  state = S_TITLE; st_t = 0;
+  attract = 1;
+  level = 1;
+  clear_bg();
+  draw_table();
+  text_pal = 2;
+  text(2, 0, "FIRST TO 7 WINS");
+  mallets_home();
+  puck_launch_random();
+  ai_wait_t = 0;
+  blink_on = 0;
+  music_title();
+  shk = 0; shx = 0; shy = 0; scroll(0, 0);
+  conf_n = 0;
+  lcd(LCD_BG | LCD_OBJ);
+}
+func menu_draw() {
+  ctext(1, "CHOOSE YOUR RIVAL", 3);
+  for (var i = 0; i < 4; i++) {
+    var row = 4 + i * 2;
+    var pal = 2;
+    if (i == sel) { pal = 3; }
+    text_pal = pal;
+    text(2, row, "                 ");
+    if (i == sel) { text(2, row, ">"); }
+    text(4, row, lvl_name[i]);
+    if (unlocked(i)) {
+      var c = 12;
+      text(c, row, utoa(rec_w[i])); c += slen(utoa(rec_w[i]));
+      text(c, row, "-"); c++;
+      text(c, row, utoa(rec_l[i]));
+    } else {
+      text(12, row, "LOCKED");
+    }
+  }
+  text_pal = 2;
+  text(1, 12, "RECORD: WON-LOST    ");
+  dark_box(0, 14, 20, 2);
+  if (unlocked(sel)) { ctext(14, lvl_desc[sel], 5); } else { ctext(14, "BEAT CHAMP TO OPEN", 4); }
+  ctext(16, "A: PLAY    B: BACK", 2);
+}
+func enter_menu() {
+  state = S_MENU; st_t = 0; attract = 0;
+  dark_screen();
+  hide_all_sprites();
+  menu_draw();
+}
+
+func enter_vs() {
+  state = S_VS; st_t = 0;
+  dark_screen();
+  hide_all_sprites();
+  ctext(11, "FIRST TO 7 GOALS", 2);
+  ctext(13, "D-PAD  MOVE MALLET", 2);
+  ctext(15, "START  PAUSE", 2);
+  ctext(17, "GOOD LUCK!", 3);
+  music_stop_all();
+  snd(SND_VS);
+}
+
+func score_text_status() {
+  if (score[0] == WIN_SCORE - 1 && score[1] == WIN_SCORE - 1) { status("SUDDEN DEATH"); }
+  else if (score[0] == WIN_SCORE - 1 || score[1] == WIN_SCORE - 1) { status("MATCH POINT"); }
+  else if (server == 0) { status("YOUR SERVE"); }
+  else { status("CPU SERVES"); }
+}
+
+func serve_start(who, first) {
+  server = who;
+  state = S_SERVE; st_t = 0; resuming = 0;
+  if (!first) { st_t = 36; }                // later serves count 2, 1 only
+  pux = 46 * 64; if (who == 1) { pux = 114 * 64; }
+  puy = 76 * 64; pvx = 0; pvy = 0;
+  hist_fill();
+  ai_wait_t = ai_wait[level];
+  ai_stuck = 0;
+  touches = 0; clock = 0;
+  score_text_status();
+  if (score[0] == WIN_SCORE - 1 || score[1] == WIN_SCORE - 1) { music_tempo(5); snd(SND_MATCHPT); }
+  else { music_tempo(6); }
+}
+
+func enter_match() {                       // from the versus card: the table
+  attract = 0;
+  clear_bg();
+  draw_table();
+  hud();
+  mallets_home();
+  music_match();
+  music_tempo(6);
+  shk = 0; shx = 0; shy = 0; scroll(0, 0);
+  conf_n = 0; go_t = 0;
+  serve_start(server, 1);
+}
+
+func enter_win() {
+  state = S_WIN; st_t = 0;
+  dark_screen();
+  hide_all_sprites();
+  conf_n = 0;
+  if (win_by == 1) { rec_w[level]++; confetti(20); } else { rec_l[level]++; }
+  new_record = 0;
+  if (shot_max > best_speed && shot_max > 0) { best_speed = shot_max; new_record = 1; }
+  ctext(6, "FINAL SCORE", 2);
+  text_pal = 3; text(10, 8, "-");
+  ctext(10, lvl_name[level], 5);
+  text_pal = 2;
+  var wl = slen(utoa(rec_w[level]));
+  text(3, 12, "RECORD"); text(10, 12, utoa(rec_w[level])); text(10 + wl, 12, "-"); text(11 + wl, 12, utoa(rec_l[level]));
+  text(3, 14, "TOP SHOT"); print_u(12, 14, shot_max * 2); text(15, 14, "KMH");
+  if (new_record) { ctext(16, "NEW SPEED RECORD!", 3); }
+  if (win_by == 1 && level == 2 && rec_w[2] == 1) { ctext(16, "LEGEND UNLOCKED!", 3); }
+  ctext(17, "A: REMATCH  B: MENU", 2);
+  music_fanfare(win_by == 1);
+}
+
+func go_state(ns) {                         // fade out, then enter ns
+  pend = ns;
+  fade_to(0, 3);
+}
+func new_match(l) {
+  level = l; sel = l;
+  score[0] = 0; score[1] = 0;
+  shot_max = 0; new_record = 0;
+  server = rand(2);
+  go_state(S_VS);
+}
+func do_enter(ns) {
+  if (ns == S_TITLE) { enter_title(); }
+  else if (ns == S_MENU) { enter_menu(); }
+  else if (ns == S_VS) { enter_vs(); }
+  else if (ns == S_SERVE) { enter_match(); }
+  else if (ns == S_WIN) { enter_win(); }
+}
+
+func start_pause() {
+  paused_from = state;
+  state = S_PAUSE; st_t = 0;
+  master_volume(3);
+  snd(SND_PAUSE);
+  dark_box(3, 6, 14, 5);
+  ctext(7, "PAUSED", 3);
+  ctext(9, "START: RESUME", 2);
+  ctext(10, "SELECT: QUIT", 2);
+}
+func end_pause() {
+  restore_table(3, 6, 14, 5);
+  master_volume(8);
+  snd(SND_RESUME);
+  if (paused_from == S_PLAY) { state = S_SERVE; st_t = 72; resuming = 1; } else { state = S_SERVE; }
+}
+
+func goal_start(side, why) {
+  goal_by = side;
+  goal_why = why;
+  score[side - 1]++;
+  state = S_GOAL; st_t = 0;
+  hud();
+  flash = 36; shk = 14;
+  if (side == 1) { snd(SND_GOAL_YOU); confetti(20); } else { snd(SND_GOAL_CPU); conf_n = 0; }
+  snd(SND_HORN);
+  if (side == 1) { status("YOU SCORE!"); } else { status("CPU SCORES"); }
+}
+
+// ---------------- per-state frames ----------------
+func player_drive() {
+  var tvx = (btn(BTN_RIGHT) - btn(BTN_LEFT)) * PLAYER_SPD;
+  var tvy = (btn(BTN_DOWN) - btn(BTN_UP)) * PLAYER_SPD;
+  if (tvx != 0 && tvy != 0) { tvx = fmul(tvx, 181); tvy = fmul(tvy, 181); }
+  mallet_drive(0, tvx, tvy);
+}
+
+func play_events() {
+  if (ev_mallet) {
+    snd_hit(ev_mallet_str, ev_mallet);
+    if (ev_mallet == 2) { ai_touched(); }
+    var sp = puck_speed8();
+    if (sp > shot_max && ev_mallet == 1 && abs(mvx[0]) + abs(mvy[0]) > 128) { shot_max = sp; }     // only a swing counts, not a bounce off a mallet that stood still
+    if (ev_mallet_str > 18) { shk = max(shk, 3); }
+  }
+  if (ev_wall > 2) { snd_custom(1, 1500 + ev_wall * 10, 900, 4 + ev_wall / 5, 0, 3 + ev_wall / 14, 0); }
+  if (ev_post > 1) { snd(SND_POST); }
+}
+
+func play_frame() {
+  if (btnp(BTN_START)) { start_pause(); return; }
+  player_drive();
+  ai_think(1);
+  physics_step();
+  hist_push();
+  play_events();
+  if (go_t > 0) { go_t--; }
+  if (goal_side) { goal_start(goal_side, 0); return; }
+  // shot clock: a puck that lies still in one half for 7 seconds loses the point for that player
+  if (puck_speed16() < 6 && !ev_mallet) { clock++; } else { clock = 0; }
+  if (clock >= 300 && clock % 60 == 0 && clock < 420) {
+    if (clock == 300) { status("SHOT CLOCK 2"); } else if (clock == 360) { status("SHOT CLOCK 1"); }
+    snd(SND_BEEP);
+  }
+  if (clock >= 420) {
+    var owner = 1; if (pux > 80 * 64) { owner = 2; }       // whose half the puck is in
+    if (owner == 1) { pux = 6 * 64; puy = 76 * 64; goal_start(2, 1); } else { pux = 154 * 64; puy = 76 * 64; goal_start(1, 1); }
+    pvx = 0; pvy = 0;
+  }
+}
+
+func serve_frame() {
+  if (btnp(BTN_START)) { start_pause(); return; }
+  var n = st_t / 36;
+  if (st_t % 36 == 0 && n < 3) { snd(SND_BEEP); }
+  if (!resuming) {
+    mx[0] += (24 * 64 - mx[0]) / 6; my[0] += (76 * 64 - my[0]) / 6;
+    mx[1] += (136 * 64 - mx[1]) / 6; my[1] += (76 * 64 - my[1]) / 6;
+  }
+  if (st_t >= 108) { state = S_PLAY; st_t = 0; go_t = 40; snd(SND_GO); resuming = 0; score_text_status(); }
+}
+
+func goal_frame() {
+  net_step();
+  for (var i = 0; i < 2; i++) {
+    mallet_drive(i, 0, 0);
+    mx[i] += mvx[i] / 4; my[i] += mvy[i] / 4;
+    mallet_limits(i);
+  }
+  if (st_t == 6) { snd(SND_NET); }
+  if (flash > 0) {
+    flash--;
+    // flash the table colour: gold for your goal, blue for theirs
+    if (goal_by == 1) { if ((flash >> 2) & 1) { bg_pal(0, rgb(15, 14, 9), rgb(15, 12, 5), rgb(5, 9, 14), rgb(14, 3, 3)); } else { bg_pal(0, rgb(13, 14, 15), rgb(11, 12, 14), rgb(5, 9, 14), rgb(14, 3, 3)); } }
+    else { if ((flash >> 2) & 1) { bg_pal(0, rgb(9, 11, 15), rgb(8, 10, 14), rgb(5, 9, 14), rgb(14, 3, 3)); } else { bg_pal(0, rgb(13, 14, 15), rgb(11, 12, 14), rgb(5, 9, 14), rgb(14, 3, 3)); } }
+    if (flash == 0) { fade_save(); }
+  }
+  if (conf_n > 0) { confetti_update(); }
+  if (st_t == 100) {
+    if (score[goal_by - 1] >= WIN_SCORE) { win_by = goal_by; go_state(S_WIN); }
+    else { restore_table(0, 17, 20, 1); serve_start(2 - goal_by, 0); }
+  }
+}
+
+func title_frame() {
+  // attract mode: two PRO computers play on the table behind the logo
+  ai_think(0); ai_think(1);
+  physics_step();
+  hist_push();
+  if (goal_side) { puck_launch_random(); mallets_home(); }
+  if (puck_speed8() < 6 && (frames() & 63) == 0) { puck_launch_random(); }
+  st_t++;
+  var on = (st_t / 30) & 1;
+  if (on != blink_on || st_t == 1) {
+    blink_on = on;
+    if (on) { dark_box(0, 17, 20, 1); } else { dark_box(0, 17, 20, 1); ctext(17, "PRESS START", 3); }
+  }
+  if (btnp(BTN_START | BTN_A)) {
+    snd(SND_OK);
+    if (!seed_ready) { srand(frames(), 0x4A21); seed_ready = 1; }
+    go_state(S_MENU);
+  }
+}
+
+func menu_frame() {
+  st_t++;
+  if (btnp(BTN_DOWN)) { sel = (sel + 1) & 3; snd(SND_MOVE); menu_draw(); }
+  if (btnp(BTN_UP)) { sel = (sel + 3) & 3; snd(SND_MOVE); menu_draw(); }
+  if (btnp(BTN_A | BTN_START)) {
+    if (unlocked(sel)) { snd(SND_OK); new_match(sel); } else { snd(SND_LOCK); }
+  }
+  if (btnp(BTN_B)) { snd(SND_BACK); go_state(S_TITLE); }
+}
+
+func vs_frame() {
+  st_t++;
+  if (st_t > 150 || (st_t > 20 && btnp(BTN_A | BTN_START))) { go_state(S_SERVE); }
+}
+
+func pause_frame() {
+  if (btnp(BTN_START)) { end_pause(); }
+  else if (btnp(BTN_SELECT)) { master_volume(8); snd(SND_BACK); go_state(S_MENU); }
+}
+
+func win_frame() {
+  st_t++;
+  if (st_t == 3) { save_store(); }           // the save checksum costs 20,000 cycles: not in the same frame as drawing the screen
+  if (conf_n > 0) { confetti_update(); }
+  if (music_mode == 4 && !music_playing(0) && st_t > 30) { music_title(); }
+  if (st_t > 40 && btnp(BTN_A | BTN_START)) { snd(SND_OK); new_match(level); }
+  if (st_t > 40 && btnp(BTN_B)) { snd(SND_BACK); go_state(S_MENU); }
+}
+
+// ---------------- drawing the sprites ----------------
+func draw_play_sprites() {
+  var ex = shx; var ey = shy;
+  // trail behind a fast puck
+  var sp = puck_speed8();
+  if (sp > 26 && state == S_PLAY) {
+    var k1 = (hist_i - 2) & 31;
+    var k2 = (hist_i - 4) & 31;
+    spr((hist_x[k2] >> 1) - 4 + ex, (hist_y[k2] >> 1) - 4 + ey, T_OBJ + 4, 3);
+    spr((hist_x[k1] >> 1) - 4 + ex, (hist_y[k1] >> 1) - 4 + ey, T_OBJ + 4, 3);
+  }
+  spr((pux >> 6) - 4 + ex, (puy >> 6) - 4 + ey, T_OBJ + 4, 2);
+  spr((mx[0] >> 6) - 8 + ex, (my[0] >> 6) - 8 + ey, T_OBJ, SPR_16X16 | 0);
+  spr((mx[1] >> 6) - 8 + ex, (my[1] >> 6) - 8 + ey, T_OBJ, SPR_16X16 | 1);
+}
+
+func draw_sprites() {
+  spr_begin(0);
+  if (state == S_TITLE) {
+    big_c(26, "AIR HOCKEY", 4);
+    spr((pux >> 6) - 4, (puy >> 6) - 4, T_OBJ + 4, 2);
+    spr((mx[0] >> 6) - 8, (my[0] >> 6) - 8, T_OBJ, SPR_16X16 | 0);
+    spr((mx[1] >> 6) - 8, (my[1] >> 6) - 8, T_OBJ, SPR_16X16 | 1);
+  } else if (state == S_SERVE) {
+    var n = 3 - st_t / 36;
+    if (n >= 1 && n <= 3) { big_char(72, 62, 48 + n, 4); }
+    draw_play_sprites();
+  } else if (state == S_PLAY) {
+    if (go_t > 0) { big_c(60, "GO!", 4); }
+    draw_play_sprites();
+  } else if (state == S_GOAL) {
+    if (goal_why) { big_wave(56, "SHOT CLOCK", 4, st_t); }
+    else if (goal_by == 1) { big_wave(56, "GOAL!", 4, st_t); } else { big_wave(56, "CPU GOAL", 4, st_t); }
+    confetti_draw();
+    draw_play_sprites();
+  } else if (state == S_VS) {
+    big_c(14, "YOU", 5);
+    big_c(40, "VS", 4);
+    big_c(66, lvl_name[level], 6);
+  } else if (state == S_WIN) {
+    if (win_by == 1) { big_wave(16, "YOU WIN!", 4, st_t); } else { big_wave(16, "YOU LOSE", 6, st_t); }
+    big_char(56, 58, 48 + score[0], 5);
+    big_char(88, 58, 48 + score[1], 6);
+    confetti_draw();
+  }
+  spr_end();
+}
+
+// ---------------- main ----------------
+func init() {
+  load_font(0);
+  load_tiles(ta, T_TAB, ta_COUNT);
+  load_tiles(bf, T_BIG, bf_COUNT);
+  load_tiles(ob, T_OBJ, ob_COUNT);
+  set_palettes();
+  fade_save();
+  hide_all_sprites();
+  master_volume(8);
+  save_load();
+  text_pal = 2;
+  enter_title();
+}
+
+func frame() {
+  fade_update();
+  music_build_step();
+  music_update();
+  snd_update();
+  if (shk > 0) {
+    shk--;
+    shx = rand_range(-1, 1) * (shk > 0); shy = rand_range(-1, 1) * (shk > 0);
+  } else { shx = 0; shy = 0; }
+  if (state == S_PLAY || state == S_SERVE || state == S_GOAL) { scroll(shx, shy); } else { scroll(0, 0); }
+  if (pend >= 0) {
+    if (!fade_busy()) { var ns = pend; pend = -1; do_enter(ns); fade_to(4, 3); }
+    draw_sprites();
+    return;
+  }
+  if (state == S_TITLE) { title_frame(); }
+  else if (state == S_MENU) { menu_frame(); }
+  else if (state == S_VS) { vs_frame(); }
+  else if (state == S_SERVE) { st_t++; serve_frame(); }
+  else if (state == S_PLAY) { play_frame(); }
+  else if (state == S_GOAL) { st_t++; goal_frame(); }
+  else if (state == S_PAUSE) { pause_frame(); }
+  else if (state == S_WIN) { win_frame(); }
+  if (state == S_PAUSE) { spr_begin(0); spr_end(); } else { draw_sprites(); }
+}

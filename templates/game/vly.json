@@ -1,0 +1,36 @@
+{
+  "name": "{{name}}",
+  "entry": "src/main.vly",
+  "out": "build/{{name}}.vlc",
+  "tests": [
+    {
+      "name": "a tree blocks the way: only 19 of 40 steps succeed",
+      "frames": 40,
+      "input": "RIGHT@0-39",
+      "expect": {
+        "words": {
+          "steps": 19
+        },
+        "frameHash": "dd495e613b2d6f91af369988598d440161c200906c0d44dd06abbebea32a0a22"
+      }
+    },
+    {
+      "name": "the hero cannot walk through the border trees",
+      "frames": 300,
+      "input": "LEFT@0-299",
+      "expect": {
+        "frameHash": "4c59fc69ad92c6f1ecd223eebfb6739410be94c45029317f107dd2b870903fab"
+      }
+    },
+    {
+      "name": "START saves the step count",
+      "frames": 30,
+      "input": "RIGHT@0-9, START@12",
+      "expect": {
+        "words": {
+          "steps": 10
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,915 @@
+// STAR RAPTOR: a space-dino shooter in 3 stages (ASTEROID BELT, JURASSIC SKY, MECHA-REX BASE), each ending in a boss.
+// Controls: D-PAD move, A (hold) fire, B bomb, START pause / start, SELECT choose start stage on the title.
+// Made for a 12-year-old who loves space and dinosaurs. Change the "FOR THE DINO CAPTAIN" line in enter_state() to put a name on the title.
+// Progress (best score, stages cleared, loops won) is saved on the cartridge.
+
+import "std/tunes";
+import "std/sprites";
+import "std/anim";
+
+tileset art = "../assets/art.tiles";
+
+const T = 100;                                  // the art lives at tile 100.. (the font is at 0..94)
+const S_TITLE = 0; const S_CARD = 1; const S_PLAY = 2; const S_PAUSE = 3; const S_DEAD = 4;
+const S_OVER = 5; const S_CLEAR = 6; const S_WIN = 7;
+const E_ROCK = 1; const E_UFO = 2; const E_PTERO = 3; const E_RAPTOR = 4; const E_BOSS = 5; const E_END = 9;
+const NE = 8; const NB = 8; const NO = 14; const NI = 3; const NM = 6; const NS = 6;
+const P_SHIP = 0; const P_UFO = 1; const P_ROCK = 2; const P_PTERO = 3; const P_CYBER = 4; const P_GOLD = 5;
+const P_FLASH = 6; const P_EBUL = 7;
+const HUD_Y = 136;
+const PY_MIN = 24; const PY_MAX = 112;
+
+// ---------------- data ----------------
+// sprite palettes (colour 0 is clear): light, mid, dark as 0xRGB
+table objpal = {
+  0, 0x9FF, 0x39F, 0x126,      // 0 ship (cyan)
+  0, 0xFBF, 0xA5D, 0x417,      // 1 UFO (purple)
+  0, 0xDCA, 0x986, 0x432,      // 2 rock (tan)
+  0, 0xFD7, 0xF82, 0x720,      // 3 pterodactyl (orange)
+  0, 0xF74, 0x6C5, 0x142,      // 4 cyborg raptor and Mecha-Rex (green, red glow)
+  0, 0xFFE, 0xFD2, 0xF70,      // 5 shots, items, blasts (gold)
+  0, 0xFFF, 0xDDF, 0x88B,      // 6 hit flash (white)
+  0, 0xFFF, 0xF4B, 0x902       // 7 enemy bullets (hot pink)
+};
+// background palette 0 per stage: space, dusk sky, base
+table stagepal = {
+  0x002, 0x889, 0x44A, 0xFFF,
+  0x315, 0xC68, 0x948, 0xFEF,
+  0x122, 0x366, 0x5A9, 0xAFD
+};
+table stage_name = { "ASTEROID BELT", "JURASSIC SKY", "MECHA-REX BASE" };
+table facts = {
+  "66 MILLION YEARS AGO", "A HUGE SPACE ROCK", "HIT EARTH. TODAY WE", "BLAST THE ROCKS!",
+  "PTEROSAURS WERE NOT", "DINOSAURS. THEY WERE", "FLYING REPTILES WITH", "WINGS 10 METERS WIDE",
+  "T. REX TEETH WERE AS", "LONG AS BANANAS!", "THIS ONE IS A ROBOT", "WITH LASER EYES!"
+};
+table boss_hp = { 60, 90, 130 };
+table drops = { 1, 2, 1, 3 };                   // P, B, P, S
+
+// The level scripts: time (frames since the stage began), enemy type, x, how many, frames between them.
+// Each stage ends with E_BOSS (the boss arrives once the screen is clear).
+table script = {
+  // stage 1: rocks, UFO snakes, then the first pterodactyls
+  90, E_ROCK, 40, 3, 45,     300, E_ROCK, 112, 3, 45,    540, E_UFO, 72, 5, 14,     800, E_UFO, 40, 5, 14,
+  860, E_ROCK, 120, 3, 55,   1100, E_UFO, 100, 6, 12,    1200, E_ROCK, 24, 4, 50,   1500, E_UFO, 30, 5, 14,
+  1580, E_UFO, 110, 5, 14,   1900, E_PTERO, 20, 3, 50,   2200, E_ROCK, 60, 3, 40,   2260, E_UFO, 70, 5, 14,
+  2600, E_PTERO, 40, 4, 40,  2900, E_UFO, 40, 6, 12,     2950, E_ROCK, 100, 4, 45,  3400, E_PTERO, 30, 4, 35,
+  3600, E_UFO, 80, 6, 12,    3900, E_BOSS, 0, 0, 0,
+  // stage 2: pterodactyl swoops, the first cyborg raptors
+  90, E_PTERO, 20, 4, 30,    330, E_PTERO, 50, 4, 30,    560, E_UFO, 80, 5, 12,     600, E_ROCK, 20, 3, 50,
+  900, E_PTERO, 30, 5, 24,   1150, E_RAPTOR, 60, 1, 1,   1450, E_UFO, 40, 6, 12,    1500, E_UFO, 110, 6, 12,
+  1800, E_RAPTOR, 30, 2, 90, 2100, E_PTERO, 30, 5, 22,   2300, E_ROCK, 40, 5, 30,   2650, E_RAPTOR, 20, 3, 60,
+  2900, E_PTERO, 40, 6, 20,  3300, E_UFO, 70, 6, 12,     3350, E_RAPTOR, 80, 2, 70, 3700, E_PTERO, 30, 6, 18,
+  4000, E_ROCK, 30, 6, 28,   4350, E_BOSS, 0, 0, 0,
+  // stage 3: everything at once
+  90, E_RAPTOR, 20, 3, 50,   400, E_PTERO, 30, 5, 22,    420, E_UFO, 100, 6, 12,    800, E_ROCK, 20, 6, 24,
+  1000, E_RAPTOR, 40, 3, 40, 1300, E_UFO, 40, 6, 12,     1330, E_UFO, 110, 6, 12,   1700, E_PTERO, 30, 6, 16,
+  1750, E_RAPTOR, 70, 2, 90, 2150, E_ROCK, 30, 8, 22,    2400, E_RAPTOR, 20, 4, 40, 2800, E_PTERO, 40, 8, 14,
+  2900, E_UFO, 80, 6, 12,    3300, E_RAPTOR, 30, 4, 45,  3300, E_ROCK, 90, 5, 40,   3800, E_PTERO, 30, 8, 14,
+  4100, E_UFO, 60, 8, 12,    4500, E_BOSS, 0, 0, 0
+};
+
+// ---------------- state ----------------
+var state; var next_state; var fading; var fade_lvl; var fade_tgt; var fade_t; var palst;
+var stage; var loopn; var tick; var start_sel;
+var score; var hi; var cleared; var loops_done; var lives; var bombs; var power; var shield; var inv; var cool;
+var px; var py; var st_score; var st_power; var kills; var next_life; var dirty; var new_best;
+var dead_t; var clear_t; var warn_t; var clock; var sp; var boss_i; var boss_max; var boss_x; var boss_y;
+var scy16; var shake; var flash; var bg_left; var bomb_cd;
+var nohit; var save_pend; var tune_pend; var banner_row; var banner_col; var banner_len; var card_t; var title_blink;
+
+var et[8]; var ex[8]; var ey[8]; var evx[8]; var evy[8]; var ehp[8]; var ea[8]; var eb[8]; var ec[8]; var ef[8];
+var bon[8]; var bx[8]; var by[8]; var bvx[8]; var bvy[8];
+var oon[14]; var ox[14]; var oy[14]; var ovx[14]; var ovy[14];
+var ik[3]; var ix[3]; var iy[3];
+var mt[6]; var mx[6]; var my[6];
+var sk_x[6]; var sk_y[6];
+var g_n[2]; var g_c[2]; var g_gap[2]; var g_type[2]; var g_x[2]; var g_i[2];
+
+// ---------------- palettes and fades ----------------
+func fc(c) {
+  var k = 4 - fade_lvl;
+  var r = (((c >> 8) & 15) * k) >> 2;
+  var g = (((c >> 4) & 15) * k) >> 2;
+  var b = ((c & 15) * k) >> 2;
+  return (r << 8) | (g << 4) | b;
+}
+func apply_pals() {
+  var s = palst * 4;
+  bg_pal(0, fc(stagepal[s]), fc(stagepal[s + 1]), fc(stagepal[s + 2]), fc(stagepal[s + 3]));
+  bg_pal(1, fc(0x113), fc(0x113), fc(0xFD3), fc(0xFFF));
+  for (var p = 0; p < 8; p++) {
+    var o = p * 4;
+    obj_pal(p, 0, fc(objpal[o + 1]), fc(objpal[o + 2]), fc(objpal[o + 3]));
+  }
+}
+
+// ---------------- background ----------------
+func bg_cell(x, y) {
+  var h = ((x * 73) ^ (y * 151) ^ (x * y)) & 63;
+  if (palst == 0) {
+    if (h == 5) { return T + art_star_a; }
+    if (h == 29) { return T + art_star_b; }
+    return 0;
+  }
+  if (palst == 1) {
+    if (((x * 37) ^ (y * 91)) % 41 == 0 && x < 31) { return T + art_cloud_l; }
+    if (x > 0 && (((x - 1) * 37) ^ (y * 91)) % 41 == 0) { return T + art_cloud_r; }
+    if (h == 5) { return T + art_star_a; }
+    return 0;
+  }
+  if ((x & 7) == 3) {
+    if ((y & 7) == 4) { return T + art_node; }
+    return T + art_pipe;
+  }
+  if ((x & 7) == 6 && h < 6) { return T + art_panel; }
+  if (h == 29) { return T + art_star_b; }
+  return 0;
+}
+// draw the background 4 rows a frame (a whole map in one frame would be too slow)
+func work() {
+  if (bg_left > 0) {
+    var r0 = 32 - bg_left;
+    for (var r = r0; r < r0 + 4; r++) {
+      for (var c = 0; c < 32; c++) { set_cell(c, r, bg_cell(c, r)); }
+    }
+    bg_left -= 4;
+  }
+}
+func banner(s, len) {
+  banner_len = len;
+  banner_col = (20 - len) >> 1;
+  banner_row = ((((scy16 >> 4) & 255) + 64) >> 3) & 31;
+  text(banner_col, banner_row, s);
+}
+func unbanner() {
+  for (var i = 0; i < banner_len; i++) { set_cell(banner_col + i, banner_row, bg_cell(banner_col + i, banner_row)); }
+  banner_len = 0;
+}
+
+// ---------------- window layer: HUD and full-screen panels ----------------
+func ov_open() {
+  window_pos(0, 0);
+  for (var r = 0; r < 18; r++) { for (var c = 0; c < 20; c++) { set_wcell(c, r, 1 << 12); } }
+}
+func ov_close() {
+  window_pos(0, HUD_Y);
+  for (var c = 0; c < 20; c++) { set_wcell(c, 0, 1 << 12); }
+  dirty = 1;
+}
+func draw_hud() {
+  dirty = 0;
+  wtext(0, 0, "SC");
+  wtext(2, 0, "      ");
+  wtext(2, 0, utoa(score));
+  set_wcell(8, 0, (T + art_icon_life) | (1 << 12));
+  wtext(9, 0, utoa(lives));
+  set_wcell(11, 0, (T + art_icon_bomb) | (1 << 12));
+  wtext(12, 0, utoa(bombs));
+  if (boss_i >= 0) {
+    wtext(14, 0, "B:");
+    var seg = (ehp[boss_i] * 8 + boss_max - 1) / boss_max;     // 0..8 half-cells
+    for (var k = 0; k < 4; k++) {
+      var tl = art_bar_e;
+      if (seg >= k * 2 + 2) { tl = art_bar_f; } else if (seg == k * 2 + 1) { tl = art_bar_h; }
+      set_wcell(16 + k, 0, (T + tl) | (1 << 12));
+    }
+  } else {
+    wtext(14, 0, "PW");
+    wtext(16, 0, utoa(power));
+    wtext(17, 0, " S");
+    wtext(19, 0, utoa(stage + 1));
+  }
+}
+
+// ---------------- scoring, sound helpers ----------------
+func add_score(n) {
+  var s = score + n;
+  if (ult(s, score)) { s = 65535; }
+  score = s;
+  if (ule(next_life, score) && ult(next_life, 60000)) {
+    next_life += 6000;
+    if (lives < 9) { lives++; sfx_play(SFX_POWER); }
+  }
+  dirty = 1;
+}
+func pew() { if (!sfx_on) { sfx_tone(1, 560 + power * 40, 4, 1, 2); } }       // fired many times a second: low, quiet, short (1.5 kHz was painful)
+func tick_snd() { if (!sfx_on) { sfx_tone(3, 1200, 3, 0, 2); } }
+
+// ---------------- effects ----------------
+func spawn_boom(x, y) {
+  for (var i = 0; i < NM; i++) { if (mt[i] == 0) { mx[i] = x; my[i] = y; mt[i] = 16; return; } }
+}
+func fire_e(x16, y16, vx, vy) {
+  for (var i = 0; i < NO; i++) {
+    if (oon[i] == 0) { oon[i] = 1; ox[i] = x16; oy[i] = y16; ovx[i] = vx; ovy[i] = vy; return; }
+  }
+}
+func fire_ang(x16, y16, a, spd) {
+  fire_e(x16, y16, (cos(a & 255) * spd) >> 8, (sin(a & 255) * spd) >> 8);
+}
+func fire_aim(x16, y16, spd) {
+  var dx = (px + 8) * 16 - x16;
+  var dy = (py + 8) * 16 - y16;
+  var m = max(abs(dx), abs(dy));
+  if (m < 16) { m = 16; }
+  fire_e(x16, y16, ((dx >> 2) * spd) / (m >> 2), ((dy >> 2) * spd) / (m >> 2));
+}
+func drop_item(x, y) {
+  var kind = drops[(kills / 6) & 3];
+  if (kind == 1 && power >= 3) { kind = 2; }
+  if (kind == 2 && bombs >= 5) { kind = 3; }
+  for (var i = 0; i < NI; i++) {
+    if (ik[i] == 0) { ik[i] = kind; ix[i] = x * 16; iy[i] = y * 16; return; }
+  }
+}
+
+// ---------------- enemies ----------------
+func enemy_count() {
+  var n = 0;
+  for (var i = 0; i < NE; i++) { if (et[i] != 0) { n++; } }
+  return n;
+}
+func spawn_enemy(t, x, y) {
+  for (var i = 0; i < NE; i++) {
+    if (et[i] == 0) {
+      et[i] = t; ex[i] = x * 16; ey[i] = y * 16; evx[i] = 0; evy[i] = 0; ea[i] = 0; eb[i] = 0; ec[i] = 0; ef[i] = 0;
+      if (t == E_ROCK) { ehp[i] = 3 + loopn; evy[i] = 10 + rand(8); evx[i] = rand(9) - 4; }
+      else if (t == E_UFO) { ehp[i] = 1 + (loopn > 0); evy[i] = 12; eb[i] = x; }
+      else if (t == E_PTERO) { ehp[i] = 2 + loopn; evy[i] = 26; evx[i] = clamp(((px - x) * 16) / 90, -24, 24); }
+      else if (t == E_RAPTOR) { ehp[i] = 4 + loopn * 2; evy[i] = 20; evx[i] = 8; if (x > 72) { evx[i] = -8; } }
+      return i;
+    }
+  }
+  return -1;
+}
+func spawn_boss() {
+  var i = spawn_enemy(E_BOSS, 64, -34);
+  if (i < 0) { return; }
+  ehp[i] = boss_hp[stage] + loopn * 30;
+  boss_max = ehp[i];
+  evy[i] = 16;
+  boss_i = i;
+  dirty = 1;
+}
+func boss_down(x, y) {
+  add_score(1000 + 500 * stage);
+  boss_i = -1;
+  boss_x = x; boss_y = y;
+  state = S_CLEAR;
+  clear_t = 200;
+  for (var i = 0; i < NE; i++) { if (et[i] != 0) { spawn_boom(ex[i] >> 4, ey[i] >> 4); et[i] = 0; } }
+  for (var i = 0; i < NO; i++) { oon[i] = 0; }
+  tune_stop();
+  sfx_play(SFX_EXPLODE);
+  shake = 30; flash = 3;
+  if (stage + 1 > cleared) { cleared = stage + 1; }
+  dirty = 1;
+}
+func kill_enemy(i) {
+  var t = et[i];
+  var x = ex[i] >> 4;
+  var y = ey[i] >> 4;
+  et[i] = 0;
+  if (t == E_BOSS) { boss_down(x, y); return; }
+  var pts = 20;
+  if (t == E_UFO) { pts = 30; } else if (t == E_PTERO) { pts = 50; } else if (t == E_RAPTOR) { pts = 80; }
+  add_score(pts);
+  spawn_boom(x, y);
+  sfx_play(SFX_HIT);
+  kills++;
+  if (kills % 6 == 0) { drop_item(x + 4, y + 4); }
+}
+func hurt_enemy(i, d) {
+  ehp[i] -= d;
+  ef[i] = 3;
+  if (ehp[i] <= 0) { kill_enemy(i); }
+  else { tick_snd(); if (et[i] == E_BOSS) { dirty = 1; } }
+}
+func hit_player() {
+  if (inv > 0 || state != S_PLAY) { return; }
+  nohit = 0;
+  if (shield) {
+    shield = 0; inv = 70; shake = 8; sfx_play(SFX_HIT);
+    return;
+  }
+  lives--;
+  power = max(1, power - 1);
+  bombs = max(bombs, 2);
+  spawn_boom(px, py); spawn_boom(px + 8, py + 4);
+  sfx_play(SFX_DEATH);
+  shake = 14;
+  dirty = 1;
+  dead_t = 55;
+  state = S_DEAD;
+}
+
+func boss_move(i, spd, lo, hx) {
+  var x = ex[i] >> 4;
+  if (evx[i] == 0) { evx[i] = spd; }
+  if (x <= lo) { evx[i] = spd; }
+  if (x >= hx) { evx[i] = -spd; }
+}
+// boss 1, the Mother Ship: sweeps side to side, fires fans, calls UFOs when hurt
+func boss1(i) {
+  var t = ea[i];
+  var half = (ehp[i] * 2 < boss_max);
+  boss_move(i, 12 + loopn * 2 + half * 6, 12, 116);
+  var rate = max(34, 60 - loopn * 10 - half * 14);
+  if (t % rate == 0) {
+    var cx = ex[i] + 12 * 16;
+    var cy = ey[i] + 28 * 16;
+    var spread = 1 + half;
+    for (var k = 0 - spread; k <= spread; k++) { fire_ang(cx, cy, 64 + k * 14, 30 + loopn * 3); }
+    sfx_tone(1, 420, 8, 2, 3);
+  }
+  if (half && ec[i] == 0) { ec[i] = 1; spawn_enemy(E_UFO, 20, -16); spawn_enemy(E_UFO, 110, -16); }
+}
+// boss 2, the Ptero King: flies about firing, then telegraphs and dives at you
+func boss2(i) {
+  var t = ea[i];
+  var s = eb[i];
+  var cx = ex[i] + 12 * 16;
+  var cy = ey[i] + 28 * 16;
+  var x = ex[i] >> 4;
+  var y = ey[i] >> 4;
+  if (s == 1) {
+    boss_move(i, 18 + loopn * 3, 8, 120);
+    if (t % 64 == 40) { fire_aim(cx, cy, 34); fire_ang(cx, cy, 46, 30); fire_ang(cx, cy, 82, 30); sfx_tone(1, 520, 8, 2, 3); }
+    if (t > 260 - loopn * 20) { eb[i] = 2; ea[i] = 0; evx[i] = 0; sfx_tone(1, 300, 10, 1, 6); }
+  } else if (s == 2) {
+    if (t > 40) {
+      eb[i] = 3; ea[i] = 0; evy[i] = 40 + loopn * 4;
+      evx[i] = clamp((((px - 8) - x) * 16) / 24, -48, 48);
+    }
+  } else if (s == 3) {
+    if (y >= 84) {
+      for (var a = 0; a < 8; a++) { fire_ang(cx, cy, a * 32, 26 + loopn * 2); }
+      eb[i] = 4; ea[i] = 0; evy[i] = -20; evx[i] = 0;
+      shake = 10; sfx_play(SFX_EXPLODE);
+    }
+  } else if (s == 4) {
+    if (y <= 14) { evy[i] = 0; eb[i] = 1; ea[i] = 0; evx[i] = 18; }
+  }
+}
+// boss 3, Mecha-Rex: aimed bursts; below 60% adds a ring of shots, below 30% drops rocks and goes faster
+func boss3(i) {
+  var t = ea[i];
+  var ph = 0;
+  if (ehp[i] * 10 < boss_max * 6) { ph = 1; }
+  if (ehp[i] * 10 < boss_max * 3) { ph = 2; }
+  boss_move(i, 12 + ph * 4 + loopn * 2, 10, 118);
+  var cx = ex[i] + 12 * 16;
+  var cy = ey[i] + 26 * 16;
+  var per = max(70, 110 - ph * 15 - loopn * 10);
+  var k = t % per;
+  if (k == 0 || k == 8 || k == 16 || (ph == 2 && k == 24)) { fire_aim(cx, cy, 38 + loopn * 3); sfx_tone(1, 330, 9, 2, 3); }
+  if (ph >= 1 && t % 150 == 100) {
+    for (var a = 0; a < 8; a++) { fire_ang(cx, cy, a * 32 + 16, 24); }
+    sfx_tone(1, 220, 10, 1, 8);
+  }
+  if (ph == 2 && t % 120 == 60) { spawn_enemy(E_ROCK, rand(130), -16); }
+}
+
+func update_enemy(i) {
+  var t = et[i];
+  ex[i] += evx[i];
+  ey[i] += evy[i];
+  if (ef[i] > 0) { ef[i]--; }
+  ea[i]++;
+  var x = ex[i] >> 4;
+  var y = ey[i] >> 4;
+  var w = 12; var h = 12;
+  if (t == E_ROCK) {
+    if (y > 120 || x < -24 || x > 170) { et[i] = 0; return; }
+  } else if (t == E_UFO) {
+    ea[i] += 2 + loopn;
+    ex[i] = eb[i] * 16 + (sin(ea[i] & 255) * 5) / 2;
+    if (y > 120) { et[i] = 0; return; }
+    if (stage + loopn > 0 && y > 8 && y < 90 && rand(240 - 35 * min(stage + loopn, 4)) == 0) { fire_e(ex[i] + 4 * 16, ey[i] + 12 * 16, 0, 30); }
+  } else if (t == E_PTERO) {
+    if (eb[i] == 0 && y >= 90) { eb[i] = 1; evy[i] = -26; }
+    if ((eb[i] == 1 && y < -24) || x < -50 || x > 200) { et[i] = 0; return; }
+  } else if (t == E_RAPTOR) {
+    h = 10;
+    if (eb[i] == 0) {
+      if (y >= 26) { eb[i] = 1; evy[i] = 0; ea[i] = 0; }
+    } else if (eb[i] == 1) {
+      if (x < 8) { evx[i] = 8; }
+      if (x > 136) { evx[i] = -8; }
+      var gap = max(34, 70 - 8 * (stage + loopn));
+      if (ea[i] % gap == gap - 1) {
+        fire_aim(ex[i] + 4 * 16, ey[i] + 12 * 16, 34 + 3 * loopn);
+        if (stage + loopn >= 2) { fire_aim(ex[i] + 4 * 16 - 160, ey[i] + 12 * 16, 34); }
+        ec[i]++;
+        sfx_tone(1, 700, 7, 1, 3);
+        if (ec[i] >= 4) { eb[i] = 2; evy[i] = -24; evx[i] = 0; }
+      }
+    } else {
+      if (y < -24) { et[i] = 0; return; }
+    }
+  } else {
+    w = 28; h = 28;
+    if (eb[i] == 0) {
+      if (y >= 14) { eb[i] = 1; ea[i] = 0; evy[i] = 0; evx[i] = 12; }
+    } else if (stage == 0) { boss1(i); }
+    else if (stage == 1) { boss2(i); }
+    else { boss3(i); }
+  }
+  // touching the ship
+  if (inv == 0 && state == S_PLAY && y > -8) {
+    if (overlap(x + 2, y + 2, w, h, px + 5, py + 5, 6, 6)) {
+      hit_player();
+      if (t == E_UFO || t == E_PTERO) { hurt_enemy(i, 9); }
+    }
+  }
+}
+
+// ---------------- the player's bullets and weapon ----------------
+func add_pb(x16, y16, vx, vy) {
+  for (var i = 0; i < NB; i++) {
+    if (bon[i] == 0) { bon[i] = 1; bx[i] = x16; by[i] = y16; bvx[i] = vx; bvy[i] = vy; return; }
+  }
+}
+func fire_player() {
+  var x = (px + 4) * 16;
+  var y = (py - 2) * 16;
+  if (power == 1) { add_pb(x, y, 0, -64); }
+  else if (power == 2) { add_pb(x - 64, y, 0, -64); add_pb(x + 64, y, 0, -64); }
+  else { add_pb(x, y - 16, 0, -64); add_pb(x - 80, y, -14, -62); add_pb(x + 80, y, 14, -62); }
+  cool = 8;
+  pew();
+}
+func update_pbullets() {
+  for (var b = 0; b < NB; b++) {
+    if (bon[b] == 0) { continue; }
+    bx[b] += bvx[b]; by[b] += bvy[b];
+    var x = bx[b] >> 4;
+    var y = by[b] >> 4;
+    if (y < -8 || x < -8 || x > 160) { bon[b] = 0; continue; }
+    for (var e = 0; e < NE; e++) {
+      if (et[e] == 0) { continue; }
+      var ex_ = ex[e] >> 4;
+      var ey_ = ey[e] >> 4;
+      if (ey_ < -10) { continue; }
+      var w = 12; var h = 12;
+      if (et[e] == E_BOSS) { w = 28; h = 28; }
+      if (overlap(x + 1, y, 6, 8, ex_ + 2, ey_ + 2, w, h)) {
+        bon[b] = 0;
+        hurt_enemy(e, 1);
+        break;
+      }
+    }
+  }
+}
+func do_bomb() {
+  if (bombs <= 0 || bomb_cd > 0) { return; }
+  bombs--; bomb_cd = 30; dirty = 1; flash = 3; shake = 16;
+  sfx_play(SFX_EXPLODE);
+  for (var i = 0; i < NO; i++) { oon[i] = 0; }
+  inv = max(inv, 45);
+  for (var e = 0; e < NE; e++) {
+    if (et[e] != 0 && (ey[e] >> 4) > -8 && state == S_PLAY) { hurt_enemy(e, 7); }
+  }
+}
+func update_ebullets() {
+  for (var i = 0; i < NO; i++) {
+    if (oon[i] == 0) { continue; }
+    ox[i] += ovx[i]; oy[i] += ovy[i];
+    var x = ox[i] >> 4;
+    var y = oy[i] >> 4;
+    if (y > 130 || y < -16 || x < -12 || x > 164) { oon[i] = 0; continue; }
+    if (inv == 0 && state == S_PLAY && overlap(x + 2, y + 2, 4, 4, px + 5, py + 5, 6, 6)) {
+      oon[i] = 0;
+      hit_player();
+    }
+  }
+}
+func update_items() {
+  for (var i = 0; i < NI; i++) {
+    if (ik[i] == 0) { continue; }
+    iy[i] += 12;
+    var x = ix[i] >> 4;
+    var y = iy[i] >> 4;
+    if (y > 126) { ik[i] = 0; continue; }
+    if (overlap(x, y, 8, 8, px, py, 16, 16)) {
+      var k = ik[i];
+      ik[i] = 0;
+      if (k == 1) { if (power < 3) { power++; } else { add_score(200); } }
+      else if (k == 2) { bombs = min(bombs + 1, 5); }
+      else { shield = 1; }
+      add_score(100);
+      sfx_play(SFX_POWER);
+      dirty = 1;
+    }
+  }
+}
+
+// ---------------- the stage script ----------------
+func start_group(t, x, n, gap) {
+  var s = 0;
+  if (g_n[0] > 0) { s = 1; }
+  g_type[s] = t; g_x[s] = x; g_n[s] = n; g_gap[s] = gap; g_c[s] = 0; g_i[s] = 0;
+}
+func group_update(s) {
+  if (g_n[s] <= 0) { return; }
+  if (g_c[s] > 0) { g_c[s]--; return; }
+  var t = g_type[s];
+  var gx = g_x[s];
+  var i = g_i[s];
+  if (t == E_ROCK) { spawn_enemy(E_ROCK, clamp(gx + rand(31) - 15, 0, 144), -16); }
+  else if (t == E_UFO) { spawn_enemy(E_UFO, gx, -16); }
+  else if (t == E_PTERO) { spawn_enemy(E_PTERO, clamp(gx + (i & 1) * 64 + rand(24), 0, 144), -16); }
+  else { spawn_enemy(E_RAPTOR, clamp(gx + i * 40, 0, 136), -16); }
+  g_i[s]++; g_n[s]--; g_c[s] = g_gap[s];
+}
+func spawner() {
+  clock++;
+  if (warn_t > 0) {
+    warn_t--;
+    if (warn_t == 149) { tune_stop(); }
+    if (warn_t % 8 == 0) { sfx_tone(1, 440 + ((warn_t >> 3) & 1) * 260, 9, 2, 8); }
+    if (warn_t % 20 == 0) { if (banner_len > 0) { unbanner(); } else { banner("WARNING!", 8); } }
+    if (warn_t == 0) {
+      if (banner_len > 0) { unbanner(); }
+      spawn_boss();
+      tune_want(TUNE_BOSS);
+    }
+    return;
+  }
+  if (boss_i >= 0) { return; }
+  group_update(0); group_update(1);
+  var b = sp * 5;
+  while (clock >= script[b]) {
+    if (script[b + 1] == E_BOSS) {
+      if (enemy_count() == 0 && g_n[0] <= 0 && g_n[1] <= 0) { warn_t = 150; }
+      break;
+    }
+    start_group(script[b + 1], script[b + 2], script[b + 3], script[b + 4]);
+    sp++;
+    b = sp * 5;
+  }
+}
+
+// ---------------- screens ----------------
+func stage_tune() {
+  if (stage == 0) { tune_want(TUNE_SPACE); }
+  else if (stage == 1) { tune_want(TUNE_ADVENTURE); }
+  else { tune_want(TUNE_ACTION); }
+}
+// Saving costs about 20,000 cycles, so it is done on its own frame (save_pend) and never together with a screen change.
+func save_progress() {
+  if (ugt(score, hi)) { hi = score; new_best = 1; }
+  save_pend = 1;
+}
+func do_save() {
+  save_pend = 0;
+  save_set(0, hi); save_set(2, cleared); save_set(4, loops_done);
+  save_seal(); save_commit();
+}
+func tune_want(id) { tune_pend = id + 1; }
+func new_game() {
+  score = 0; lives = 3; bombs = 3; power = 1; shield = 0; loopn = 0; next_life = 5000; new_best = 0;
+  stage = start_sel;
+  st_score = 0; st_power = 1;
+  go(S_CARD);
+}
+func go(s) {
+  if (fading) { return; }
+  next_state = s; fading = 1; fade_tgt = 4; fade_t = 0;
+}
+func reset_stage() {
+  for (var i = 0; i < NE; i++) { et[i] = 0; }
+  for (var i = 0; i < NB; i++) { bon[i] = 0; }
+  for (var i = 0; i < NO; i++) { oon[i] = 0; }
+  for (var i = 0; i < NI; i++) { ik[i] = 0; }
+  for (var i = 0; i < NM; i++) { mt[i] = 0; }
+  g_n[0] = 0; g_n[1] = 0;
+  px = 72; py = 104; inv = 90; cool = 0; clock = 0; warn_t = 0; boss_i = -1; banner_len = 0; bomb_cd = 0;
+  shake = 0; flash = 0; kills = 0; nohit = 1;
+  sp = 0;
+  for (var s = 0; s < stage; s++) {
+    while (script[sp * 5 + 1] != E_BOSS) { sp++; }
+    sp++;
+  }
+  scy16 = 0;
+  scroll(0, 0);
+}
+func enter_state(s) {
+  state = s;
+  hide_all_sprites();
+  if (s == S_TITLE) {
+    palst = 0;
+    ov_open();
+    wtext(4, 2, "STAR RAPTOR");
+    wtext(1, 3, "SPACE DINO SHOOTER");
+    wtext(0, 11, "BEST");
+    wtext(5, 11, utoa(hi));
+    wtext(4, 13, "PRESS START");
+    wtext(1, 14, "A FIRE     B BOMB");
+    wtext(1, 15, "START PAUSE");
+    wtext(1, 16, "SELECT: STAGE");
+    wtext(15, 16, utoa(start_sel + 1));
+    wtext(0, 17, "FOR THE DINO CAPTAIN");
+    tune_want(TUNE_TITLE);
+  } else if (s == S_CARD) {
+    palst = stage;
+    ov_open();
+    if (loopn > 0) { wtext(7, 1, "LOOP"); wtext(12, 1, utoa(loopn + 1)); }
+    wtext(6, 3, "STAGE");
+    wtext(12, 3, utoa(stage + 1));
+    var nm = stage_name[stage];
+    var n = 0;
+    while (peek8(nm + n) != 0) { n++; }
+    wtext((20 - n) >> 1, 5, nm);
+    wtext(5, 8, "DINO FACT");
+    for (var k = 0; k < 4; k++) { wtext(0, 10 + k * 2, facts[stage * 4 + k]); }
+    wtext(2, 17, "A FIRE  B BOMB");
+    card_t = 0;
+    tune_pend = 0; tune_stop();
+    sfx_play(SFX_SELECT);
+  } else if (s == S_PLAY) {
+    ov_close();
+    reset_stage();
+    palst = stage;
+    bg_left = 32;
+    stage_tune();
+  } else if (s == S_OVER) {
+    save_progress();
+    ov_open();
+    wtext(5, 4, "GAME OVER");
+    wtext(4, 7, "SCORE");
+    wtext(10, 7, utoa(score));
+    wtext(4, 9, "BEST");
+    wtext(10, 9, utoa(hi));
+    wtext(4, 11, "STAGE");
+    wtext(10, 11, utoa(stage + 1));
+    wtext(2, 14, "START: TRY AGAIN");
+    wtext(2, 15, "SELECT: TITLE");
+    tune_stop();
+  } else if (s == S_WIN) {
+    loops_done = max(loops_done, loopn + 1);
+    save_progress();
+    ov_open();
+    wtext(1, 2, "MISSION COMPLETE!");
+    wtext(1, 4, "THE DINOS ARE SAFE");
+    wtext(2, 6, "THANKS, CAPTAIN!");
+    wtext(3, 8, "SCORE");
+    wtext(9, 8, utoa(score));
+    wtext(3, 10, "RANK");
+    if (lives >= 3) { wtext(8, 10, "GOLD RAPTOR"); }
+    else if (lives == 2) { wtext(8, 10, "SILVER RAPTOR"); }
+    else { wtext(8, 10, "BRONZE RAPTOR"); }
+    if (new_best) { wtext(5, 12, "NEW BEST SCORE!"); }
+    wtext(1, 14, "START: HARDER LOOP");
+    wtext(1, 15, "SELECT: TITLE");
+    tune_want(TUNE_TITLE);
+    sfx_play(SFX_WIN);
+  }
+  apply_pals();
+}
+
+func fade_step() {
+  fade_t++;
+  if (fade_t < 3) { return; }
+  fade_t = 0;
+  if (fade_lvl < fade_tgt) { fade_lvl++; apply_pals(); }
+  else if (fade_lvl > fade_tgt) { fade_lvl--; apply_pals(); }
+  else if (fading == 1) { enter_state(next_state); fading = 2; }
+  else if (fading == 2) { if (bg_left <= 0) { fade_tgt = 0; fading = 3; } }
+  else { fading = 0; }
+}
+
+// ---------------- drawing ----------------
+func draw_boss(i, x, y) {
+  var tp = art_b1_t; var bt = art_b1_b; var pal = P_UFO;
+  if (stage == 1) { tp = art_b2_t; bt = art_b2_b; pal = P_PTERO; }
+  else if (stage == 2) { tp = art_b3_t; bt = art_b3_b; pal = P_CYBER; }
+  if (ef[i] > 0) { pal = P_FLASH; }
+  if (eb[i] == 2) { x += (tick & 2) - 1; if ((tick >> 2) & 1) { pal = P_FLASH; } }
+  spr(x, y, T + tp, SPR_16X16 | pal);
+  spr(x, y + 16, T + bt, SPR_16X16 | pal);
+  spr(x + 16, y, T + tp, SPR_16X16 | SPR_FLIPX | pal);
+  spr(x + 16, y + 16, T + bt, SPR_16X16 | SPR_FLIPX | pal);
+}
+func draw_play() {
+  spr_begin(0);
+  if (state == S_PLAY || state == S_CLEAR) {
+    if (inv == 0 || ((inv >> 2) & 1) == 0) {
+      spr(px, py, T + art_ship, SPR_16X16 | P_SHIP);
+      spr(px + 4, py + 15, T + art_flame0 + ((tick >> 2) & 1), P_GOLD);
+      if (shield) { spr(px, py, T + art_shield, SPR_16X16 | P_SHIP); }
+    }
+  }
+  for (var b = 0; b < NB; b++) { if (bon[b]) { spr(bx[b] >> 4, by[b] >> 4, T + art_pshot, P_GOLD); } }
+  for (var i = 0; i < NO; i++) { if (oon[i]) { spr(ox[i] >> 4, oy[i] >> 4, T + art_ebullet, P_EBUL); } }
+  for (var e = 0; e < NE; e++) {
+    var t = et[e];
+    if (t == 0) { continue; }
+    var x = ex[e] >> 4;
+    var y = ey[e] >> 4;
+    var pal = 0;
+    var tl = 0;
+    var fl = 0;
+    if (t == E_ROCK) { tl = art_rock; pal = P_ROCK; }
+    else if (t == E_UFO) { tl = art_ufo; pal = P_UFO; }
+    else if (t == E_PTERO) { tl = art_ptero_a; if ((tick >> 3) & 1) { tl = art_ptero_b; } pal = P_PTERO; }
+    else if (t == E_RAPTOR) { tl = art_raptor; pal = P_CYBER; if ((tick >> 4) & 1) { fl = SPR_FLIPX; } }
+    if (t == E_BOSS) { draw_boss(e, x, y); }
+    else {
+      if (ef[e] > 0) { pal = P_FLASH; }
+      spr(x, y, T + tl, SPR_16X16 | fl | pal);
+    }
+  }
+  for (var i = 0; i < NI; i++) { if (ik[i]) { spr(ix[i] >> 4, iy[i] >> 4, T + art_item_p + ik[i] - 1, P_GOLD); } }
+  for (var i = 0; i < NM; i++) {
+    if (mt[i] > 0) { spr(mx[i], my[i], T + art_boom_a + (mt[i] < 8) * 4, SPR_16X16 | P_GOLD); }
+  }
+  for (var i = 0; i < NS; i++) { spr(sk_x[i], sk_y[i], T + art_streak, P_SHIP); }
+  spr_end();
+}
+func draw_title() {
+  spr_begin(0);
+  var bob = sin((tick * 3) & 255) / 80;
+  var pf = (tick >> 3) & 1;
+  spr(64, 44 + bob, T + art_b3_t, SPR_16X16 | P_CYBER);
+  spr(64, 60 + bob, T + art_b3_b, SPR_16X16 | P_CYBER);
+  spr(80, 44 + bob, T + art_b3_t, SPR_16X16 | SPR_FLIPX | P_CYBER);
+  spr(80, 60 + bob, T + art_b3_b, SPR_16X16 | SPR_FLIPX | P_CYBER);
+  spr(24, 50 - bob, T + art_ptero_a + pf * 4, SPR_16X16 | P_PTERO);
+  spr(120, 50 - bob, T + art_ptero_a + (1 - pf) * 4, SPR_16X16 | P_PTERO);
+  spr(72, 88, T + art_ship, SPR_16X16 | P_SHIP);
+  spr_end();
+}
+func draw_none() { spr_begin(0); spr_end(); }
+func draw() {
+  if (state == S_TITLE) { draw_title(); }
+  else if (state == S_PLAY || state == S_DEAD || state == S_CLEAR) { draw_play(); }
+  else { draw_none(); }
+}
+
+// ---------------- per-state updates ----------------
+func world_update() {
+  if (banner_len == 0) { scy16 -= 10 + stage * 3; }
+  var sx = 0;
+  if (shake > 0) { shake--; sx = ((tick >> 1) & 1) * 2 - 1; }
+  scroll(sx, (scy16 >> 4) & 255);
+  for (var i = 0; i < NS; i++) {
+    sk_y[i] += 4 + (i & 1) * 2;
+    if (sk_y[i] > 128) { sk_y[i] = -8; sk_x[i] = rand(150); }
+  }
+  for (var i = 0; i < NM; i++) { if (mt[i] > 0) { mt[i]--; } }
+  if (flash > 0) {
+    flash--;
+    if (flash == 0) { apply_pals(); } else { bg_pal(0, 0xFFF, 0xCCF, 0x99F, 0xFFF); }
+  }
+  if (bomb_cd > 0) { bomb_cd--; }
+  if (inv > 0) { inv--; }
+}
+func play_update() {
+  if (btnp(BTN_START)) {
+    state = S_PAUSE;
+    ov_open();
+    wtext(7, 6, "PAUSED");
+    wtext(2, 9, "START: CONTINUE");
+    wtext(2, 11, "SELECT: GIVE UP");
+    wtext(0, 14, "A FIRE   B BOMB");
+    music_mute(1);
+    sfx_play(SFX_PAUSE);
+    return;
+  }
+  px = clamp(px + (btn(BTN_RIGHT) - btn(BTN_LEFT)) * 2, 0, 144);
+  py = clamp(py + (btn(BTN_DOWN) - btn(BTN_UP)) * 2, PY_MIN, PY_MAX);
+  if (cool > 0) { cool--; }
+  if (btn(BTN_A) && cool == 0) { fire_player(); }
+  if (btnp(BTN_B)) { do_bomb(); if (state != S_PLAY) { return; } }
+  update_pbullets();
+  for (var i = 0; i < NE; i++) {
+    if (et[i] != 0) { update_enemy(i); if (state != S_PLAY) { return; } }
+  }
+  update_ebullets();
+  update_items();
+  spawner();
+  world_update();
+}
+func dead_update() {
+  world_update();
+  dead_t--;
+  if (dead_t <= 0) {
+    if (lives <= 0) { go(S_OVER); dead_t = 999; }
+    else {
+      for (var i = 0; i < NO; i++) { oon[i] = 0; }
+      px = 72; py = 104; inv = 140; state = S_PLAY; shield = 0;
+    }
+  }
+}
+func clear_update() {
+  world_update();
+  px = clamp(px + sign(72 - px), 0, 144);
+  py = clamp(py + sign(104 - py), PY_MIN, PY_MAX);
+  update_pbullets();
+  update_items();
+  clear_t--;
+  if (clear_t % 7 == 0 && clear_t > 90) {
+    spawn_boom(boss_x + rand(24), boss_y + rand(24));
+    sfx_tone(3, 500 + rand(400), 10, 0, 4);
+  }
+  if (clear_t == 150) { sfx_play(SFX_WIN); banner("STAGE CLEAR!", 12); }
+  if (clear_t == 85) {
+    unbanner();
+    if (nohit) { add_score(2000); sfx_play(SFX_POWER); banner("PERFECT! +2000", 14); }
+  }
+  if (clear_t <= 0) {
+    unbanner();
+    add_score(lives * 300 + bombs * 100);
+    st_score = score; st_power = power;
+    save_progress();
+    if (stage >= 2) { go(S_WIN); }
+    else { stage++; go(S_CARD); }
+    clear_t = 999;
+  }
+}
+func title_update() {
+  if ((tick % 20) == 0) {
+    if ((tick / 20) & 1) { wtext(4, 13, "           "); } else { wtext(4, 13, "PRESS START"); }
+  }
+  if (btnp(BTN_SELECT)) {
+    start_sel = (start_sel + 1) % (min(cleared, 2) + 1);
+    wtext(15, 16, utoa(start_sel + 1));
+    sfx_play(SFX_SELECT);
+  }
+  if (btnp(BTN_START)) { srand(frames(), 0x5EED); sfx_play(SFX_POWER); new_game(); }
+}
+func card_update() {
+  card_t++;
+  if ((card_t > 45 && btnp(BTN_START | BTN_A)) || card_t > 300) { go(S_PLAY); }
+}
+func over_update() {
+  if (btnp(BTN_START)) {
+    score = st_score; lives = 3; bombs = 3; power = max(1, st_power); shield = 0;
+    sfx_play(SFX_SELECT);
+    go(S_CARD);
+  }
+  if (btnp(BTN_SELECT)) { go(S_TITLE); }
+}
+func win_update() {
+  if (btnp(BTN_START)) {
+    loopn++; stage = 0; lives = max(lives, 3); bombs = max(bombs, 3); st_score = score; st_power = power;
+    sfx_play(SFX_SELECT);
+    go(S_CARD);
+  }
+  if (btnp(BTN_SELECT)) { go(S_TITLE); }
+}
+func pause_update() {
+  if (btnp(BTN_START)) {
+    ov_close();
+    state = S_PLAY;
+    music_mute(0);
+    sfx_play(SFX_PAUSE);
+  } else if (btnp(BTN_SELECT)) {
+    music_mute(0);
+    go(S_TITLE);
+  }
+}
+
+func frame() {
+  tick++;
+  music_update(); sfx_update();
+  if (tune_pend > 0) { var id = tune_pend - 1; tune_pend = 0; tune_play(id); }
+  else if (save_pend) { do_save(); }
+  if (fading) {
+    fade_step();
+    work();
+    if (state == S_DEAD || state == S_CLEAR) { world_update(); }
+    draw();
+    return;
+  }
+  if (state == S_TITLE) { title_update(); }
+  else if (state == S_CARD) { card_update(); }
+  else if (state == S_PLAY) { play_update(); }
+  else if (state == S_PAUSE) { pause_update(); }
+  else if (state == S_DEAD) { dead_update(); }
+  else if (state == S_CLEAR) { clear_update(); }
+  else if (state == S_OVER) { over_update(); }
+  else { win_update(); }
+  draw();
+  if (dirty && (state == S_PLAY || state == S_DEAD || state == S_CLEAR)) { draw_hud(); }
+}
+
+func init() {
+  load_font(0);
+  load_tiles(art, T, art_COUNT);
+  text_pal = 1;
+  hide_all_sprites();
+  master_volume(9);
+  hi = 0; cleared = 0; loops_done = 0;
+  if (save_loaded() && save_valid()) { hi = save_get(0); cleared = save_get(2); loops_done = save_get(4); }
+  for (var i = 0; i < NS; i++) { sk_x[i] = 12 + i * 26; sk_y[i] = i * 21; }
+  score = 0; lives = 3; bombs = 3; power = 1; stage = 0; loopn = 0; start_sel = 0;
+  fade_lvl = 4; fade_tgt = 4; fading = 0;
+  clear_win();
+  state = S_TITLE;
+  enter_state(S_TITLE);
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+  fading = 2; fade_tgt = 0; bg_left = 0;          // fade the title in
+}

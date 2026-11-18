@@ -1,0 +1,1061 @@
+// THIES' WORLD: a block-building sandbox made for one particular six-year-old.
+//
+//   D-pad      walk (the hero hops up single blocks on its own)
+//   A          jump (swim up when in water)
+//   B, held    dig the block the cursor is on (aim with UP / DOWN, or just face it)
+//   B, tapped  build: put the chosen block in the empty space ahead, on top of the block ahead,
+//              or (aiming DOWN) under your own feet
+//   SELECT     next block          START   pause menu (go home, music, save)
+//
+// Nothing can hurt you. Every kind of block you dig is yours forever after. Chests hold the special ones (blue and yellow
+// bricks, glass, TNT); there are chests all over the world, some hiding in caves. The world is saved by itself.
+//
+// Shows: an endless world (4,000 blocks wide, the limit of 16-bit pixel coordinates) made from a seed as you walk: only
+// 64 columns exist at a time and everything you change is saved as a 3-byte edit (330 fit in the 1 KB save); hash-based
+// terrain, ponds, caves, trees and chests; a scrolling background streamed a row or column at a time; per-cell palettes;
+// day and night by palette; a sun that hides behind blocks (SPR_BEHIND); std/music.
+
+import "songs.vly";
+import "std/anim";
+
+var player_name = "THIES";          // <- the hero of this cartridge: change it and rebuild (up to 5 letters)
+
+tileset art bank 3 = "../assets/art.tiles";
+
+const T = 96;                       // art tiles start here in tile RAM (the font is 0..94)
+const WH = 30;                      // the world is 30 blocks deep (16x16 pixels each); bedrock lies under row 29
+const WMAX = 1990;                  // ...and 4,000 blocks wide: x from -1990 to 1990, as far as 16-bit pixel coordinates reach
+const NEGW = -1990;
+const MAXED = 330;                  // how many changes to the world fit in the 1 KB save
+const CAVE_ROW = 14;                // empty blocks from this row down show a cave wall, not sky
+const HOME_X = 0;
+
+// Block types: 4 bits each, so the whole world fits in the save.
+const B_AIR = 0; const B_GRASS = 1; const B_DIRT = 2; const B_STONE = 3; const B_SAND = 4; const B_LOG = 5;
+const B_LEAVES = 6; const B_PLANKS = 7; const B_WATER = 8; const B_GLASS = 9; const B_GOLD = 10;
+const B_DIAMOND = 11; const B_RED = 12; const B_BLUE = 13; const B_YELLOW = 14; const B_TNT = 15;
+const B_ROCK = 16;                  // bedrock and the world's edge: never stored, never broken
+const B_CHEST = 17; const B_OPEN = 18;   // treasure chests, closed and opened (drawn as sprites)
+const NBLOCKS = 15;
+
+table blk_tile = { 0, art_grass, art_dirt, art_stone, art_sand, art_log, art_leaves, art_planks, art_water,
+                   art_glass, art_ore, art_gems, art_brick, art_brick, art_brick, art_tnt };
+btable blk_pal_top = { 0, 3, 1, 2, 5, 1, 3, 1, 4, 4, 6, 4, 7, 4, 5, 7 };   // palette of the upper two cells
+btable blk_pal_bot = { 0, 1, 1, 2, 5, 1, 3, 1, 4, 4, 6, 4, 7, 4, 5, 7 };   // and of the lower two
+btable blk_hard = { 0, 14, 14, 22, 14, 18, 14, 16, 14, 14, 28, 34, 16, 16, 16, 14 };   // frames of digging
+btable blk_bit = { 0, 0x52, 0x50, 0x51, 0x21, 0x50, 0x52, 0x50, 0x01, 0x01, 0x21, 0x01, 0x71, 0x01, 0x21, 0x71 };  // debris: palette << 4 | tile
+table blk_name = { "", "GRASS", "DIRT", "STONE", "SAND", "WOOD", "LEAVES", "PLANKS", "WATER", "GLASS", "GOLD",
+                   "DIAMOND", "RED BRICK", "BLUE BRICK", "YELLOW BRICK", "TNT" };
+
+const S_TITLE = 0; const S_GEN = 1; const S_LOAD = 2; const S_PLAY = 3; const S_PAUSE = 4;
+
+// physics, in 1/16 pixel per frame
+const GRAV = 4; const MAXFALL = 64; const JUMPV = -58; const ACC = 3; const MAXV = 20; const FRIC = 3;
+const TAP = 12;                     // a press shorter than this is a tap (build), longer is a hold (dig)
+
+// sprite slots, front to back
+const SP_CURSOR = 0; const SP_CRACK = 1; const SP_HERO = 2; const SP_BITS = 3; const SP_CRIT = 11;
+const SP_CHEST = 14; const SP_SKY = 18;
+
+// The world is made up as you walk (from a seed) and only your changes are saved. `world` is a window of 64 columns:
+// the column at x lives in slot x & 63 and colx[slot] says which x it holds right now.
+byte world[1920];
+var colx[64];
+var wseed;
+var ed_x[330]; byte ed_y[330]; byte ed_t[330];     // your changes: the column, row and block of each
+var ed_n; var ed_w; var ed_warned;
+var state; var has_save;
+var px; var py; var fx; var fy; var vx; var vy; var face; var grounded; var coyote; var jump_buf; var in_water; var climb; var hop;
+var camx; var camy; var view_bx; var view_by; var shake;
+var sel; var unlocked; var gems; var found;
+var tx; var ty;                     // the block the cursor is on
+var b_state; var hold_t; var dig_t; var dig_x; var dig_y; var broke; var aim; var aim_x; var aim_y;
+var daytime; var phase;
+var anim_t; var walked;
+var toast_t; var hud_dirty; var tut;
+var music_off; var dirty; var save_stage; var save_timer;
+// making columns ready around gen_c; gen_goal: 0 new world, 1 continue, 2 go home
+var gen_phase; var gen_x; var gen_c; var gen_goal; var menu_i; var hold_a;
+var sfx1; var sfx3;
+var chest_open;                     // chests opened so far
+var fuse_x[4]; var fuse_y[4]; var fuse_t[4];
+var pt_x[8]; var pt_y[8]; var pt_vx[8]; var pt_vy[8]; var pt_life[8]; var pt_tile[8]; var pt_attr[8];
+var cr_type[3]; var cr_x[3]; var cr_y[3]; var cr_vy[3]; var cr_dir[3]; var cr_t[3]; var cr_cool[3];
+var title_t; var hinted_tree;
+
+// ================= sound =================
+func blip(hz, frames) { tone(1, hz, 9, 2); sfx1 = frames; }
+func crunch(rate, frames) { tone(3, rate, 10, 0); sfx3 = frames; }
+func sound_update() {
+  if (sfx1 > 0) { sfx1--; if (sfx1 == 0 && !music_playing(2)) { tone_off(1); } }
+  if (sfx3 > 0) { sfx3--; if (sfx3 == 0) { tone_off(3); } }
+  music_update();
+}
+func start_music() {
+  music_tempo(8);
+  music_play(0, 0, song_lead, 7);
+  music_duty(0, 1);
+  music_play(1, 2, song_bass, 9);
+  music_mute(music_off);
+}
+func fanfare(song) { music_play(2, 1, song, 10); }
+
+// ================= the world =================
+func block_at(bx, by) {
+  if (by >= WH || bx < NEGW || bx > WMAX) { return B_ROCK; }
+  if (by < 0) { return B_AIR; }
+  if (colx[bx & 63] != bx) { load_col(bx); }
+  return world[(by << 6) + (bx & 63)];
+}
+// Remember a change the player made (or an explosion did) so it can be saved, and put it in the window.
+func record_edit(bx, by, t) {
+  var i = 0;
+  while (i < ed_n && !(ed_x[i] == bx && ed_y[i] == by)) { i++; }
+  if (i == ed_n) {
+    if (ed_n < MAXED) { ed_n++; } else { i = ed_w; ed_w++; if (ed_w >= MAXED) { ed_w = 0; } }
+    if (ed_n >= 300 && !ed_warned) { ed_warned = 1; toast("WORLD IS FILLING UP"); }
+  }
+  ed_x[i] = bx; ed_y[i] = by; ed_t[i] = t;
+}
+func wset(bx, by, t) {
+  if (by < 0 || by >= WH || bx < NEGW || bx > WMAX) { return; }
+  if (colx[bx & 63] != bx) { load_col(bx); }
+  world[(by << 6) + (bx & 63)] = t;
+  record_edit(bx, by, t);
+}
+// Trees are not walls: you walk past trunks and leaves, climb them with UP, and can stand on top of leaves.
+func solid_at(bx, by) {
+  var t = block_at(bx, by);
+  return t != B_AIR && t != B_WATER && t != B_LOG && t != B_LEAVES && t != B_CHEST && t != B_OPEN;
+}
+func climbable(bx, by) {
+  var t = block_at(bx, by);
+  return t == B_LOG || t == B_LEAVES;
+}
+func rect_solid(x, y, w, h) {
+  for (var by = y >> 4; by <= (y + h - 1) >> 4; by++) {
+    for (var bx = x >> 4; bx <= (x + w - 1) >> 4; bx++) {
+      if (solid_at(bx, by)) { return 1; }
+    }
+  }
+  return 0;
+}
+func surface(bx) {
+  for (var by = 0; by < WH; by++) { if (solid_at(bx, by)) { return by; } }
+  return WH;
+}
+
+// Draw one block into the background map. The map holds 16x16 blocks, so world coordinates wrap.
+func put4(bx, by, tile, ptop, pbot) {
+  var a = BG_MAP + ((((by << 1) & 31) << 5) + ((bx << 1) & 31)) * 2;
+  poke(a, tile | (ptop << 12));
+  poke(a + 2, (tile + 1) | (ptop << 12));
+  poke(a + 64, (tile + 2) | (pbot << 12));
+  poke(a + 66, (tile + 3) | (pbot << 12));
+}
+func draw_block(bx, by) {
+  var t = block_at(bx, by);
+  if (t == B_CHEST || t == B_OPEN) { t = B_AIR; }
+  if (t == B_ROCK) { put4(bx, by, T + art_bedrock, 2, 2); return; }
+  if (t != B_AIR) { put4(bx, by, T + blk_tile[t], blk_pal_top[t], blk_pal_bot[t]); return; }
+  if (by >= CAVE_ROW) { put4(bx, by, T + art_cave, 2, 2); return; }
+  // sky: mostly empty, with the odd cloud (two blocks wide) and stars that only show at night
+  var h = (((bx >> 1) * 73) ^ (by * 151) ^ ((bx >> 1) * by)) & 15;
+  if (by >= 1 && by <= 5 && h == 3) {
+    if (bx & 1) { put4(bx, by, T + art_cloud_r, 0, 0); } else { put4(bx, by, T + art_cloud_l, 0, 0); }
+    return;
+  }
+  var a = BG_MAP + ((((by << 1) & 31) << 5) + ((bx << 1) & 31)) * 2;
+  var s = ((bx * 37) ^ (by * 101)) & 7;
+  poke(a, s == 1 ? T + art_star_a : 0);
+  poke(a + 2, 0);
+  poke(a + 64, 0);
+  poke(a + 66, s == 5 ? T + art_star_b : 0);
+}
+func draw_if_visible(bx, by) {
+  if (bx >= view_bx && bx <= view_bx + 10 && by >= view_by && by <= view_by + 8) { draw_block(bx, by); }
+}
+func redraw_view() {
+  for (var y = 0; y < 9; y++) {
+    for (var x = 0; x < 11; x++) { draw_block(view_bx + x, view_by + y); }
+  }
+}
+// Follow the hero. Only the row or column that scrolls into view is drawn.
+func camera_update() {
+  camx = clamp(px + 8 - 80, NEGW * 16, WMAX * 16 - 80);
+  camy = clamp(py + 8 - 64, 0, (WH + 1) * 16 - 128);
+  var nbx = camx >> 4;
+  var nby = camy >> 4;
+  if (abs(nbx - view_bx) > 1 || abs(nby - view_by) > 1) { view_bx = nbx; view_by = nby; redraw_view(); }
+  else {
+    if (nbx > view_bx) { for (var i = 0; i < 9; i++) { draw_block(nbx + 10, nby + i); } }
+    if (nbx < view_bx) { for (var i = 0; i < 9; i++) { draw_block(nbx, nby + i); } }
+    if (nby > view_by) { for (var i = 0; i < 11; i++) { draw_block(nbx + i, nby + 8); } }
+    if (nby < view_by) { for (var i = 0; i < 11; i++) { draw_block(nbx + i, nby); } }
+    view_bx = nbx; view_by = nby;
+  }
+  var sy = camy;
+  if (shake > 0) {
+    shake--;
+    if ((shake & 2) && (camy & 15) <= 13) { sy = camy + 2; }
+    else if ((camy & 15) >= 2) { sy = camy - 2; }
+  }
+  scroll(camx & 255, sy & 255);
+}
+
+// ================= world generation: any column, on demand, from the seed =================
+func mix(a, b) {                      // a small 16-bit hash of two numbers and the world's seed
+  var h = a * 0x2F6B + b * 0x7A3D + wseed;
+  h = h ^ (h >>> 7);
+  h = h * 0x9E35;
+  h = h ^ (h >>> 9);
+  h = h * 0x7F4B;
+  return h ^ (h >>> 6);
+}
+func vnoise(x, shift, k) {            // smooth value noise, 0..15, hills as wide as 1 << shift blocks
+  var c = x >> shift;
+  var t = x & ((1 << shift) - 1);
+  var a = mix(c, k) & 15;
+  var b = mix(c + 1, k) & 15;
+  return (a * ((1 << shift) - t) + b * t) >> shift;
+}
+// The ground never changes by more than one block from one column to the next, so the hero can always hop along it.
+func height(x) {
+  var h = 11 + (((vnoise(x, 4, 1) - 8) * 3) >> 3);
+  if (abs(x) < 8) { h = 11 + ((h - 11) * abs(x)) / 8; }      // a flat meadow at home
+  return clamp(h, 7, 14);
+}
+func pond_center(r) { return (r << 6) + 16 + umod(mix(r, 77), 32); }
+func pond_depth(x) {                  // 0 outside a pond; a shallow bowl: 2 deep in the middle, 1 at the sides
+  var r = x >> 6;
+  if (r == 0 || (mix(r, 78) & 3) != 0) { return 0; }
+  var d = abs(x - pond_center(r));
+  if (d <= 1) { return 2; }
+  if (d <= 3) { return 1; }
+  return 0;
+}
+func is_sand(x) { var r = x >> 6; return r != 0 && (mix(r, 78) & 3) == 0 && abs(x - pond_center(r)) <= 5; }
+func tree_at(x) {
+  if (abs(x) < 4 || is_sand(x)) { return 0; }
+  return umod(mix(x, 5), 5) == 0 && umod(mix(x - 1, 5), 5) != 0 && umod(mix(x - 2, 5), 5) != 0;
+}
+func tree_h(x) { return 2 + (mix(x, 6) & 1); }
+// Two chests in every 64 columns, one of them right at home to teach the idea. Half are lying on the grass, half hide in a cave.
+func chest_at(x) {
+  if (x == 6) { return 1; }
+  var r = x >> 6;
+  if (abs(x) < 9) { return 0; }
+  return x == (r << 6) + 8 + umod(mix(r, 42), 48) || x == (r << 6) + 8 + umod(mix(r, 52), 48);
+}
+func chest_cave(x) { return x != 6 && (mix(x, 44) & 1) == 1; }
+func cave_row(x) { return 17 + (mix(x, 45) & 7); }          // the room a hidden chest sits in: rows r..r+1, floor at r+2
+func put_if_air(s, by, t) { if (by >= 0 && by < WH && world[(by << 6) + s] == B_AIR) { world[(by << 6) + s] = t; } }
+func load_col(x) {
+  var s = x & 63;
+  colx[s] = x;
+  var h = height(x);
+  var sand = is_sand(x);
+  var base = h;
+  var pd = pond_depth(x);
+  var pond = pd > 0;
+  if (pond) { h = base + pd; }
+  var xs = x + 2048;
+  var shaft = (mix(xs >> 1, 31) % 41) == 0 && abs(x) > 6 && !pond;
+  for (var by = 0; by < WH; by++) {
+    var t = B_AIR;
+    if (by < h) { if (pond && by >= base) { t = B_WATER; } }
+    else if (by == h) { t = sand ? B_SAND : B_GRASS; }
+    else if (by <= h + 1) { t = sand ? B_SAND : B_DIRT; }
+    else if (by <= h + 3) { t = B_DIRT; }
+    else {
+      t = B_STONE;
+      if (by >= 16) {
+        var cx = udiv(xs, 5); var cy = by >> 2;
+        if (umod(mix(cx, cy + 100), 7) == 0 && abs(xs - (cx * 5 + 2)) <= 2 && abs(by - (cy * 4 + 1 + (mix(cx, cy + 101) & 1))) <= 1) { t = B_AIR; }
+        else if (umod(mix(x, by + 200), 19) == 0) { t = B_GOLD; }
+        else if (by >= 22 && umod(mix(x, by + 300), 29) == 0) { t = B_DIAMOND; }
+      }
+    }
+    if (shaft && by >= h && by <= 22) { t = B_AIR; }
+    world[(by << 6) + s] = t;
+  }
+  // trees: the trunk and leaves of this column and of its neighbours' crowns
+  for (var dx = -1; dx <= 1; dx++) {
+    var tx2 = x + dx;
+    if (tree_at(tx2)) {
+      var th = tree_h(tx2);
+      var hh = height(tx2);
+      if (dx == 0) { for (var k = 1; k <= th; k++) { put_if_air(s, hh - k, B_LOG); } }
+      put_if_air(s, hh - th - 2, B_LEAVES);
+      put_if_air(s, hh - th - 1, B_LEAVES);
+    }
+  }
+  // chests: on the grass, or in a little room cut into the stone
+  for (var dx = -1; dx <= 1; dx++) {
+    var cx2 = x + dx;
+    if (chest_at(cx2)) {
+      if (chest_cave(cx2)) {
+        var r2 = cave_row(cx2);
+        world[(r2 << 6) + s] = B_AIR; world[((r2 + 1) << 6) + s] = B_AIR;
+        if (world[((r2 + 2) << 6) + s] == B_AIR) { world[((r2 + 2) << 6) + s] = B_STONE; }
+        if (dx == 0) { world[((r2 + 1) << 6) + s] = B_CHEST; }
+      } else if (dx == 0 && !pond) { world[((h - 1) << 6) + s] = B_CHEST; }
+    }
+  }
+  // finally, what the player has changed here
+  for (var i = 0; i < ed_n; i++) { if (ed_x[i] == x) { world[(ed_y[i] << 6) + s] = ed_t[i]; } }
+}
+func reset_columns() { for (var i = 0; i < 64; i++) { colx[i] = 32767; } }
+// Make the window ready around the hero a few columns at a time (used while the world is being made).
+func gen_step() {
+  if (gen_phase == 0) { gen_x = gen_c - 15; gen_phase = 1; return; }
+  for (var i = 0; i < 3 && gen_x <= gen_c + 15; i++) { load_col(gen_x); gen_x++; }
+  if (gen_x > gen_c + 15) { gen_phase = 4; }
+}
+
+// ================= saving: the seed and the changes, 3 bytes each (12 bits of column, 5 of row, 5 of block) =================
+func save_header() {
+  save_set8(0, 'T'); save_set8(1, 'W'); save_set8(2, 2); save_set8(3, sel);
+  save_set(4, unlocked);
+  save_set8(6, chest_open);
+  save_set8(7, music_off | (tut << 1));
+  save_set(8, gems);
+  save_set(10, daytime);
+  save_set(12, wseed);
+  save_set(14, ((px + 8) >> 4) + 2048);
+  save_set8(16, (py + 8) >> 4);
+  save_set(18, ed_n);
+  save_set(20, ed_w);
+}
+func pack(from, to) {
+  for (var i = from; i < to && i < ed_n; i++) {
+    var xs = ed_x[i] + 2048;
+    var a = 32 + i * 3;
+    save_set8(a, xs & 255);
+    save_set8(a + 1, (xs >> 8) | ((ed_y[i] & 15) << 4));
+    save_set8(a + 2, ((ed_y[i] >> 4) & 1) | (ed_t[i] << 1));
+  }
+}
+func unpack(from, to) {
+  for (var i = from; i < to && i < ed_n; i++) {
+    var a = 32 + i * 3;
+    var b1 = save_get8(a + 1);
+    ed_x[i] = (save_get8(a) | ((b1 & 15) << 8)) - 2048;
+    ed_y[i] = (b1 >> 4) | ((save_get8(a + 2) & 1) << 4);
+    ed_t[i] = save_get8(a + 2) >> 1;
+  }
+}
+func save_valid_world() { return save_loaded() && save_get8(0) == 'T' && save_get8(1) == 'W' && save_get8(2) == 2 && save_valid(); }
+// One piece per frame so a save never costs more than a third of a frame.
+func save_step() {
+  if (save_stage == 1) { save_header(); pack(0, 110); save_stage = 2; }
+  else if (save_stage == 2) { pack(110, 220); save_stage = 3; }
+  else if (save_stage == 3) { pack(220, 330); save_stage = 4; }
+  else if (save_stage == 4) { save_seal(); save_commit(); save_stage = 0; dirty = 0; save_timer = 0; }
+}
+func request_save() { if (save_stage == 0) { save_stage = 1; } }
+
+// ================= HUD (the window layer: two rows at the bottom) =================
+func count_found() {
+  found = 0;
+  for (var i = 1; i <= NBLOCKS; i++) { if (unlocked & (1 << i)) { found++; } }
+}
+func hud_line0() {
+  wtext(3, 0, "                 ");
+  if (tut == 0) { wtext(3, 0, "D-PAD:WALK A:JUMP"); }
+  else if (tut == 1) { wtext(3, 0, "HOLD B: DIG"); }
+  else if (tut == 2) { wtext(3, 0, "TAP B: BUILD"); }
+  else if (tut == 3) { wtext(3, 0, "SELECT: NEW BLOCK"); }
+  else { wtext(3, 0, blk_name[sel]); }
+}
+func draw_hud() {
+  var tile = T + blk_tile[sel];
+  set_wcell(0, 0, tile | (blk_pal_top[sel] << 12));
+  set_wcell(1, 0, (tile + 1) | (blk_pal_top[sel] << 12));
+  set_wcell(0, 1, (tile + 2) | (blk_pal_bot[sel] << 12));
+  set_wcell(1, 1, (tile + 3) | (blk_pal_bot[sel] << 12));
+  if (toast_t == 0) { hud_line0(); }
+  set_wcell(3, 1, (T + art_gem_icon) | (4 << 12));
+  wprint_u(4, 1, gems);
+  set_wcell(11, 1, (T + art_mini) | (7 << 12));
+  wtext(12, 1, utoa(found));
+  wtext(12 + (found > 9 ? 2 : 1), 1, "/15 ");
+  hud_dirty = 0;
+}
+func toast(s) {
+  wtext(3, 0, "                 ");
+  wtext(3, 0, s);
+  toast_t = 150;
+}
+func toast_new(t) {
+  wtext(3, 0, "                 ");
+  wtext(3, 0, "NEW:");
+  wtext(8, 0, blk_name[t]);
+  toast_t = 180;
+}
+func unlock(t) {
+  if (unlocked & (1 << t)) { return; }
+  unlocked = unlocked | (1 << t);
+  count_found();
+  hud_dirty = 1;
+  dirty = 1;
+  if (found == NBLOCKS) { toast("MASTER BUILDER!!!"); toast_t = 400; fanfare(song_win); }
+  else { toast_new(t); fanfare(song_fanfare); }
+}
+
+// ================= little flying things =================
+func spawn_bit(wx, wy, bvx, bvy, tile, attr, life) {
+  for (var i = 0; i < 8; i++) {
+    if (pt_life[i] == 0) {
+      pt_x[i] = wx; pt_y[i] = wy; pt_vx[i] = bvx; pt_vy[i] = bvy; pt_tile[i] = tile; pt_attr[i] = attr; pt_life[i] = life;
+      return;
+    }
+  }
+}
+func debris(bx, by, t, n) {
+  var b = blk_bit[t];
+  for (var i = 0; i < n; i++) {
+    spawn_bit(bx * 16 + 2 + rand(10), by * 16 + 2 + rand(8), rand(5) - 2, 0 - 1 - rand(3), T + art_bit1 + (b & 15), b >> 4, 18 + rand(10));
+  }
+}
+func sparkle(wx, wy, n) {
+  for (var i = 0; i < n; i++) { spawn_bit(wx + rand(14), wy + rand(10), rand(3) - 1, 0 - 2 - rand(2), T + art_spark, 3, 26 + rand(12)); }
+}
+func bits_update() {
+  for (var i = 0; i < 8; i++) {
+    if (pt_life[i] > 0) {
+      pt_life[i]--;
+      pt_x[i] += pt_vx[i];
+      pt_y[i] += pt_vy[i];
+      if ((pt_life[i] & 3) == 0 && pt_tile[i] != T + art_heart) { pt_vy[i]++; }
+      var sx = pt_x[i] - camx;
+      var sy = pt_y[i] - camy;
+      if (pt_life[i] > 0 && sx > -8 && sx < 160 && sy > -8 && sy < 122) { sprite(SP_BITS + i, sx, sy, pt_tile[i], pt_attr[i]); }
+      else { hide_sprite(SP_BITS + i); }
+    } else { hide_sprite(SP_BITS + i); }
+  }
+}
+
+// ================= TNT =================
+func has_fuse(bx, by) {
+  for (var i = 0; i < 4; i++) { if (fuse_t[i] > 0 && fuse_x[i] == bx && fuse_y[i] == by) { return 1; } }
+  return 0;
+}
+func light_fuse(bx, by, t) {
+  for (var i = 0; i < 4; i++) {
+    if (fuse_t[i] == 0) { fuse_x[i] = bx; fuse_y[i] = by; fuse_t[i] = t; return 1; }
+  }
+  return 0;
+}
+func blast(bx, by) {
+  var t = block_at(bx, by);
+  if (t == B_ROCK || t == B_AIR) { return; }
+  if (t == B_TNT) { if (!has_fuse(bx, by)) { light_fuse(bx, by, 14); } return; }
+  wset(bx, by, B_AIR);
+  draw_if_visible(bx, by);
+}
+func explode(bx, by) {
+  wset(bx, by, B_AIR);
+  draw_if_visible(bx, by);
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) { blast(bx + dx, by + dy); }
+  }
+  blast(bx - 2, by); blast(bx + 2, by); blast(bx, by - 2); blast(bx, by + 2);
+  debris(bx, by, B_TNT, 4);
+  debris(bx, by, B_STONE, 4);
+  shake = 24;
+  crunch(700, 26);
+  dirty = 1;
+  if (abs(px - bx * 16) < 44 && abs(py - by * 16) < 44) { vy = -84; grounded = 0; }
+}
+func fuses_update() {
+  for (var i = 0; i < 4; i++) {
+    if (fuse_t[i] > 0) {
+      fuse_t[i]--;
+      var bx = fuse_x[i];
+      var by = fuse_y[i];
+      if (block_at(bx, by) != B_TNT) { fuse_t[i] = 0; }
+      else if (fuse_t[i] == 0) { explode(bx, by); }
+      else if ((fuse_t[i] & 7) == 0 && bx >= view_bx && bx <= view_bx + 10 && by >= view_by && by <= view_by + 8) {
+        if (fuse_t[i] & 8) { put4(bx, by, T + art_tnt_lit, 7, 7); } else { put4(bx, by, T + art_tnt, 7, 7); }
+        blip(880 + (120 - fuse_t[i]) * 6, 2);
+      }
+    }
+  }
+}
+
+// ================= animals =================
+func spawn_critters() {
+  for (var i = 0; i < 3; i++) {
+    var bx = HOME_X - 5 + i * 4 + (i == 2 ? 3 : 0);
+    cr_type[i] = i == 2;
+    cr_x[i] = bx * 16;
+    cr_y[i] = (surface(bx) - 1) * 16;
+    cr_vy[i] = 0; cr_dir[i] = i & 1 ? 1 : -1; cr_t[i] = 30 + i * 40; cr_cool[i] = 0;
+  }
+}
+func critters_update() {
+  for (var i = 0; i < 3; i++) {
+    if (abs(cr_x[i] - px) > 240) {              // too far behind: a new animal wanders in ahead
+      var nb = clamp(((px + 8) >> 4) + (rand(2) ? 9 : -9) + rand(5), NEGW + 2, WMAX - 2);
+      cr_x[i] = nb * 16; cr_y[i] = (surface(nb) - 1) * 16; cr_vy[i] = 0;
+    }
+    var x = cr_x[i];
+    var y = cr_y[i];
+    if (abs(x - px) < 170) {
+      // fall
+      cr_vy[i] = min(cr_vy[i] + 1, 4);
+      var steps = abs(cr_vy[i]);
+      var s = sign(cr_vy[i]);
+      var on_ground = 0;
+      while (steps > 0) {
+        if (s > 0 && solid_at((x + 8) >> 4, (y + 16) >> 4)) { cr_vy[i] = 0; on_ground = 1; break; }
+        if (s < 0 && solid_at((x + 8) >> 4, (y + 6) >> 4)) { cr_vy[i] = 0; break; }
+        y += s; steps--;
+      }
+      // wander: walk for a while, stand for a while
+      cr_t[i]--;
+      if (cr_t[i] <= 0) { cr_t[i] = 60 + rand(120); if (rand(3) == 0) { cr_dir[i] = 0 - cr_dir[i]; } }
+      if (cr_t[i] > 50 && (frames() & 1)) {
+        var d = cr_dir[i];
+        var front = (x + 8 + d * 7) >> 4;
+        var row = (y + 12) >> 4;
+        if (front < NEGW || front > WMAX) { cr_dir[i] = 0 - d; }
+        else if (solid_at(front, row)) {
+          if (on_ground && !solid_at(front, row - 1) && !solid_at((x + 8) >> 4, row - 1)) { cr_vy[i] = -5; }
+          else if (on_ground) { cr_dir[i] = 0 - d; }
+          else { x += d; }
+        } else { x += d; }
+      }
+      cr_x[i] = x; cr_y[i] = y;
+      // say hello
+      if (cr_cool[i] > 0) { cr_cool[i]--; }
+      else if (overlap(px + 3, py + 2, 10, 14, x + 2, y + 4, 12, 12)) {
+        spawn_bit(x + 4, y - 2, 0, -1, T + art_heart, 7, 40);
+        cr_cool[i] = 120;
+        if (cr_type[i]) { blip(1760, 4); } else { blip(220, 6); }
+        if (on_ground) { cr_vy[i] = -4; }
+      }
+    }
+    var sx = cr_x[i] - camx;
+    var sy = cr_y[i] - camy;
+    if (sx > -16 && sx < 160 && sy > -16 && sy < 114) {
+      var walk = cr_t[i] > 50 && ((anim_t >> 3) & 1);
+      var attr = cr_dir[i] < 0 ? SPR_FLIPX : 0;
+      if (cr_type[i]) { sprite(SP_CRIT + i, sx + 4, sy + 8, T + art_chick1 + walk, attr | 2); }
+      else { sprite(SP_CRIT + i, sx, sy, T + art_pig1 + walk * 4, attr | SPR_16X16 | 1); }
+    } else { hide_sprite(SP_CRIT + i); }
+  }
+}
+
+// ================= chests =================
+func chests_update() {
+  var slot = 0;
+  for (var by = view_by; by <= view_by + 8; by++) {
+    for (var bx = view_bx; bx <= view_bx + 10; bx++) {
+      var t = block_at(bx, by);
+      if ((t == B_CHEST || t == B_OPEN) && slot < 4) {
+        var wx = bx * 16;
+        var wy = by * 16;
+        if (t == B_CHEST && overlap(px + 3, py + 2, 10, 14, wx + 2, wy + 2, 12, 14)) {
+          wset(bx, by, B_OPEN);
+          chest_open++;
+          sparkle(wx, wy - 6, 6);
+          open_chest(bx);
+          if (tut < 4) { tut = 4; }
+          request_save();
+          t = B_OPEN;
+        }
+        sprite(SP_CHEST + slot, wx - camx, wy - camy, T + (t == B_OPEN ? art_chest_open : art_chest), SPR_16X16 | 6);
+        slot++;
+      }
+    }
+  }
+  for (var i = slot; i < 4; i++) { hide_sprite(SP_CHEST + i); }
+}
+// Every chest holds the next block you do not own yet; when you own them all it holds gems.
+btable rewards = { B_BLUE, B_YELLOW, B_GLASS, B_TNT };
+func open_chest(bx) {
+  var k = mix(bx, 12) & 3;
+  for (var i = 0; i < 4; i++) {
+    var t = rewards[(k + i) & 3];
+    if (!(unlocked & (1 << t))) { unlock(t); return; }
+  }
+  gems = min(99, gems + 5); hud_dirty = 1; toast("5 GEMS!"); blip(1568, 8);
+}
+
+// ================= day and night =================
+// Daytime colors for background palettes 1..7 (three colors each; color 0 is the sky).
+table day_colors = {
+  rgb(12, 9, 6), rgb(9, 6, 3), rgb(5, 3, 2),           // 1 earth
+  rgb(12, 12, 12), rgb(9, 9, 10), rgb(5, 5, 6),        // 2 stone
+  rgb(9, 14, 5), rgb(4, 11, 3), rgb(9, 6, 3),          // 3 green (3 = the earth's brown)
+  rgb(11, 15, 15), rgb(3, 8, 15), rgb(1, 3, 9),        // 4 blue
+  rgb(15, 14, 8), rgb(15, 12, 2), rgb(11, 7, 1),       // 5 yellow
+  rgb(10, 10, 11), rgb(6, 6, 7), rgb(15, 12, 1),       // 6 gold ore
+  rgb(15, 13, 12), rgb(14, 3, 2), rgb(7, 1, 1)         // 7 red
+};
+func dim(c, k) {      // scale a color to k/8 brightness, keeping a little extra blue for moonlight
+  var r = ((c >> 8) & 15) * k >> 3;
+  var g = ((c >> 4) & 15) * k >> 3;
+  var b = min(15, ((c & 15) * (k + 1)) >> 3);
+  return (r << 8) | (g << 4) | b;
+}
+func apply_phase(p) {
+  phase = p;
+  var k = 8;
+  var sky = rgb(8, 12, 15);
+  var cloud = rgb(15, 15, 15);
+  var star = sky;
+  if (p == 1) { k = 6; sky = rgb(15, 9, 6); cloud = rgb(15, 12, 11); star = sky; }
+  if (p == 2) { k = 4; sky = rgb(1, 2, 6); cloud = rgb(4, 5, 9); star = rgb(15, 15, 11); }
+  if (p == 3) { k = 6; sky = rgb(12, 9, 11); cloud = rgb(15, 13, 13); star = sky; }
+  bg_pal(0, sky, cloud, star, rgb(1, 2, 5));
+  for (var i = 0; i < 7; i++) {
+    var a = BG_PAL + (i + 1) * 8;
+    poke(a, i == 1 ? rgb(14, 14, 13) : sky);            // palette 2's color 0 is the HUD panel
+    poke(a + 2, dim(day_colors[i * 3], k));
+    poke(a + 4, dim(day_colors[i * 3 + 1], k));
+    poke(a + 6, dim(day_colors[i * 3 + 2], i == 1 ? 8 : k));   // keep the HUD text dark
+  }
+  if (p == 2) { obj_pal(4, 0, rgb(15, 15, 13), rgb(12, 12, 11), rgb(10, 10, 9)); }
+  else { obj_pal(4, 0, rgb(15, 15, 9), rgb(15, 11, 2), rgb(10, 10, 9)); }
+}
+// One full day is 7,200 ticks of two frames: four minutes.
+func sky_update() {
+  if (frames() & 1) { daytime++; if (daytime >= 7200) { daytime = 0; } }
+  var p = 0;
+  if (daytime >= 3600) { p = 1; }
+  if (daytime >= 4200) { p = 2; }
+  if (daytime >= 6600) { p = 3; }
+  if (p != phase) { apply_phase(p); }
+  // the sun crosses during the day (and dusk), the moon at night (and dawn)
+  var t = daytime; var len = 4200; var tile = T + art_sun;
+  if (daytime >= 4200) { t = daytime - 4200; len = 3000; tile = T + art_moon; }
+  var a = udiv(t * 4, udiv(len, 32));                  // 0..128: half a turn
+  var sx = 2 + ((a * 140) >> 7);
+  var sy = 38 - ((sin(a) * 30) >> 8) - max(0, camy - 104);      // in the sky at ground level; it rises out of view as you dig down
+  if (sy > -16) { sprite(SP_SKY, sx, sy, tile, SPR_16X16 | SPR_BEHIND | 4); } else { hide_sprite(SP_SKY); }
+  // water ripples: swap the two water pictures in tile RAM
+  if ((frames() & 31) == 0) { load_tiles(art + ((frames() & 32) ? art_water2 : art_water) * 16, T + art_water, 4); }
+}
+
+// ================= the hero =================
+func place(bx, by) {
+  if (bx < NEGW || bx > WMAX || by < 0 || by >= WH) { blip(110, 3); return 0; }
+  var t = block_at(bx, by);
+  if (t != B_AIR && t != B_WATER) { return 0; }
+  if (overlap(px + 3, py + 2, 10, 14, bx * 16, by * 16, 16, 16)) { blip(110, 3); return 0; }
+  wset(bx, by, sel);
+  draw_if_visible(bx, by);
+  blip(330, 3);
+  dirty = 1;
+  if (sel == B_TNT) { light_fuse(bx, by, 120); }
+  if (tut == 2) { tut = 3; hud_dirty = 1; }
+  return 1;
+}
+func break_block(bx, by) {
+  var t = block_at(bx, by);
+  wset(bx, by, B_AIR);
+  draw_if_visible(bx, by);
+  debris(bx, by, t, 4);
+  crunch(2200, 5);
+  dirty = 1;
+  broke = 1;
+  if (t == B_GOLD || t == B_DIAMOND) { gems++; hud_dirty = 1; sparkle(bx * 16, by * 16, 3); blip(1568, 6); }
+  unlock(t);
+  if (tut == 1) { tut = 2; hud_dirty = 1; }
+}
+// A tap on something solid builds next to it instead.
+func tap_build() {
+  var pbx = (px + 8) >> 4;
+  var pby = (py + 8) >> 4;
+  if (aim == 2) {
+    // under my own feet: lift the hero one block and fill the gap
+    if (grounded && !rect_solid(px + 3, py - 14, 10, 14)) {
+      py -= 16;
+      wset(pbx, pby, sel);
+      draw_if_visible(pbx, pby);
+      blip(330, 3);
+      dirty = 1;
+      if (sel == B_TNT) { light_fuse(pbx, pby, 120); }
+      if (tut == 2) { tut = 3; hud_dirty = 1; }
+    } else { blip(110, 3); }
+    return;
+  }
+  if (aim == 1) { blip(110, 3); return; }
+  // a tap builds in the cell next to the hero in the aimed direction when it is free
+  if (!solid_at(pbx + aim_x, pby + aim_y) && block_at(pbx + aim_x, pby + aim_y) != B_WATER) { place(pbx + aim_x, pby + aim_y); return; }
+  // otherwise on top of the block ahead (up to two more blocks: a wall three high)
+  if (!solid_at(dig_x, dig_y - 1)) { place(dig_x, dig_y - 1); }
+  else if (!solid_at(dig_x, dig_y - 2)) { place(dig_x, dig_y - 2); }
+  else { blip(110, 3); }
+}
+// Leaves hold you up when you come down onto them; hold DOWN to sink in. y is the pixel row just below the feet.
+func leaf_floor(y) {
+  if ((y & 15) != 0 || climb || btn(BTN_DOWN)) { return 0; }
+  for (var bx = (px + 3) >> 4; bx <= (px + 12) >> 4; bx++) { if (block_at(bx, y >> 4) == B_LEAVES) { return 1; } }
+  return 0;
+}
+func hero_step() {
+  // walking
+  var dir = btn(BTN_RIGHT) - btn(BTN_LEFT);
+  if (btn(BTN_B)) { dir = 0; }          // while B is held the D-pad aims instead of walking
+  var top = in_water ? MAXV / 2 : MAXV;
+  if (dir > 0) { vx = min(vx + ACC, top); face = 0; }
+  else if (dir < 0) { vx = max(vx - ACC, 0 - top); face = 1; }
+  else { vx = approach(vx, 0, FRIC); }
+  // jumping and swimming
+  in_water = block_at((px + 8) >> 4, (py + 10) >> 4) == B_WATER;
+  if (btnp(BTN_A)) { jump_buf = 6; }
+  if (jump_buf > 0) { jump_buf--; }
+  if (grounded) { coyote = 6; } else if (coyote > 0) { coyote--; }
+  // climbing: on a trunk or in leaves, UP and DOWN take over from gravity
+  if (!climbable((px + 8) >> 4, (py + 8) >> 4) && !climbable((px + 8) >> 4, (py + 15) >> 4)) { climb = 0; }
+  else if (btn(BTN_UP) || btn(BTN_DOWN)) { climb = 1; }
+  if (climb && btnp(BTN_A)) { climb = 0; coyote = 6; }
+  if (climb) {
+    vy = (btn(BTN_DOWN) - btn(BTN_UP)) * 18;
+    fy = 0;
+  } else if (in_water) {
+    vy = min(vy + 1, 14);
+    if (btn(BTN_A)) { vy = max(vy - 3, -22); }
+  } else {
+    if (jump_buf > 0 && coyote > 0) { vy = JUMPV; jump_buf = 0; coyote = 0; grounded = 0; blip(523, 4); }
+    if (hop > 0) { hop--; }
+    else if (vy < -16 && !btn(BTN_A) && vy > -80) { vy = -16; }      // let go of A early for a short jump
+    vy = min(vy + GRAV, MAXFALL);
+  }
+  // move sideways a pixel at a time; hop up a single block that is in the way
+  fx += vx;
+  var dx = fx >> 4;
+  fx = fx - (dx << 4);
+  while (dx != 0) {
+    var s = sign(dx);
+    if (rect_solid(px + s + 3, py + 2, 10, 14)) {
+      if (grounded && dir == s && !rect_solid(px + s + 3, py - 14, 10, 14) && !rect_solid(px + 3, py - 14, 10, 14)) { vy = JUMPV; grounded = 0; coyote = 0; hop = 16; }
+      vx = 0; fx = 0;
+      break;
+    }
+    px = px + s; dx = dx - s; walked++;
+  }
+  // move up or down
+  fy += vy;
+  var dy = fy >> 4;
+  fy = fy - (dy << 4);
+  while (dy != 0) {
+    var s2 = sign(dy);
+    if (rect_solid(px + 3, py + s2 + 2, 10, 14) || (s2 > 0 && leaf_floor(py + 16))) { vy = 0; fy = 0; break; }
+    py = py + s2; dy = dy - s2;
+  }
+  grounded = rect_solid(px + 3, py + 16, 10, 1) || leaf_floor(py + 16);
+  if (tut == 0 && walked > 40) { tut = 1; hud_dirty = 1; }
+  // the first time near a tree, say that it can be climbed
+  if (!hinted_tree && tut >= 4 && toast_t == 0 && climbable((px + 8) >> 4, (py + 8) >> 4)) { hinted_tree = 1; toast("UP: CLIMB TREES"); }
+
+  // the cursor: the D-pad picks one of eight directions (none held: straight ahead), and the cursor jumps to the
+  // first block it finds along that line, up to three cells away. If there is nothing to dig it rests on the next cell.
+  var pbx = (px + 8) >> 4;
+  var pby = (py + 8) >> 4;
+  var ax = btn(BTN_RIGHT) - btn(BTN_LEFT);
+  var ay = btn(BTN_DOWN) - btn(BTN_UP);
+  if (ax != 0 && btn(BTN_B)) { face = ax < 0; }
+  if (ax == 0 && ay == 0) { ax = face ? -1 : 1; }
+  tx = pbx + ax; ty = pby + ay;
+  for (var k = 1; k <= 3; k++) {
+    var ct = block_at(pbx + ax * k, pby + ay * k);
+    if (ct != B_AIR && ct != B_WATER) { tx = pbx + ax * k; ty = pby + ay * k; break; }
+  }
+  var tt = block_at(tx, ty);
+  var can_dig = tt != B_AIR && tt != B_ROCK;
+
+  // B: tap to build, hold to dig
+  if (btnp(BTN_B)) {
+    hold_t = 0; dig_t = 0; broke = 0; dig_x = tx; dig_y = ty;
+    aim = (btn(BTN_UP) && ax == 0) ? 1 : (btn(BTN_DOWN) && ax == 0) ? 2 : 0;      // remembered: fingers rarely leave two buttons at once
+    aim_x = ax; aim_y = ay;
+    if (tt == B_AIR || tt == B_WATER) { place(tx, ty); b_state = 2; } else { b_state = 1; }
+  }
+  if (btn(BTN_B) && b_state != 0) {
+    hold_t++;
+    if (tx != dig_x || ty != dig_y) { dig_x = tx; dig_y = ty; dig_t = 0; if (hold_t > TAP) { aim = (btn(BTN_UP) && ax == 0) ? 1 : (btn(BTN_DOWN) && ax == 0) ? 2 : 0; aim_x = ax; aim_y = ay; } }
+    if (can_dig && b_state == 1) {                 // a press that already built something never digs it back
+      dig_t++;
+      if ((dig_t & 7) == 1) { crunch(4000, 2); }
+      if (dig_t >= blk_hard[tt]) { break_block(tx, ty); dig_t = 0; b_state = 1; }
+    } else { dig_t = 0; }
+  } else {
+    if (b_state == 1 && hold_t < TAP && !broke && can_dig) { tap_build(); }
+    b_state = 0; dig_t = 0;
+  }
+  if (btnp(BTN_SELECT)) {
+    for (var i = 0; i < 16; i++) {
+      sel++;
+      if (sel > NBLOCKS) { sel = 1; }
+      if (unlocked & (1 << sel)) { break; }
+    }
+    hud_dirty = 1;
+    blip(660, 2);
+    if (tut == 3) { tut = 4; toast("FIND THE CHESTS!"); }
+  }
+}
+func draw_hero() {
+  var tile = T + art_hero_idle;
+  if (dig_t > 0) { tile = T + ((dig_t >> 2) & 1 ? art_hero_dig2 : art_hero_dig1); }
+  else if (climb) { tile = T + ((py >> 3) & 1 ? art_hero_walk2 : art_hero_walk1); }
+  else if (!grounded) { tile = T + art_hero_jump; }
+  else if (abs(vx) > 2) { tile = T + ((anim_t >> 3) & 1 ? art_hero_walk2 : art_hero_walk1); }
+  sprite(SP_HERO, px - camx, py - camy, tile, SPR_16X16 | (face ? SPR_FLIPX : 0));
+  // cursor and cracks
+  var sx = tx * 16 - camx;
+  var sy = ty * 16 - camy;
+  if (sx > -16 && sx < 160 && sy > -16 && sy < 114) {
+    sprite(SP_CURSOR, sx, sy, T + art_cursor, SPR_16X16 | 3);
+    var tt = block_at(tx, ty);
+    if (dig_t > 0 && tt != B_AIR && tt != B_ROCK) {
+      var stage = udiv(dig_t * 3, blk_hard[tt]);
+      sprite(SP_CRACK, sx, sy, T + art_crack1 + min(stage, 2) * 4, SPR_16X16 | 3);
+    } else { hide_sprite(SP_CRACK); }
+  } else { hide_sprite(SP_CURSOR); hide_sprite(SP_CRACK); }
+}
+
+// ================= starting, pausing =================
+func hud_on() {
+  clear_win();
+  window_pos(0, 128);
+  text_pal = 2;
+  for (var c = 0; c < 20; c++) { set_wcell(c, 0, 2 << 12); set_wcell(c, 1, 2 << 12); }
+  count_found();
+  draw_hud();
+}
+func enter_play() {
+  hide_all_sprites();
+  clear_bg();
+  apply_phase(daytime >= 6600 ? 3 : daytime >= 4200 ? 2 : daytime >= 3600 ? 1 : 0);
+  view_bx = -9; view_by = -9;        // forces a full redraw
+  fx = 0; fy = 0; vx = 0; vy = 0;
+  spawn_critters();
+  camera_update();
+  hud_on();
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+  state = S_PLAY;
+  save_timer = 0;
+}
+func go_home() {
+  px = HOME_X * 16;
+  py = (surface(HOME_X) - 1) * 16;
+  vx = 0; vy = 0;
+}
+func new_world() {
+  srand(frames(), 0x7E57);
+  unlocked = (1 << B_DIRT) | (1 << B_PLANKS) | (1 << B_RED);
+  sel = B_RED; gems = 0; chest_open = 0; daytime = 600; tut = 0; walked = 0;
+  wseed = frames() * 31 + 17; ed_n = 0; ed_w = 0; ed_warned = 0;
+  for (var i = 0; i < 4; i++) { fuse_t[i] = 0; }
+  reset_columns();
+  gen_c = HOME_X; gen_goal = 0;
+  gen_phase = 0;
+  state = S_GEN;
+  clear_bg();
+  hide_all_sprites();
+  text_pal = 0;
+  text(2, 6, "BUILDING A WORLD");
+  text(6, 8, "FOR");
+  text(10, 8, player_name);
+}
+func load_world() {
+  sel = save_get8(3);
+  unlocked = save_get(4);
+  chest_open = save_get8(6);
+  music_off = save_get8(7) & 1;
+  tut = save_get8(7) >> 1;
+  gems = save_get(8);
+  daytime = save_get(10);
+  wseed = save_get(12);
+  px = (save_get(14) - 2048) * 16;
+  py = save_get8(16) * 16;
+  ed_n = min(save_get(18), MAXED); ed_w = save_get(20); ed_warned = ed_n >= 300;
+  for (var i = 0; i < 4; i++) { fuse_t[i] = 0; }
+  reset_columns();
+  gen_phase = 0;
+  state = S_LOAD;
+}
+btable menu_rows = { 5, 7, 9, 11 };
+func draw_menu() {
+  wtext(3, 2, player_name);
+  var n = str_len(player_name);
+  if (peek8(player_name + n - 1) == 'S') { wtext(3 + n, 2, "' WORLD"); } else { wtext(3 + n, 2, "'S WORLD"); }
+  wtext(4, 5, "KEEP PLAYING");
+  wtext(4, 7, "GO HOME");
+  wtext(4, 9, music_off ? "MUSIC: OFF" : "MUSIC: ON ");
+  wtext(4, 11, "SAVE");
+  for (var i = 0; i < 4; i++) { wtext(2, menu_rows[i], i == menu_i ? ">" : " "); }
+  wtext(2, 14, "BLOCKS");
+  wtext(9, 14, utoa(found));
+  wtext(9 + (found > 9 ? 2 : 1), 14, "/15");
+  set_wcell(14, 14, (T + art_gem_icon) | (4 << 12));
+  wtext(15, 14, utoa(gems));
+}
+func pause() {
+  state = S_PAUSE;
+  menu_i = 0;
+  hide_all_sprites();
+  clear_win();
+  for (var r = 0; r < 18; r++) { for (var c = 0; c < 20; c++) { set_wcell(c, r, 2 << 12); } }
+  window_pos(0, 0);
+  count_found();
+  draw_menu();
+  request_save();
+}
+func unpause() {
+  hud_on();
+  state = S_PLAY;
+}
+func pause_frame() {
+  if (btnp(BTN_UP) && menu_i > 0) { menu_i--; draw_menu(); blip(660, 2); }
+  if (btnp(BTN_DOWN) && menu_i < 3) { menu_i++; draw_menu(); blip(660, 2); }
+  if (btnp(BTN_START) || btnp(BTN_B)) { unpause(); return; }
+  if (btnp(BTN_A)) {
+    if (menu_i == 0) { unpause(); }
+    else if (menu_i == 1) {
+      gen_c = HOME_X; gen_goal = 2; gen_phase = 0; state = S_GEN;
+      clear_bg(); clear_win(); hide_all_sprites(); window_pos(0, 144); text_pal = 0; text(5, 7, "GOING HOME...");
+    }
+    else if (menu_i == 2) { music_off = !music_off; music_mute(music_off); draw_menu(); request_save(); }
+    else { request_save(); wtext(10, 11, "SAVED!"); blip(1046, 6); }
+  }
+}
+
+// ================= the title screen =================
+// A 3x5 alphabet, one word per letter: row 0 in the top three bits.
+table glyph3 = {
+  0x2BED, 0x6BAE, 0x3923, 0x6B6E, 0x79A7, 0x79A4, 0x396B, 0x5BED, 0x7497, 0x126A, 0x5BAD, 0x4927, 0x5FED,
+  0x6B6D, 0x2B6A, 0x6BA4, 0x2B73, 0x6BAD, 0x79CF, 0x7492, 0x5B6F, 0x5B6A, 0x5BFD, 0x5AAD, 0x5A92, 0x72A7
+};
+btable big_pal = { 7, 4, 5, 3, 7, 4 };
+func big_text(col, row, s) {
+  var i = 0;
+  var c = peek8(s);
+  while (c != 0) {
+    if (c >= 'A' && c <= 'Z') {
+      var g = glyph3[c - 'A'];
+      for (var y = 0; y < 5; y++) {
+        for (var x = 0; x < 3; x++) {
+          if ((g >> (14 - (y * 3 + x))) & 1) { set_cell(col + x, row + y, (T + art_mini) | (big_pal[i] << 12)); }
+        }
+      }
+    }
+    col += 4; i++;
+    if (i > 5) { i = 0; }
+    c = peek8(s + i);
+  }
+}
+func str_len(s) { var n = 0; while (peek8(s + n) != 0) { n++; } return n; }
+func title_menu() {
+  text_pal = 0;
+  if (has_save) {
+    text(5, 12, menu_i == 0 ? "> PLAY     " : "  PLAY     ");
+    text(5, 14, menu_i == 1 ? "> NEW WORLD" : "  NEW WORLD");
+  } else { text(4, 13, "PRESS  START"); }
+}
+func draw_title() {
+  state = S_TITLE;
+  hide_all_sprites();
+  clear_bg(); clear_win();
+  scroll(0, 0);
+  window_pos(0, 144);
+  apply_phase(0);
+  var n = min(str_len(player_name), 5);
+  big_text((20 - (n * 4 - 1)) / 2, 1, player_name);
+  big_text(0, 7, "WORLD");
+  for (var x = 0; x < 10; x++) {
+    var a = BG_MAP + ((16 << 5) + x * 2) * 2;
+    var t = T + art_grass;
+    poke(a, t | (3 << 12)); poke(a + 2, (t + 1) | (3 << 12));
+    poke(a + 64, (t + 2) | (1 << 12)); poke(a + 66, (t + 3) | (1 << 12));
+  }
+  menu_i = 0; hold_a = 0; title_t = 0;
+  title_menu();
+  lcd(LCD_BG | LCD_OBJ);
+}
+func title_frame() {
+  title_t++;
+  // a little parade along the grass
+  var hx = (title_t >> 1) % 200 - 20;
+  sprite(SP_HERO, hx, 112, T + ((title_t >> 3) & 1 ? art_hero_walk2 : art_hero_walk1), SPR_16X16);
+  sprite(SP_CRIT, hx - 28, 112, T + art_pig1 + ((title_t >> 3) & 1) * 4, SPR_16X16 | 1);
+  sprite(SP_CRIT + 1, hx - 44, 120, T + art_chick1 + ((title_t >> 2) & 1), 2);
+  if (!has_save) {
+    if (btnp(BTN_START) || btnp(BTN_A)) { new_world(); }
+    return;
+  }
+  if (btnp(BTN_UP) || btnp(BTN_DOWN)) { menu_i = !menu_i; hold_a = 0; title_menu(); text(1, 16, "                  "); blip(660, 2); }
+  if (menu_i == 0) {
+    if (btnp(BTN_START) || btnp(BTN_A)) { load_world(); }
+  } else {
+    // starting over wipes the old world, so it takes a long press
+    if (btnp(BTN_A) || btnp(BTN_START)) { text(1, 16, "HOLD A: START OVER"); }
+    if (btn(BTN_A)) { hold_a++; if (hold_a > 90) { new_world(); } } else { hold_a = 0; }
+  }
+}
+
+// ================= frames =================
+func gen_frame() {
+  if (gen_phase == 4) {
+    if (gen_goal != 1) { go_home(); }
+    enter_play();
+    if (gen_goal == 0) { toast("HI!"); wtext(7, 0, player_name); request_save(); }
+    return;
+  }
+  gen_step();
+  // a row of bricks fills up while the world is built
+  var done = (gen_x - gen_c + 15) >> 1;
+  for (var i = 0; i < done && i < 12; i++) { set_cell(4 + i, 11, (T + art_mini) | (big_pal[i % 4] << 12)); }
+}
+func load_frame() {
+  if (gen_phase == 0) { unpack(0, 110); gen_phase = 1; return; }
+  if (gen_phase == 1) { unpack(110, 220); gen_phase = 2; return; }
+  if (gen_phase == 2) { unpack(220, 330); gen_phase = 3; return; }
+  gen_c = (px + 8) >> 4; gen_goal = 1; gen_phase = 0; state = S_GEN;
+}
+func play_frame() {
+  if (btnp(BTN_START)) { pause(); return; }
+  hero_step();
+  fuses_update();
+  camera_update();
+  draw_hero();
+  critters_update();
+  chests_update();
+  bits_update();
+  sky_update();
+  if (toast_t > 0) { toast_t--; if (toast_t == 0) { hud_dirty = 1; } }
+  if (hud_dirty) { draw_hud(); }
+  if (dirty) { save_timer++; if (save_timer > 1800) { request_save(); } }
+  anim_t++;
+}
+func frame() {
+  if (save_stage) { save_step(); }       // first, so a save asked for this frame starts on the next one
+  if (state == S_TITLE) { title_frame(); }
+  else if (state == S_GEN) { gen_frame(); }
+  else if (state == S_LOAD) { load_frame(); }
+  else if (state == S_PLAY) { play_frame(); }
+  else { pause_frame(); }
+  sound_update();
+}
+func init() {
+  select_bank(bankof(art));
+  load_font(0);
+  load_tiles(art, T, art_COUNT);
+  obj_pal(0, 0, rgb(15, 11, 8), rgb(2, 11, 12), rgb(3, 2, 2));        // hero: skin, shirt, hair
+  obj_pal(1, 0, rgb(15, 12, 12), rgb(15, 8, 10), rgb(6, 2, 3));       // pig
+  obj_pal(2, 0, rgb(15, 15, 15), rgb(15, 13, 2), rgb(14, 6, 1));      // chick, yellow debris
+  obj_pal(3, 0, rgb(15, 15, 15), rgb(15, 14, 4), rgb(0, 0, 0));       // cursor, cracks, sparkles
+  obj_pal(5, 0, rgb(9, 6, 3), rgb(9, 9, 10), rgb(4, 11, 3));          // debris: brown, grey, green
+  obj_pal(6, 0, rgb(15, 12, 2), rgb(10, 6, 2), rgb(4, 2, 1));         // chests
+  obj_pal(7, 0, rgb(15, 14, 14), rgb(14, 3, 2), rgb(7, 1, 1));        // hearts, red debris
+  master_volume(9);
+  has_save = save_valid_world();
+  if (has_save) { music_off = save_get8(7) & 1; }
+  start_music();
+  draw_title();
+}

@@ -1,0 +1,466 @@
+// NEBBLE: a pocket pet for the VLY-1. Raise an egg into one of five grown-up forms, shaped by how you care for it.
+//   D-pad left/right choose, A do it, B pet it / back, START pause.   Three mini-games, a day and night cycle, a saved pet.
+// Time: the console has no clock, so pet time runs only while it is on; switching it on again counts as one short nap (pet.vly).
+import "std/music";
+import "std/sfx";
+import "std/tunes";
+import "std/fade";
+import "pet.vly";
+import "snd.vly";
+import "ui.vly";
+import "games.vly";
+
+tileset art bank 3 = "../assets/art.tiles";        // UI, room, faces, effects, items (loaded into tile RAM at T)
+tileset pets bank 4 = "../assets/pets.tiles";      // egg, baby, child and the five adults; one body at a time is copied to PB
+
+const S_TITLE = 0; const S_NAME = 1; const S_HATCH = 2; const S_ROOM = 3; const S_CATCH = 4; const S_COPY = 5; const S_HOP = 6;
+const S_RESULT = 7; const S_EVOLVE = 8; const S_INFO = 9; const S_PAUSE = 10;
+const ACT_NONE = 0; const ACT_EAT = 1; const ACT_WASH = 2; const ACT_PET = 3; const ACT_NO = 4;
+
+var state; var pstate; var nxt; var trans; var enter_step; var late_pal; var pet_bud = 3;
+var cur;                  // cursor on the title / pause / info pages
+var sub; var scur;        // sub-menu in the room: 0 none, 1 feed, 2 play
+var act; var atm; var food;
+var music_later = -1; var msg_t; var sec_f; var save_t; var call_t = 600; var mess_t; var last_ph; var petcd; var welcome;
+var evo_t; var evo_stage; var hatch_cd; var info_page; var zz;
+
+// ---------- small helpers ----------
+func say(s) { clr_row(14); puts(1, 14, s); msg_t = 260; }
+func say2(s) { clr_row(15); puts(1, 15, s); }
+func show_label() {
+  clr_row(15);
+  if (sleeping) { puts(1, 15, "ZZZ...  A: WAKE UP"); return; }
+  if (sub == 1) { puts(1, 15, "MEAL"); puts(8, 15, "SNACK"); putsel(1 + scur * 7, 15, scur == 0 ? "MEAL" : "SNACK"); return; }
+  if (sub == 2) {
+    puts(1, 15, "CATCH"); puts(8, 15, "COPY"); puts(14, 15, "HOP");
+    if (scur == 0) { putsel(1, 15, "CATCH"); } else if (scur == 1) { putsel(8, 15, "COPY"); } else { putsel(14, 15, "HOP"); }
+    return;
+  }
+  puts(1, 15, menu_label[mcur]);
+}
+table mood_msg = { "FEELING GREAT!", "DOING FINE.", "SO HUNGRY!", "BORED...", "SO SLEEPY...", "FEELS ICKY.", "GRUMPY!!", "ZZZ", "YUM!", "HAPPY!" };
+table tips = { "B: PET YOUR NEBBLE", "FEED WHEN HUNGRY", "SLEEP AT NIGHT", "GAMES MAKE FUN", "START: PAUSE", "ABOUT ME HAS HINTS", "BATHS END THE STINK", "SELECT: SOUND" };
+var tip_i;
+func default_msg() {
+  var m = get_mood();
+  if ((m == M_HAPPY || m == M_OK) && (tip_i & 1) == 1) { say(tips[(tip_i >> 1) & 7]); } else { say(mood_msg[m]); }
+  tip_i++; msg_t = 0;
+}
+func full_redraw_room() {
+  draw_room(); draw_meters(); draw_info(); draw_menu(); show_label();
+  if (msg_t == 0) { default_msg(); }
+}
+func win_clear(a, b) { clear_win(); }
+func win_show(y) { lcd(LCD_BG | LCD_WIN | LCD_OBJ); window_pos(0, y); }
+func win_hide() { lcd(LCD_BG | LCD_OBJ); }
+func go(s) { if (trans) { return; } nxt = s; trans = 1; fade_to(0, 3); }
+func wake_up() {
+  if (sleep_sec >= 5 && sleep_phase >= 1) { n_rest++; }
+  sleeping = 0; set_look(); pal_flush(); draw_window(0); draw_menu(); draw_info(); show_label();
+  music_later = room_music(); snd_wake(); say("GOOD MORNING!"); sv_dirty = 1; save_t = 60;
+}
+var sleep_phase;
+
+// ---------- entering screens (runs while the screen is black) ----------
+func enter(s) bank 8 {
+  hide_all_sprites(); win_hide(); q_clear(); sfx_stop(); face_ovr = -1; tmoving = 0;
+  clear_bg(); clear_win();
+  if (s == S_TITLE) {
+    for (var i = 0; i < 14; i++) { set_cell(1 + rand(18), 2 + rand(12), T + art_dot); }
+    puts(4, 2, "N E B B L E");
+    puts(4, 4, "A POCKET PET");
+    load_pet_art();
+    pxx = 64; pdir = 1; anim = 0;
+    cur = 0;
+    if (have_save) { puts(5, 12, "CONTINUE"); puts(5, 14, "NEW EGG"); puts(3, 10, pet_names[pname]); puts(9, 10, stage_names[stage]); if (stage == 3) { puts(15, 10, form_names[form]); } } else { puts(4, 13, "PRESS START"); }
+    puts(1, 16, "D-PAD MOVE  A: OK"); puts(0, 17, "B: BACK START: PAUSE");
+    music_later = MU_TITLE;
+  } else if (s == S_NAME) {
+    puts(3, 3, "NAME YOUR PET"); puts(2, 14, "A: OK      B: BACK");
+    pxx = 64; pdir = 1; hp = 0; stage = 0;      // (a saved pet is reloaded if the player backs out)
+    load_pet_art();
+    if (have_save && (save_get(4) == 1 || save_get(4) == 2)) { puts(1, 11, "THIS REPLACES YOUR"); puts(1, 12, "GROWING PET!"); }
+    if (have_save && save_get(4) == 3) { puts(1, 11, "YOUR GROWN-UP PET"); puts(0, 12, "MOVES ON, ALBUM KEPT"); }
+  } else if (s == S_HATCH) {
+    draw_room(); draw_info(); draw_menu();
+    puts(1, 14, "KEEP IT WARM!"); puts(1, 15, "A: RUB THE EGG");
+    clr_rows(16, 17); puts(1, 16, "WARMTH"); 
+    pxx = 64; load_pet_art(); late_pal = 1;
+    music_later = MU_DAY;
+  } else if (s == S_ROOM) {
+    sub = 0; scur = 0; act = ACT_NONE; zz = 0;
+    load_pet_art(); late_pal = 1;
+    full_redraw_room();
+    last_ph = phase();
+    music_later = room_music();
+    if (pxx < 8 || pxx > 130) { pxx = 64; }
+    ptx = pxx; sec_f = 0;
+    if (welcome == 1) { say("IT TOOK A NAP. HI!"); } if (welcome == 2) { say("IT HATCHED! HELLO!"); } welcome = 0;
+  } else if (s == S_EVOLVE) {
+    draw_room(); draw_info(); late_pal = 1;
+    evo_t = 0; evo_stage = stage; pxx = 56; pdir = 1;
+    puts(1, 14, "IT IS CHANGING!");
+    music_set(MU_NONE);
+  } else if (s == S_INFO) {
+    info_draw();
+  } else if (s == S_CATCH || s == S_COPY || s == S_HOP) {
+    draw_room(); late_pal = 1;
+    mg_enter(s);
+  }
+}
+
+// ---------- title and naming ----------
+func title_frame() {
+  anim = (frames() >> 4) & 1;
+  var b = (frames() >> 1) & 63; var y = 0;
+  if (b < 16) { y = (sin(b * 8) * 6) >> 8; }
+  pet_draw(M_HAPPY, y + 32); pet_fx(M_HAPPY, y + 32);
+  if (have_save) {
+    puts(4, 12, cur == 0 ? ">CONTINUE" : " CONTINUE");
+    puts(4, 14, cur == 1 ? ">NEW EGG " : " NEW EGG ");
+    if (btnp(BTN_UP | BTN_DOWN)) { cur = 1 - cur; snd_move(); }
+    if (btnp(BTN_A | BTN_START)) {
+      snd_ok();
+      if (cur == 0) {
+        apply_away(); welcome = 1; sv_dirty = 1;
+        if (stage == 0) { go(S_HATCH); } else { go(S_ROOM); }
+      } else { go(S_NAME); }
+    }
+  } else {
+    if ((frames() & 32) == 0) { puts(4, 13, "PRESS START"); } else { puts(4, 13, "           "); }
+    if (btnp(BTN_START | BTN_A)) { snd_ok(); go(S_NAME); }
+  }
+}
+func name_frame() {
+  anim = (frames() >> 4) & 1;
+  pet_draw(M_OK, 0);
+  clr_row(8);
+  puts(4, 8, "<"); puts(15, 8, ">");
+  putsel(7, 8, pet_names[pname]);
+  if (btnp(BTN_LEFT)) { pname = (pname + 7) & 7; snd_move(); }
+  if (btnp(BTN_RIGHT)) { pname = (pname + 1) & 7; snd_move(); }
+  if (btnp(BTN_B)) { snd_back(); if (have_save) { load_game(); } go(S_TITLE); }
+  if (btnp(BTN_A | BTN_START)) {
+    snd_ok();
+    var album_ = album; var b0 = best[0]; var b1 = best[1]; var b2 = best[2]; var g = gens + 1; var bo = boots; var nm = pname;
+    new_pet(nm);
+    album = album_; best[0] = b0; best[1] = b1; best[2] = b2; gens = g; boots = bo;
+    srand(frames(), 0x4E42);
+    save_game(); have_save = 1;
+    go(S_HATCH);
+  }
+}
+
+// ---------- the egg ----------
+func hatch_bar() {
+  var v8 = (hp * 64) / HATCH_NEED;
+  for (var k = 0; k < 8; k++) { set_cell(7 + k, 16, T + art_bar0 + clamp(v8 - k * 8, 0, 8) + (5 << 12)); }
+}
+func hatch_frame() {
+  anim = 0;
+  pet_draw(M_OK, 0);
+  if (hatch_cd > 0) { hatch_cd--; }
+  if (btnp(BTN_A) && hatch_cd == 0) { hp = hp + 3; hatch_cd = 6; snd_pet(); hatch_bar(); if (hp == 15 || hp == 14 || hp == 28 || hp == 29 || hp == 27) { snd_crack(); } }
+  sec_f++;
+  if (sec_f >= 60) { sec_f = 0; hp++; clock_second(1); hatch_bar(); if (hp == 14 || hp == 28) { snd_crack(); } }
+  if (hp >= HATCH_NEED) {
+    stage = 1; age = 0; hp = 0; hun = 70; fun = 70; nrg = 90; cln = 90;
+    sv_dirty = 1; save_game();
+    snd_hatch(); welcome = 2;
+    go(S_ROOM);
+  }
+}
+
+// ---------- the room ----------
+func eat_start(kind) {
+  if (kind == 0 && hun >= 90) { snd_no(); say("NOT HUNGRY NOW"); return; }
+  if (kind == 1 && hun >= 96) { snd_no(); say("TOO FULL FOR SNACKS"); return; }
+  act = ACT_EAT; atm = 80; food = kind; sub = 0; show_label();
+  say(kind == 0 ? "NOM NOM NOM" : "A TREAT! YUM!");
+}
+func eat_done() {
+  if (food == 0) { hun = min(99, hun + 34); n_meal++; if (rand(100) < 70) { mess_t = 15 + rand(20); } }
+  else { hun = min(99, hun + 12); fun = min(99, fun + 14); n_snack++; if (rand(100) < 45) { mess_t = 20 + rand(20); } }
+  snd_gulp(); draw_meters(); save_game(); face_ovr = -1; petcd = 60; bcnt = 0;
+}
+func wash_start() {
+  if (mess == 0 && cln >= 88) { snd_no(); say("ALREADY SPOTLESS"); return; }
+  act = ACT_WASH; atm = 110; sub = 0; show_label(); say("SCRUB A DUB DUB");
+}
+func wash_done() {
+  cln = min(99, cln + 45); mess = 0; n_wash++; draw_meters(); save_game(); snd_ok(); bcnt = 0; say("SQUEAKY CLEAN!");
+}
+func sleep_start() {
+  if (nrg >= 90 && phase() != 2) { snd_no(); say("NOT SLEEPY YET"); return; }
+  sleeping = 1; sleep_sec = 0; sleep_phase = phase(); sub = 0;
+  set_look(); pal_flush(); draw_window(1); draw_info(); show_label(); say("SWEET DREAMS...");
+  music_later = MU_SLEEP; snd_sleep(); sv_dirty = 1;
+}
+func play_start(g) {
+  if (nrg < 15) { snd_no(); say("TOO TIRED TO PLAY"); sub = 0; show_label(); return; }
+  if (hun < 15) { snd_no(); say("TOO HUNGRY TO PLAY"); sub = 0; show_label(); return; }
+  snd_ok(); sub = 0; go(S_CATCH + g);
+}
+func pet_it() {
+  if (petcd > 0) { return; }
+  petcd = 50; act = ACT_PET; atm = 45; bcnt = 0;
+  if (pet_bud > 0) { pet_bud--; fun = min(99, fun + 2); draw_meters(); } else { say("PURR... ENOUGH!"); }
+  snd_pet();
+}
+func room_second() {
+  var before = phase();
+  clock_second(sleeping ? 5 : 1);
+  needs_second();
+  if (sc % 15 == 0 && pet_bud < 3) { pet_bud++; }
+  if (phase() != last_ph) {
+    last_ph = phase();
+    if (!sleeping) { set_look(); pal_flush(); draw_window(0); draw_info(); music_later = room_music(); snd_chime(); if (last_ph == 1) { say("EVENING FALLS..."); } if (last_ph == 2) { say("NIGHT TIME! SLEEPY?"); } }
+  }
+  draw_meters();
+  if (!sleeping) {
+    if (mess_t > 0) { mess_t--; if (mess_t == 0 && mess < 3) { mess++; snd_plop(); say("OOPS! A MESS."); } }
+    if (call_t > 0) { call_t--; }
+    var m = get_mood();
+    if (call_t == 0 && m != M_HAPPY && m != M_OK) { if (m == M_SLEEPY) { snd_yawn(); } else { snd_call(); } say(mood_msg[m]); call_t = 28; }
+    if (msg_t == 0 && act == ACT_NONE) { default_msg(); }
+    if (act == ACT_NONE && ((stage == 1 && age >= EVO1) || (stage == 2 && age >= EVO2))) { sv_dirty = 1; save_game(); go(S_EVOLVE); }
+  } else {
+    sleep_sec++;
+    if (nrg >= 99 && sleep_sec >= 8) { wake_up(); }
+  }
+  save_t++;
+  if (save_t >= 90) { save_t = 0; if (sv_dirty) { save_game(); } }
+  sv_dirty = 1;
+}
+func room_input() {
+  if (sleeping) {
+    if (btnp(BTN_A | BTN_B) && sleep_sec >= 3) { wake_up(); }
+    return;
+  }
+  if (act != ACT_NONE) { return; }
+  if (sub == 0) {
+    if (btnp(BTN_LEFT)) { mcur = (mcur + 4) % 5; draw_menu(); show_label(); snd_move(); }
+    if (btnp(BTN_RIGHT)) { mcur = (mcur + 1) % 5; draw_menu(); show_label(); snd_move(); }
+    if (btnp(BTN_B)) { pet_it(); }
+    if (btnp(BTN_A)) {
+      if (mcur == 0) { sub = 1; scur = 0; snd_ok(); show_label(); say("MEAL FILLS UP"); }
+      else if (mcur == 1) { sub = 2; scur = 0; snd_ok(); show_label(); say("PICK A GAME!"); }
+      else if (mcur == 2) { sleep_start(); }
+      else if (mcur == 3) { wash_start(); }
+      else { snd_ok(); info_page = 0; go(S_INFO); }
+    }
+  } else {
+    var n = 2; if (sub == 2) { n = 3; }
+    if (btnp(BTN_LEFT)) { scur = (scur + n - 1) % n; show_label(); snd_move(); }
+    if (btnp(BTN_RIGHT)) { scur = (scur + 1) % n; show_label(); snd_move(); }
+    if (btnp(BTN_B)) { sub = 0; show_label(); snd_back(); default_msg(); }
+    if (btnp(BTN_A)) { if (sub == 1) { eat_start(scur); } else { play_start(scur); } }
+  }
+}
+// wandering: the pet strolls about when nothing else is happening
+func pet_wander(m) {
+  tmoving = 0;
+  if (stage == 0 || sleeping || act != ACT_NONE || m == M_SLEEPY && rand(4) != 0) { return; }
+  if (pwait > 0) { pwait--; return; }
+  if (pxx == ptx) { ptx = 12 + rand(150 - pet_size() - 16); pwait = 50 + rand(150); return; }
+  tmoving = 1;
+  if ((frames() & 1) == 0) { if (ptx > pxx) { pxx++; pdir = 1; } else { pxx--; pdir = -1; } }
+}
+func room_frame() {
+  var m = get_mood();
+  sec_f++;
+  if (sec_f >= 60) { sec_f = 0; room_second(); m = get_mood(); }
+  if (msg_t > 0) { msg_t--; if (msg_t == 0 && act == ACT_NONE) { default_msg(); } }
+  if (petcd > 0) { petcd--; }
+  room_input();
+  pet_wander(m);
+  // actions
+  var yoff = 0;
+  face_ovr = -1;
+  if (bcnt < 16) { yoff = (sin(bcnt * 8) * 9) >> 8; bcnt++; }
+  if (act == ACT_EAT) {
+    atm--; face_ovr = M_EAT;
+    var fy = PYB - pet_size() + 4 - (atm >> 3);
+    sprite(4, pxx + (pdir > 0 ? pet_size() - 4 : -4), fy, T + (food == 0 ? art_it_apple : art_it_cookie), food == 0 ? 2 : 4);
+    if ((atm & 7) == 0) { snd_munch(); }
+    if (atm <= 0) { act = ACT_NONE; hide_sprite(4); eat_done(); }
+  } else if (act == ACT_WASH) {
+    atm--;
+    for (var i = 0; i < 4; i++) { sprite(4 + i, pxx + 4 + ((i * 11 + (atm >> 1)) % 24), PYB - 30 - ((atm + i * 9) % 20) + (i & 1) * 10, T + art_bub_a + (i & 1), 3); }
+    if ((atm % 6) == 0) { snd_bubble(atm / 6); }
+    face_ovr = M_JOY;
+    if (atm <= 0) { act = ACT_NONE; for (var i = 0; i < 4; i++) { hide_sprite(4 + i); } wash_done(); }
+  } else if (act == ACT_PET) {
+    atm--; face_ovr = M_JOY;
+    if (atm <= 0) { act = ACT_NONE; }
+  }
+  anim = (frames() >> (tmoving ? 3 : 4)) & 1;
+  if (sleeping) { anim = (frames() >> 6) & 1; }
+  pet_draw(m, yoff);
+  if (act == ACT_PET) { pet_fx(M_JOY, yoff); } else { pet_fx(m, yoff); }
+  if (act != ACT_WASH && act != ACT_EAT) { draw_mess(); } else { draw_mess_hide(); }
+}
+func draw_mess_hide() { }
+
+// ---------- growing up ----------
+table form_desc = { "BRIGHT ALL-ROUNDER", "NEEDS LOTS OF PLAY", "ALWAYS HUNGRY", "LOVES NAPS AT NIGHT", "GRUBBY LITTLE ROGUE" };
+func evolve_frame() bank 8 {
+  evo_t++;
+  var sz = pet_size();
+  pxx = 80 - sz / 2;
+  anim = (frames() >> 3) & 1;
+  if (evo_t < 150) {
+    var shake = ((evo_t >> 1) & 1) * 2 - 1;
+    var sx = pxx; pxx = pxx + shake;
+    if ((evo_t & 8) == 0 || evo_t < 40) { pet_draw(M_OK, 0); } else { hide_sprite(0); hide_sprite(1); }
+    pxx = sx;
+    if ((evo_t & 7) == 0) { sfx_tone(1, 300 + evo_t * 4, 7, 2, 4); }
+    for (var i = 0; i < 4; i++) { sprite(8 + i, 40 + ((evo_t * (3 + i)) % 80), 40 + ((evo_t * (2 + i)) % 60), T + art_fx_spark, 1); }
+  } else {
+    if (evo_t == 150) {
+      stage++;
+      if (stage == 3) { form = choose_form(); album = album | (1 << form); }
+      load_pet_art(); pal_flush(); draw_info(); sv_dirty = 1;
+    }
+    if (evo_t == 154) { music_set(MU_EVO); }
+    if (evo_t == 170) { save_game(); }
+    if (evo_t == 156) {
+      clr_row(14); clr_row(15);
+      puts(1, 14, pet_names[pname]); puts(7, 14, "GREW UP!");
+      if (stage == 3) { puts(1, 15, "IT IS NOW"); puts(11, 15, form_names[form]); puts(0, 16, form_desc[form]); }
+      else { puts(1, 15, "NOW A CHILD!"); }
+    }
+    var b = (evo_t - 150) >> 1; var y = 0; if ((b & 31) < 16) { y = (sin((b & 31) * 8) * 8) >> 8; }
+    pet_draw(M_JOY, y);
+    for (var i = 0; i < 4; i++) { sprite(8 + i, 28 + i * 34 + ((evo_t >> 2) & 3), 40 + ((evo_t * (1 + i)) % 50), T + art_fx_spark, 1); }
+    if (evo_t > 210 && btnp(BTN_A | BTN_START)) { snd_ok(); go(S_ROOM); }
+  }
+}
+
+// ---------- about me (pages) ----------
+func min_sec(c, r, v) {
+  print_u(c, r, v / 60); puts(c + 2, r, ":");
+  if (v % 60 < 10) { puts(c + 3, r, "0"); print_u(c + 4, r, v % 60); } else { print_u(c + 3, r, v % 60); }
+}
+func lean_word() {
+  if (n_neg >= 40) { return "NEEDS ATTENTION!"; }
+  if (stage < 3 && age > 120 && n_good * 4 < age) { return "KEEP NEEDS HIGH!"; }
+  if (n_snack > n_meal && n_snack >= 3) { return "LOVES SNACKS"; }
+  if (n_play >= 5 && n_win * 2 >= n_play) { return "LOVES PLAYING"; }
+  if (n_rest + n_wash >= 6) { return "CALM AND CLEAN"; }
+  return "WELL ROUNDED";
+}
+func info_draw() bank 7 {
+  clear_bg();
+  if (info_page == 0) {
+    puts(1, 1, pet_names[pname]); puts(7, 1, stage_names[stage]);
+    if (stage == 3) { puts(13, 1, form_names[form]); }
+    puts(1, 3, "AGE"); min_sec(6, 3, age);
+    if (stage < 3) { puts(1, 4, "GROWS UP IN"); var left = (stage == 1 ? EVO1 : EVO2) - age; min_sec(13, 4, max(0, left)); }
+    else { puts(1, 4, "GROWN UP FOR"); min_sec(14, 4, tadult); }
+    puts(1, 6, "MEALS"); print_u(8, 6, n_meal); puts(11, 6, "TREAT"); print_u(17, 6, n_snack);
+    puts(1, 7, "GAMES"); print_u(8, 7, n_play); puts(11, 7, "WINS"); print_u(17, 7, n_win);
+    puts(1, 8, "BATHS"); print_u(8, 8, n_wash); puts(11, 8, "NAPS"); print_u(17, 8, n_rest);
+    puts(1, 10, "FOOD"); puts(6, 10, "FUN"); puts(11, 10, "ZZZ"); puts(16, 10, "CLN"); print_u(1, 11, hun); print_u(6, 11, fun); print_u(11, 11, nrg); print_u(16, 11, cln);
+    
+    puts(1, 13, "RIGHT NOW:"); puts(1, 14, lean_word());
+    puts(0, 16, "<> PAGE      B: BACK");
+  } else if (info_page == 1) {
+    puts(1, 1, "ALBUM  RAISED:"); print_u(16, 1, gens);
+    for (var i = 0; i < 5; i++) {
+      if ((album >> i) & 1) { puts(1, 3 + i * 2, form_names[i]); puts(2, 4 + i * 2, form_desc[i]); }
+      else { puts(1, 3 + i * 2, "??????"); puts(2, 4 + i * 2, "NOT FOUND YET"); }
+    }
+    if (album == 31) { puts(1, 14, "ALBUM COMPLETE!"); } else { puts(1, 14, "YOUR CARE DECIDES"); puts(1, 15, "WHAT IT GROWS INTO"); }
+    puts(0, 16, "<> PAGE      B: BACK");
+  } else {
+    puts(1, 1, "ABOUT TIME");
+    puts(1, 3, "THIS CONSOLE HAS NO"); puts(1, 4, "CLOCK, SO YOUR PET"); puts(1, 5, "LIVES ONLY WHILE IT"); puts(1, 6, "IS SWITCHED ON.");
+    puts(1, 8, "SWITCHED OFF IS A"); puts(1, 9, "SHORT NAP: A LITTLE"); puts(1, 10, "HUNGRIER, NEVER"); puts(1, 11, "STARVING.");
+    puts(1, 13, "NEGLECT NEVER KILLS"); puts(1, 14, "IT JUST GROWS UP"); puts(1, 15, "SCRUFFY. TRY AGAIN!");
+    puts(0, 16, "<> PAGE      B: BACK");
+  }
+}
+func info_frame() {
+  anim = (frames() >> 4) & 1;
+  hide_sprite(0); hide_sprite(1);
+  if (btnp(BTN_RIGHT)) { info_page = (info_page + 1) % 3; info_draw(); snd_move(); }
+  if (btnp(BTN_LEFT)) { info_page = (info_page + 2) % 3; info_draw(); snd_move(); }
+  if (btnp(BTN_B | BTN_A)) { snd_back(); go(S_ROOM); }
+}
+
+// ---------- pause (START) ----------
+func pause_draw() {
+  win_clear(0, 11);
+  wtext(7, 1, "PAUSED");
+  wtext(3, 3, cur == 0 ? ">RESUME" : " RESUME");
+  wtext(3, 4, cur == 1 ? ">SOUND:" : " SOUND:");
+  wtext(10, 4, sound_on ? "ON " : "OFF");
+  wtext(3, 5, cur == 2 ? (pstate == S_ROOM || pstate == S_HATCH ? ">SAVE + TITLE" : ">QUIT GAME") : (pstate == S_ROOM || pstate == S_HATCH ? " SAVE + TITLE" : " QUIT GAME"));
+  wtext(1, 8, "TIME STANDS STILL");
+  wtext(1, 9, "WHILE PAUSED.");
+  wtext(1, 11, "SELECT: SOUND");
+}
+func pause_open() {
+  pstate = state; state = S_PAUSE; cur = 0;
+  hide_all_sprites(); q_clear(); sfx_play(SFX_PAUSE);
+  master_volume(sound_on ? 3 : 0);
+  text_pal = 0;
+  win_show(56); pause_draw();
+}
+func pause_close() {
+  win_hide(); state = pstate; master_volume(sound_on ? mu_vol : 0);
+}
+func pause_frame() {
+  if (btnp(BTN_UP)) { cur = (cur + 2) % 3; snd_move(); pause_draw(); }
+  if (btnp(BTN_DOWN)) { cur = (cur + 1) % 3; snd_move(); pause_draw(); }
+  if (btnp(BTN_START | BTN_B)) { pause_close(); sfx_play(SFX_BACK); return; }
+  if (btnp(BTN_A)) {
+    if (cur == 0) { pause_close(); sfx_play(SFX_BACK); }
+    else if (cur == 1) { sound_on = 1 - sound_on; master_volume(sound_on ? 3 : 0); pause_draw(); sv_dirty = 1; }
+    else {
+      var ps = pstate;
+      win_hide(); state = ps; master_volume(sound_on ? mu_vol : 0);
+      if (ps == S_ROOM || ps == S_HATCH) { save_game(); go(S_TITLE); } else { go(S_ROOM); }
+    }
+  }
+}
+
+// ---------- the main loop ----------
+func init() {
+  load_font(0);
+  select_bank(bankof(art));
+  load_tiles(art, T, art_COUNT);
+  hide_all_sprites();
+  init_pals();
+  text_pal = 0;
+  have_save = load_game();
+  if (!have_save) { pname = 2; }
+  master_volume(sound_on ? mu_vol : 0);
+  state = S_TITLE;
+  enter(S_TITLE);
+  lcd(LCD_BG | LCD_OBJ);
+  fade_set(0); fade_to(4, 3); trans = 2;
+}
+func frame() {
+  music_update(); sfx_update(); q_update(); fade_update();
+  if (music_later >= 0 && trans != 1) { var ml = music_later; music_later = -1; music_set(ml); return; }
+  if (trans == 1) {                                     // black: build the next screen over two frames (keeps each frame cheap)
+    if (!fade_busy()) {
+      if (enter_step == 0) { enter(nxt); enter_step = 1; }
+      else { if (late_pal) { set_look(); pal_flush(); late_pal = 0; } enter_step = 0; state = nxt; trans = 2; fade_to(4, 3); }
+    }
+    return;
+  }
+  if (trans == 2 && !fade_busy()) { trans = 0; }
+  if (btnp(BTN_SELECT)) { sound_on = 1 - sound_on; master_volume(sound_on ? (state == S_PAUSE ? 3 : mu_vol) : 0); sv_dirty = 1; if (state == S_PAUSE) { pause_draw(); } }
+  if (state == S_PAUSE) { pause_frame(); return; }
+  if (btnp(BTN_START) && state >= S_HATCH && state != S_EVOLVE && state != S_INFO && state != S_RESULT && trans == 0) { pause_open(); return; }
+  if (state == S_TITLE) { title_frame(); }
+  else if (state == S_NAME) { name_frame(); }
+  else if (state == S_HATCH) { hatch_frame(); }
+  else if (state == S_ROOM) { room_frame(); }
+  else if (state == S_EVOLVE) { evolve_frame(); }
+  else if (state == S_INFO) { info_frame(); }
+  else { games_frame(); }
+}

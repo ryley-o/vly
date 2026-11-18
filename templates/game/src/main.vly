@@ -1,0 +1,88 @@
+// {{name}}: a scrolling tile-map walker with collision and a saved step counter.
+//   D-pad walks, START saves your steps. Water and trees block you.
+// Shows: tilesets, background map, camera scrolling, 16x16 sprite, collision, save data.
+
+import "std/tunes";
+
+tileset world = "../assets/world.tiles";
+
+const TILE0 = 100;                  // where the world tiles live in tile RAM
+const PAL_GRASS = 0;
+const PAL_TREE = 1;
+const PAL_WATER = 2;
+
+var px = 120;                       // hero position in world pixels (top-left of the 16x16 sprite)
+var py = 120;
+var steps;
+var msg_timer;
+
+func solid(wx, wy) {                // is the world pixel (wx, wy) blocked?
+  var t = get_cell(wx >> 3, wy >> 3) & 0x1FF;
+  return t == TILE0 + world_tree || t == TILE0 + world_water;
+}
+
+func build_world() {
+  for (var r = 0; r < 32; r++) {
+    for (var c = 0; c < 32; c++) {
+      var cell = (TILE0 + world_grass) | (PAL_GRASS << 12);
+      if (r == 0 || c == 0 || r == 31 || c == 31) { cell = (TILE0 + world_tree) | (PAL_TREE << 12); }
+      else if (c > 18 && c < 27 && r > 8 && r < 15) { cell = (TILE0 + world_water) | (PAL_WATER << 12); }
+      else if (umod(c * 7 + r * 13, 11) == 0) { cell = (TILE0 + world_tree) | (PAL_TREE << 12); }
+      else if (umod(c * 5 + r * 3, 17) == 0) { cell = (TILE0 + world_flower) | (PAL_GRASS << 12); }
+      set_cell(c, r, cell);
+    }
+  }
+}
+
+func init() {
+  master_volume(8);
+  tune_play(TUNE_ADVENTURE);
+  tune_play(TUNE_ADVENTURE);
+  load_font(0);
+  load_tiles(world, TILE0, world_COUNT);
+  bg_pal(PAL_GRASS, rgb(7, 12, 4), rgb(9, 14, 6), rgb(15, 12, 2), rgb(3, 6, 2));
+  bg_pal(PAL_TREE, rgb(7, 12, 4), rgb(6, 12, 3), rgb(3, 8, 2), rgb(1, 3, 1));
+  bg_pal(PAL_WATER, rgb(3, 6, 13), rgb(5, 9, 15), rgb(2, 4, 10), rgb(1, 2, 7));
+  obj_pal(0, 0, rgb(15, 14, 10), rgb(15, 8, 2), rgb(5, 1, 0));
+  build_world();
+  hide_all_sprites();
+  if (save_loaded() && save_valid()) { steps = save_get(0); }
+  window_pos(0, 136);                // a one-row status bar at the bottom of the screen
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+  text_pal = 0;
+}
+
+func try_move(dx, dy) {
+  var nx = px + dx;
+  var ny = py + dy;
+  // test the two bottom corners of the hero's 16x16 box
+  if (solid(nx + 3, ny + 15) || solid(nx + 12, ny + 15) || solid(nx + 3, ny + 8) || solid(nx + 12, ny + 8)) { return; }
+  px = nx;
+  py = ny;
+  steps++;
+}
+
+func frame() {
+  music_update(); sfx_update();
+  var dx = btn(BTN_RIGHT) - btn(BTN_LEFT);
+  var dy = btn(BTN_DOWN) - btn(BTN_UP);
+  if (dx != 0) { try_move(dx, 0); }
+  if (dy != 0) { try_move(0, dy); }
+
+  if (btnp(BTN_START)) {
+    save_set(0, steps);
+    save_seal();
+    save_commit();
+    msg_timer = 60;
+  }
+
+  var camx = clamp(px - 72, 0, 96);
+  var camy = clamp(py - 64, 0, 112);
+  scroll(camx, camy);
+  sprite(0, px - camx, py - camy, 100 + world_hero, SPR_16X16);
+
+  // status bar (window layer, drawn with the background palette)
+  wtext(0, 0, "STEPS");
+  wprint_u(6, 0, steps);
+  if (msg_timer > 0) { wtext(12, 0, "SAVED!"); msg_timer--; } else { wtext(12, 0, "      "); }
+}

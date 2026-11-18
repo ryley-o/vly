@@ -1,0 +1,352 @@
+// {{name}}: VOID RAID, a fixed-screen shooter. LEFT/RIGHT move, A fires (three shots at a time), START begins.
+//   Clear the formation before it lands, dodge the bombs, shoot the UFO for bonus points. High score is saved.
+// Shows: many hardware sprites at once (up to 48), formation logic, cell-based collision, a procedural starfield
+// that scrolls for free, the window layer as a HUD, noise and pulse sound effects.
+
+import "std/tunes";
+
+tileset art = "../assets/gfx.tiles";
+
+const T = 100;                       // the art tiles live at 100.. in tile RAM (the font is at 0..94)
+const COLS = 8;
+const ROWS = 4;
+const NE = 32;                       // enemies in a formation
+const SHIP_Y = 116;
+const OFF = -100;                    // y value meaning "this slot is unused"
+const S_TITLE = 0; const S_PLAY = 1; const S_WAVE = 2; const S_OVER = 3;
+// sprite slots
+const SP_SHIP = 0;                   // 0
+const SP_SHOT = 1;                   // 1..3
+const SP_ENEMY = 4;                  // 4..35
+const SP_BOMB = 36;                  // 36..38
+const SP_UFO = 39;                   // 39..40
+const SP_BOOM = 41;                  // 41..48
+
+var state;
+var score; var hi; var lives; var wave; var timer;
+var sx; var inv; var cool;           // ship x, invulnerable frames, fire cooldown
+var shot_x[3]; var shot_y[3];
+var bomb_x[3]; var bomb_y[3];
+var boom_x[8]; var boom_y[8]; var boom_t[8];
+byte alive[32];
+var left;                            // enemies still alive
+var fx; var fy; var fdir; var fcount;
+var colmin; var colmax; var rowmax;
+var ufo_on; var ufo_x; var ufo_dir; var ufo_timer;
+var beep; var nbeep;
+
+// ---------- backdrop ----------
+func star_tile(x, y) {
+  var h = ((x * 73) ^ (y * 151) ^ (x * y)) & 63;
+  if (h == 5) { return T + art_star_a; }
+  if (h == 29) { return T + art_star_b; }
+  return 0;
+}
+func draw_stars() {
+  for (var y = 0; y < 32; y++) {
+    for (var x = 0; x < 32; x++) { set_cell(x, y, star_tile(x, y)); }
+  }
+}
+// Put the stars back where a banner of text was.
+func erase_text(col, row, n) {
+  for (var i = 0; i < n; i++) { set_cell(col + i, row, star_tile(col + i, row)); }
+}
+
+func draw_hud() {
+  wtext(0, 0, "SC");
+  wprint_u(3, 0, score);
+  wtext(9, 0, "HI");
+  wprint_u(12, 0, hi);
+  wtext(18, 0, "x");
+  wprint_u(19, 0, lives);
+}
+
+// ---------- sound ----------
+func shoot_sound() { sfx_tone(1, 640, 5, 1, 3); beep = 3; }          // channel 1; the music has 0 and 2
+func boom_sound(rate, frames) { tone(3, rate, 12, 0); nbeep = frames; }
+
+// ---------- effects ----------
+func spawn_boom(x, y) {
+  for (var i = 0; i < 8; i++) {
+    if (boom_t[i] == 0) { boom_x[i] = x; boom_y[i] = y; boom_t[i] = 12; return; }
+  }
+}
+
+// ---------- the formation ----------
+func extents() {
+  colmin = 99; colmax = 0 - 1; rowmax = 0 - 1;
+  for (var k = 0; k < NE; k++) {
+    if (alive[k]) {
+      var c = k & 7;
+      var r = k >> 3;
+      if (c < colmin) { colmin = c; }
+      if (c > colmax) { colmax = c; }
+      if (r > rowmax) { rowmax = r; }
+    }
+  }
+}
+
+func start_wave() {
+  fx = 20;
+  fy = 14 + min(wave, 5) * 4;
+  fdir = 1;
+  fcount = 0;
+  left = NE;
+  fill(alive, 1, NE);
+  extents();
+  for (var i = 0; i < 3; i++) { shot_y[i] = OFF; bomb_y[i] = OFF; }
+  state = S_PLAY;
+  erase_text(7, 8, 10);
+}
+
+func lose_game() {
+  state = S_OVER;
+  if (score > hi) { hi = score; save_set(0, hi); save_seal(); save_commit(); }
+  tone_off(0); tone_off(1);
+  scroll(0, 0);
+  draw_hud();
+  text(5, 7, "GAME OVER");
+  text(5, 9, "SCORE");
+  print_u(11, 9, score);
+  text(4, 12, "START: AGAIN");
+}
+
+func hit_ship() {
+  spawn_boom(sx, SHIP_Y);
+  spawn_boom(sx + 8, SHIP_Y + 4);
+  boom_sound(5000, 24);
+  lives--;
+  inv = 100;
+  draw_hud();
+  if (lives <= 0) { lose_game(); }
+}
+
+func kill(k) {
+  var row = k >> 3;
+  var col = k & 7;
+  alive[k] = 0;
+  left--;
+  if (row == 0) { score = score + 30; } else if (row == 3) { score = score + 10; } else { score = score + 20; }
+  spawn_boom(fx + col * 16, fy + row * 12);
+  boom_sound(3200, 8);
+  draw_hud();
+  if (left == 0) {
+    wave++;
+    state = S_WAVE;
+    timer = 100;
+    scroll(0, 0);
+    text(7, 8, "WAVE");
+    print_u(12, 8, wave + 1);
+    for (var i = 0; i < 3; i++) { shot_y[i] = OFF; bomb_y[i] = OFF; }
+  } else {
+    extents();
+  }
+}
+
+// Does shot i hit an enemy? Cells are 16 wide and 12 tall; the 8x8 enemy sits in the top-left of its cell.
+func hit_enemy(i) {
+  var cx = shot_x[i] + 4 - fx;
+  var cy = shot_y[i] + 2 - fy;
+  if (cx < 0 || cy < 0) { return 0; }
+  var col = cx >> 4;
+  var row = cy / 12;
+  if (col >= COLS || row >= ROWS) { return 0; }
+  if ((cx & 15) >= 8 || (cy - row * 12) >= 8) { return 0; }
+  var k = row * COLS + col;
+  if (alive[k] == 0) { return 0; }
+  kill(k);
+  return 1;
+}
+
+func hit_ufo(i) {
+  if (ufo_on && overlap(shot_x[i] + 2, shot_y[i], 4, 6, ufo_x, 8, 16, 8)) {
+    ufo_on = 0;
+    ufo_timer = 600 + rand(400);
+    score = score + 50 + rand(3) * 50;
+    spawn_boom(ufo_x, 8);
+    spawn_boom(ufo_x + 8, 8);
+    boom_sound(2400, 14);
+    tone_off(1);
+    draw_hud();
+    return 1;
+  }
+  return 0;
+}
+
+func step_formation() {
+  var nx = fx + fdir * 2;
+  if (nx + colmin * 16 < 4 || nx + colmax * 16 + 8 > 156) {
+    fdir = 0 - fdir;
+    fy += 3;
+    if (fy + rowmax * 12 + 8 >= SHIP_Y) { lives = 1; hit_ship(); }
+  } else {
+    fx = nx;
+  }
+}
+
+func spawn_bomb() {
+  var slot = 0 - 1;
+  for (var i = 0; i < 3; i++) { if (bomb_y[i] == OFF) { slot = i; } }
+  if (slot < 0) { return; }
+  var c = rand(COLS);
+  var found = 0 - 1;
+  for (var r = 0; r < ROWS; r++) { if (alive[r * COLS + c]) { found = r; } }
+  if (found < 0) { return; }
+  bomb_x[slot] = fx + c * 16;
+  bomb_y[slot] = fy + found * 12 + 6;
+}
+
+// ---------- the game ----------
+func new_game() {
+  score = 0; lives = 3; wave = 0; sx = 72; inv = 0; cool = 0;
+  ufo_on = 0; ufo_timer = 500;
+  for (var i = 0; i < 8; i++) { boom_t[i] = 0; }
+  draw_hud();
+  erase_text(5, 3, 10); erase_text(4, 6, 11); erase_text(4, 8, 7); erase_text(4, 10, 11);   // title
+  erase_text(5, 7, 9); erase_text(5, 9, 11); erase_text(4, 12, 12);                          // game over
+  start_wave();
+}
+
+func play() {
+  // ship
+  sx = clamp(sx + (btn(BTN_RIGHT) - btn(BTN_LEFT)) * 2, 0, 144);
+  if (cool > 0) { cool--; }
+  if (inv > 0) { inv--; }
+  if (btnp(BTN_A) && cool == 0) {
+    for (var i = 0; i < 3; i++) {
+      if (shot_y[i] == OFF) { shot_x[i] = sx + 4; shot_y[i] = SHIP_Y - 4; cool = 8; shoot_sound(); break; }
+    }
+  }
+  // shots
+  for (var i = 0; i < 3; i++) {
+    if (shot_y[i] != OFF) {
+      shot_y[i] -= 4;
+      if (shot_y[i] < 0 - 6) { shot_y[i] = OFF; }
+      else if (hit_enemy(i) || hit_ufo(i)) { shot_y[i] = OFF; }
+    }
+  }
+  if (state != S_PLAY) { return; }
+  // the formation steps faster as it thins out and as waves go by
+  fcount++;
+  if (fcount >= max(2, 1 + left / 5 - wave / 2)) { fcount = 0; step_formation(); }
+  if (state != S_PLAY) { return; }
+  // bombs
+  if (rand(max(20, 60 - wave * 6)) == 0) { spawn_bomb(); }
+  for (var i = 0; i < 3; i++) {
+    if (bomb_y[i] != OFF) {
+      bomb_y[i] += 2 + (wave > 2);
+      if (bomb_y[i] > 140) { bomb_y[i] = OFF; }
+      else if (inv == 0 && overlap(bomb_x[i] + 2, bomb_y[i], 4, 6, sx + 3, SHIP_Y + 4, 10, 10)) {
+        bomb_y[i] = OFF;
+        hit_ship();
+        if (state != S_PLAY) { return; }
+      }
+    }
+  }
+  // the UFO
+  if (ufo_on) {
+    ufo_x += ufo_dir;
+    if (beep == 0) { sfx_tone(1, 300 + (frames() & 7) * 30, 4, 2, 2); }
+    if (ufo_x < -16 || ufo_x > 160) { ufo_on = 0; ufo_timer = 600 + rand(400); tone_off(1); }
+  } else {
+    ufo_timer--;
+    if (ufo_timer <= 0 && left > 6) {
+      ufo_on = 1;
+      if (rand(2) == 0) { ufo_x = -16; ufo_dir = 1; } else { ufo_x = 160; ufo_dir = -1; }
+    }
+  }
+}
+
+func draw_sprites() {
+  // ship (blinks while invulnerable)
+  if (state == S_PLAY || state == S_WAVE) {
+    if (inv > 0 && ((inv >> 2) & 1)) { hide_sprite(SP_SHIP); }
+    else { sprite(SP_SHIP, sx, SHIP_Y, T + art_ship, SPR_16X16); }
+  } else {
+    hide_sprite(SP_SHIP);
+  }
+  for (var i = 0; i < 3; i++) {
+    if (shot_y[i] == OFF) { hide_sprite(SP_SHOT + i); } else { sprite(SP_SHOT + i, shot_x[i], shot_y[i], T + art_shot, 4); }
+    if (bomb_y[i] == OFF) { hide_sprite(SP_BOMB + i); } else { sprite(SP_BOMB + i, bomb_x[i], bomb_y[i], T + art_bomb, 4); }
+  }
+  var anim = (frames() >> 4) & 1;
+  for (var k = 0; k < NE; k++) {
+    if (alive[k] && state != S_OVER) {
+      var row = k >> 3;
+      var t = T + art_enemy_b0;
+      var pal = 2;
+      if (row == 0) { t = T + art_enemy_a0; pal = 1; }
+      if (row == 3) { t = T + art_enemy_c0; pal = 3; }
+      sprite(SP_ENEMY + k, fx + (k & 7) * 16, fy + row * 12, t + anim, pal);
+    } else {
+      hide_sprite(SP_ENEMY + k);
+    }
+  }
+  if (ufo_on) {
+    sprite(SP_UFO, ufo_x, 8, T + art_ufo_l, 6);
+    sprite(SP_UFO + 1, ufo_x + 8, 8, T + art_ufo_r, 6);
+  } else {
+    hide_sprite(SP_UFO); hide_sprite(SP_UFO + 1);
+  }
+  for (var i = 0; i < 8; i++) {
+    if (boom_t[i] > 0) {
+      boom_t[i]--;
+      sprite(SP_BOOM + i, boom_x[i], boom_y[i], T + art_boom0 + (boom_t[i] < 6), 5);
+    } else {
+      hide_sprite(SP_BOOM + i);
+    }
+  }
+}
+
+func title_screen() {
+  text(5, 3, "VOID  RAID");
+  text(4, 6, "D-PAD: MOVE");
+  text(4, 8, "A: FIRE");
+  text(4, 10, "PRESS START");
+  if (btnp(BTN_START)) { srand(frames(), 0x5EED); new_game(); }
+}
+
+func frame() {
+  music_update(); sfx_update();
+  if (state == S_TITLE) { title_screen(); }
+  else if (state == S_PLAY) {
+    play();
+    if (state == S_PLAY) { scroll(0, (0 - (frames() >> 1)) & 255); }   // the stars drift down; banners need scroll 0
+  }
+  else if (state == S_WAVE) {
+    play();
+    timer--;
+    if (timer == 0) { start_wave(); }
+  } else {
+    if (btnp(BTN_START)) { new_game(); }
+  }
+  draw_sprites();
+  if (beep > 0) { beep--; if (beep == 0) { tone_off(1); } }
+  if (nbeep > 0) { nbeep--; if (nbeep == 0) { tone_off(3); } }
+}
+
+func init() {
+  load_font(0);
+  load_tiles(art, T, art_COUNT);
+  bg_pal(0, rgb(1, 1, 4), rgb(8, 8, 11), rgb(10, 11, 15), rgb(15, 15, 15));
+  obj_pal(0, 0, rgb(8, 15, 15), rgb(3, 8, 15), rgb(1, 2, 6));        // ship
+  obj_pal(1, 0, rgb(15, 12, 15), rgb(15, 5, 13), rgb(7, 1, 6));      // top row
+  obj_pal(2, 0, rgb(12, 15, 10), rgb(5, 14, 5), rgb(1, 6, 2));       // middle rows
+  obj_pal(3, 0, rgb(15, 14, 8), rgb(15, 10, 2), rgb(8, 4, 0));       // bottom row
+  obj_pal(4, 0, rgb(15, 15, 12), rgb(15, 12, 3), rgb(15, 5, 1));     // shots and bombs
+  obj_pal(5, 0, rgb(15, 15, 14), rgb(15, 11, 2), rgb(12, 2, 0));     // blasts
+  obj_pal(6, 0, rgb(15, 12, 12), rgb(15, 3, 3), rgb(8, 1, 3));       // UFO
+  hide_all_sprites();
+  master_volume(8);
+  tune_play(TUNE_ACTION);
+  draw_stars();
+  hi = 0;
+  if (save_loaded() && save_valid()) { hi = save_get(0); }
+  score = 0; lives = 3; wave = 0; sx = 72;
+  for (var i = 0; i < 3; i++) { shot_y[i] = OFF; bomb_y[i] = OFF; }
+  window_pos(0, 136);
+  clear_win();
+  draw_hud();
+  state = S_TITLE;
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+}

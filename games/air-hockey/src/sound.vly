@@ -1,0 +1,175 @@
+// sound.vly: a two-lane sound effect player (lane 0 = tonal on channel 1, lane 1 = noise on channel 3, so a "thock" and a "ping"
+// can play together) and the music. std/sfx has one shared lane, which is not enough for a puck game.
+import "std/music";
+
+const SND_WALL = 0; const SND_POST = 1; const SND_MOVE = 2; const SND_OK = 3; const SND_BACK = 4; const SND_BEEP = 5;
+const SND_GO = 6; const SND_GOAL_YOU = 7; const SND_GOAL_CPU = 8; const SND_PAUSE = 9; const SND_RESUME = 10;
+const SND_HORN = 11; const SND_NET = 12; const SND_MATCHPT = 13; const SND_VS = 14; const SND_LOCK = 15;
+// lane, hz at start, hz at end, volume at start, volume at end, frames, duty
+table snd_tab = {
+  1, 1400, 1000, 7, 0, 4, 0,                                                                  // 0 wall tick (noise)
+  0, 2093, 1568, 11, 0, 8, 1,                                                                 // 1 post ping
+  0, 880, 880, 9, 5, 3, 2,                                                                    // 2 menu move
+  0, 523, 523, 10, 8, 3, 2,   0, 784, 784, 10, 8, 3, 2,   0, 1047, 1047, 11, 0, 8, 2,        // 3 menu ok (rising)
+  0, 660, 440, 9, 0, 6, 2,                                                                    // 4 back
+  0, 440, 440, 11, 8, 12, 2,                                                                  // 5 count beep
+  0, 880, 880, 12, 10, 5, 2,   0, 1319, 1319, 13, 0, 26, 2,                                   // 6 go
+  0, 523, 523, 12, 10, 6, 2,   0, 659, 659, 12, 10, 6, 2,   0, 784, 784, 12, 10, 6, 2,   0, 1047, 1047, 12, 10, 10, 2,   0, 784, 784, 12, 10, 4, 2,   0, 1047, 1047, 12, 0, 30, 2,   // 7 you scored
+  0, 392, 392, 12, 10, 9, 2,   0, 330, 330, 12, 10, 9, 2,   0, 262, 262, 12, 10, 9, 2,   0, 220, 110, 12, 0, 30, 2,                    // 8 cpu scored
+  0, 660, 660, 10, 8, 3, 2,   0, 440, 440, 10, 0, 6, 2,                                       // 9 pause
+  0, 440, 440, 10, 8, 3, 2,   0, 660, 660, 10, 0, 6, 2,                                       // 10 resume
+  1, 600, 300, 15, 0, 28, 0,                                                                  // 11 horn (noise)
+  1, 2200, 1800, 8, 0, 9, 0,                                                                  // 12 net rattle
+  0, 1175, 1175, 11, 8, 4, 1,   0, 0, 0, 0, 0, 3, 1,   0, 1175, 1175, 11, 0, 5, 1,           // 13 match point
+  0, 330, 330, 11, 9, 5, 2,   0, 440, 440, 11, 9, 5, 2,   0, 660, 660, 11, 0, 14, 2,         // 14 versus card
+  0, 220, 220, 9, 0, 6, 0                                                                     // 15 locked
+};
+table snd_start = { 0, 1, 2, 3, 6, 7, 8, 10, 16, 20, 22, 24, 25, 26, 29, 32 };
+table snd_count = { 1, 1, 1, 3, 1, 1, 2, 6, 4, 2, 2, 1, 1, 3, 3, 1 };
+
+var sn_left[2]; var sn_len[2]; var sn_h0[2]; var sn_h1[2]; var sn_v0[2]; var sn_v1[2]; var sn_duty[2];
+var sn_next[2]; var sn_more[2];
+
+func snd_seg(lane, row) {
+  var b = row * 7;
+  sn_h0[lane] = snd_tab[b + 1]; sn_h1[lane] = snd_tab[b + 2]; sn_v0[lane] = snd_tab[b + 3]; sn_v1[lane] = snd_tab[b + 4];
+  sn_len[lane] = snd_tab[b + 5]; sn_left[lane] = sn_len[lane]; sn_duty[lane] = snd_tab[b + 6];
+  var ch = 1; if (lane == 1) { ch = 3; }
+  audio_hold[ch] = sn_len[lane] + 2;
+  if (sn_v0[lane] > 0) { tone(ch, sn_h0[lane], sn_v0[lane], sn_duty[lane]); } else { tone_off(ch); }
+}
+// Play a sound from the table.
+func snd(id) {
+  var row = snd_start[id];
+  var lane = snd_tab[row * 7];
+  sn_next[lane] = row + 1;
+  sn_more[lane] = snd_count[id] - 1;
+  snd_seg(lane, row);
+}
+// One tone of your own on a lane: a start and end pitch, start and end volume, frames.
+func snd_custom(lane, h0, h1, v0, v1, frames, duty) {
+  sn_h0[lane] = h0; sn_h1[lane] = h1; sn_v0[lane] = v0; sn_v1[lane] = v1; sn_len[lane] = frames; sn_left[lane] = frames; sn_duty[lane] = duty;
+  sn_more[lane] = 0;
+  var ch = 1; if (lane == 1) { ch = 3; }
+  audio_hold[ch] = frames + 2;
+  tone(ch, h0, v0, duty);
+}
+// A mallet hit the puck: noise thock plus a tonal knock whose pitch and loudness follow the speed (1/8 px/frame, 1..44).
+// who = 1 player (lower knock), 2 CPU (higher).
+func snd_hit(strength, who) {
+  var s = min(strength, 44);
+  snd_custom(1, 420, 140, 6 + s / 6, 0, 4 + s / 11, 0);
+  var base = 150; if (who == 2) { base = 205; }
+  snd_custom(0, base + s * 6, base - 20, 8 + s / 8, 0, 5 + s / 10, 2);
+}
+func snd_update() {
+  for (var lane = 0; lane < 2; lane++) {
+    if (sn_left[lane] > 0) {
+      sn_left[lane]--;
+      var ch = 1; if (lane == 1) { ch = 3; }
+      if (sn_left[lane] <= 0) {
+        tone_off(ch);
+        if (sn_more[lane] > 0) { sn_more[lane]--; snd_seg(lane, sn_next[lane]); sn_next[lane]++; }
+      } else {
+        var t = sn_len[lane] - sn_left[lane];
+        var hz = sn_h0[lane] + ((sn_h1[lane] - sn_h0[lane]) * t) / sn_len[lane];
+        var v = sn_v0[lane] + ((sn_v1[lane] - sn_v0[lane]) * t) / sn_len[lane];
+        if (v > 0 && hz > 0) { tone(ch, hz, v, sn_duty[lane]); } else { tone_off(ch); }
+        audio_hold[ch] = sn_left[lane] + 2;
+      }
+    }
+  }
+  for (var c = 0; c < 4; c++) { if (audio_hold[c] > 0) { audio_hold[c]--; } }
+}
+
+// ---------------- music ----------------
+// Match song: A minor, 16 bars of 16 steps (about 26 seconds at 6 frames a step), lead + bass + drums.
+btable lead_pats = {
+  N_A4,0,N_C5,0,N_E5,0,N_C5,0, N_A4,0,N_C5,0,N_E5,0,N_A5,0,      // 0 Am arpeggio
+  N_F4,0,N_A4,0,N_C5,0,N_A4,0, N_F4,0,N_A4,0,N_C5,0,N_F5,0,      // 1 F
+  N_C5,0,N_E5,0,N_G5,0,N_E5,0, N_C5,0,N_E5,0,N_G5,0,N_C6,0,      // 2 C
+  N_G4,0,N_B4,0,N_D5,0,N_B4,0, N_G4,0,N_B4,0,N_D5,0,N_G5,0,      // 3 G
+  N_E5,0,0,N_E5,N_D5,0,N_C5,0, N_A4,0,0,0,N_C5,0,N_E5,0,         // 4 Am tune
+  N_F5,0,0,N_F5,N_E5,0,N_D5,0, N_C5,0,0,0,N_A4,0,N_C5,0,         // 5 F tune
+  N_G5,0,0,N_G5,N_E5,0,N_C5,0, N_E5,0,N_G5,0,N_A5,0,N_G5,0,      // 6 C tune
+  N_D5,0,0,N_D5,N_B4,0,N_G4,0, N_B4,0,N_D5,0,N_E5,0,N_D5,0,      // 7 G tune
+  N_A5,0,N_G5,0,N_E5,0,N_D5,0, N_E5,0,N_C5,0,N_A4,0,0,0,         // 8 Am descending
+  N_E5,N_E5,0,N_G5,0,N_E5,N_D5,0, N_E5,0,0,0,N_E5,0,N_B4,0        // 9 E (turnaround)
+};
+btable lead_order = { 0,1,2,3, 4,5,6,7, 0,1,2,3, 4,5,8,9 };
+btable bass_pats = {
+  N_A2,0,N_A2,0,N_E3,0,N_A2,0, N_A2,0,N_A2,0,N_E3,0,N_G3,0,      // 0 Am
+  N_F2,0,N_F2,0,N_C3,0,N_F2,0, N_F2,0,N_F2,0,N_C3,0,N_A2,0,      // 1 F
+  N_C3,0,N_C3,0,N_G3,0,N_C3,0, N_C3,0,N_C3,0,N_G3,0,N_E3,0,      // 2 C
+  N_G2,0,N_G2,0,N_D3,0,N_G2,0, N_G2,0,N_G2,0,N_D3,0,N_B2,0,      // 3 G
+  N_E2,0,N_E2,0,N_B2,0,N_E2,0, N_E2,0,N_E2,0,N_B2,0,N_GS2,0      // 4 E
+};
+btable bass_order = { 0,1,2,3, 0,1,2,3, 0,1,2,3, 0,1,2,4 };
+btable drum_pats = {
+  N_C2,0,N_B6,0,N_G4,0,N_B6,0, N_C2,0,N_B6,0,N_G4,0,N_B6,N_B6,     // 0 kick, hat, snare
+  N_C2,0,N_B6,0,N_G4,0,N_B6,N_C2, N_C2,0,N_B6,0,N_G4,0,N_G4,N_G4    // 1 fill
+};
+btable drum_order = { 0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,1 };
+byte lead_buf[16 * 16 * 2 + 1];
+byte bass_buf[16 * 16 * 2 + 1];
+byte drum_buf[16 * 16 * 2 + 1];
+
+// Title song: slow, 8 bars of a gentle line over a bass.
+btable tlead_pats = {
+  N_E5,0,0,0,N_C5,0,0,0, N_D5,0,0,0,N_A4,0,0,0,                  // 0
+  N_C5,0,0,0,N_A4,0,0,0, N_B4,0,0,0,N_E5,0,0,0,                  // 1
+  N_A4,0,N_C5,0,N_E5,0,N_A5,0, N_G5,0,N_E5,0,N_C5,0,N_E5,0,      // 2
+  N_F5,0,N_E5,0,N_D5,0,N_C5,0, N_B4,0,N_C5,0,N_D5,0,0,0          // 3
+};
+btable tlead_order = { 0,1,2,3, 0,1,2,3, 2,3,0,1, 2,3,0,1 };
+btable tbass_pats = {
+  N_A2,0,0,0,N_E3,0,0,0, N_A2,0,0,0,N_E3,0,0,0,
+  N_F2,0,0,0,N_C3,0,0,0, N_G2,0,0,0,N_D3,0,0,0
+};
+btable tbass_order = { 0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1 };
+byte tlead_buf[16 * 16 * 2 + 1];
+byte tbass_buf[16 * 16 * 2 + 1];
+
+btable fan_win_lead = { N_C5,2, N_E5,2, N_G5,2, N_C6,6, N_G5,2, N_C6,3, N_E6,10, 0,4, N_C6,2, N_E6,2, N_G6,14, MUS_END };
+btable fan_win_bass = { N_C3,4, N_C3,4, N_G3,4, N_C4,10, N_C3,4, N_G3,4, N_C4,14, MUS_END };
+btable fan_lose_lead = { N_E5,5, N_D5,5, N_C5,5, N_A4,8, N_G4,6, N_E4,24, MUS_END };
+btable fan_lose_bass = { N_A2,10, N_F2,10, N_E2,10, N_A2,24, MUS_END };
+
+var music_mode;     // 0 none, 1 title, 2 match, 4 fanfare
+var mphase;         // a song is built one voice per frame (each build costs about 19,000 cycles) and started together at the end
+func music_title() { music_stop_all(); music_mode = 1; mphase = 1; }
+func music_match() { music_stop_all(); music_mode = 2; mphase = 1; }
+func music_build_step() {
+  if (mphase == 0) { return; }
+  if (music_mode == 1) {
+    if (mphase == 1) { music_build(tlead_buf, tlead_pats, 16, tlead_order, 16); }
+    else {
+      music_build(tbass_buf, tbass_pats, 16, tbass_order, 16);
+      music_tempo(8);
+      music_play(0, 0, tlead_buf, 6);
+      music_play(1, 2, tbass_buf, 8);
+      music_duty(0, 1);
+      mphase = 0; return;
+    }
+  } else {
+    if (mphase == 1) { music_build(lead_buf, lead_pats, 16, lead_order, 16); }
+    else if (mphase == 2) { music_build(bass_buf, bass_pats, 16, bass_order, 16); }
+    else {
+      music_build(drum_buf, drum_pats, 16, drum_order, 16);
+      music_play(0, 0, lead_buf, 6);
+      music_play(1, 2, bass_buf, 8);
+      music_play(2, 3, drum_buf, 5);
+      music_duty(0, 2);
+      mphase = 0; return;
+    }
+  }
+  mphase++;
+}
+func music_fanfare(win) {
+  music_stop_all();
+  mphase = 0;
+  music_tempo(6);
+  if (win) { music_play(0, 0, fan_win_lead, 8); music_play(1, 2, fan_win_bass, 9); }
+  else { music_play(0, 0, fan_lose_lead, 7); music_play(1, 2, fan_lose_bass, 9); }
+  music_mode = 4;
+}

@@ -1,0 +1,338 @@
+// {{name}}: a turn-based monster battle where every creature is GENERATED from a seed.
+//   START begins. A selects, B goes back, the D-pad moves the cursor.
+// Shows: generated sprite art (symmetric 32x32 monsters written into tile RAM at runtime), std/ui menus and
+// typewriter dialogue, a turn engine with type advantages, HP bars from tiles, and a saved win streak.
+//
+// A creature is just a 16-bit seed. The seed decides its shape, colors, name, type and stats, so the cartridge
+// holds no creature art at all and can show 65,536 different monsters.
+
+import "std/tunes";
+import "std/ui";
+
+tileset ui = "../assets/ui.tiles";
+
+const MON_P = 8;                // tile RAM for the player's monster (16 tiles: 8..23)
+const MON_E = 24;               // tile RAM for the enemy monster (16 tiles: 24..39)
+const BAR = 70;                 // HP bar tiles (9 tiles: 70..78)
+const UI_TILES = 80;            // std/ui tiles (11 tiles: 80..90)
+const FONT0 = 100;              // the font (95 tiles: 100..194)
+
+const S_TITLE = 0; const S_MENU = 1; const S_MOVES = 2; const S_TALK = 3; const S_OVER = 4; const S_GEN = 5;
+
+table syl = { "DEG", "GM", "WAG", "PIX", "MOON", "NFT", "FLR", "ZK" };
+table type_names = { "GAS", "MINT", "FLOOR", "PLAIN" };
+table main_items = { "FIGHT", "RUN" };
+table move_names = { "GAS WAR", "SHILL", "FLOOR RUG", "WAGMI" };
+btable move_type = { 0, 1, 2, 3 };
+btable move_power = { 50, 45, 40, 35 };
+
+var state;
+var gen_phase;                  // monster generation is spread over several frames
+var streak;
+var best;
+var seed_p; var seed_e;
+var hp_p; var max_p; var hp_e; var max_e;
+byte cells[128];                // monster occupancy grid (8 columns x 16 rows, mirrored)
+byte shade[128];                // the color index (0-3) of each cell
+byte buf[48];                   // message builder
+var buf_len;
+byte pool[300];                 // text of queued messages
+var pool_len;
+var ev_n; var ev_i;
+var ev_ptr[8]; var ev_hp_p[8]; var ev_hp_e[8];
+var ev_end;                     // what happens when all messages are done: 0 menu, 1 win, 2 lose
+var after_win;
+
+// ---------- small helpers ----------
+func name_a(seed) { return peek(syl + (seed & 7) * 2); }
+func name_b(seed) { return peek(syl + ((seed >> 3) & 7) * 2); }
+func type_of(seed) { return umod(seed >> 6, 3); }
+func max_hp_of(seed) { return 30 + ((seed >> 8) & 15); }
+func speed_of(seed) { return (seed >> 4) & 15; }
+
+func b_reset() { buf_len = 0; buf[0] = 0; }
+func b_str(s) {
+  var i = 0;
+  while (peek8(s + i) != 0) { buf[buf_len] = peek8(s + i); buf_len++; i++; }
+  buf[buf_len] = 0;
+}
+func b_name(seed) { b_str(name_a(seed)); b_str(name_b(seed)); }
+func b_pad(n) { while (buf_len < n) { b_str(" "); } }
+func b_num(n) { b_str(utoa(n)); }
+// Queue the text in buf as a message that, when shown, sets the HP bars to (hp_p_after, hp_e_after).
+func say(hpp, hpe) {
+  ev_ptr[ev_n] = pool + pool_len;
+  for (var i = 0; i <= buf_len; i++) { pool[pool_len + i] = buf[i]; }
+  pool_len = pool_len + buf_len + 1;
+  ev_hp_p[ev_n] = hpp;
+  ev_hp_e[ev_n] = hpe;
+  ev_n++;
+  b_reset();
+}
+
+// ---------- generated monster art ----------
+// A monster is a 32x32 sprite (16 tiles) built from an 8x16 grid of 2x2-pixel cells that is mirrored left to right.
+// Colors are decided per cell first, then whole bytes (4 pixels = 2 cells) are composed and written to tile RAM,
+// which is about five times cheaper than setting pixels one at a time.
+func cell_shade(seed_s, x, y) {
+  var edge = 0;
+  if (x == 0 || !cells[y * 8 + x - 1]) { edge = 1; }
+  if (x < 7 && !cells[y * 8 + x + 1]) { edge = 1; }
+  if (y == 0 || !cells[(y - 1) * 8 + x]) { edge = 1; }
+  if (y == 15 || !cells[(y + 1) * 8 + x]) { edge = 1; }
+  if (edge) { return 3; }
+  if (((x + y) & 3) == 0) { return 1; }
+  return 2;
+}
+// Phase 1: decide which cells of the 8x16 grid are filled (cheap).
+func gen_cells(seed) {
+  var s = seed | 1;
+  // the seed also picks how quickly the body thins out sideways and vertically, and where its middle is
+  var wx = 12 + ((seed >> 1) & 7) * 4;         // 12..40: wide ... narrow
+  var wy = 6 + ((seed >> 4) & 7) * 3;          // 6..27: tall ... squat
+  var mid = 5 + ((seed >> 7) & 3);             // 5..8: where the body is centered vertically
+  for (var cy = 0; cy < 16; cy++) {
+    for (var cx = 0; cx < 8; cx++) {
+      s = s * 25173 + 13849;
+      var r = (s >> 8) & 255;
+      var dx = 7 - cx;                      // 0 at the mirror line
+      var dy = cy - mid;
+      if (dy < 0) { dy = 0 - dy; }
+      var filled = r < 255 - dx * wx - dy * wy;
+      if (dx <= 1 && dy <= 2) { filled = 1; }   // a solid core so it never comes out empty
+      cells[cy * 8 + cx] = filled;
+    }
+  }
+}
+// Phase 2: shade and write cell rows y0..y1-1 into the 16 tiles starting at tile0. Whole bytes (4 pixels = 2 cells)
+// are composed and written, which is about five times cheaper than setting pixels one at a time.
+func gen_rows(tile0, y0, y1) {
+  for (var y = y0; y < y1; y++) {
+    for (var x = 0; x < 8; x++) {
+      var c = 0;
+      if (cells[y * 8 + x]) { c = cell_shade(0, x, y); }
+      if (y == 6 && x == 5 && cells[y * 8 + x]) { c = 1; }   // eyes: light cells
+      shade[y * 8 + x] = c;
+    }
+    for (var bx = 0; bx < 8; bx++) {
+      var fa = bx * 2;                      // the two cells (of 16 across) that make up this byte
+      var fb = bx * 2 + 1;
+      var ca = shade[y * 8 + fa];
+      if (fa > 7) { ca = shade[y * 8 + 15 - fa]; }
+      var cb = shade[y * 8 + fb];
+      if (fb > 7) { cb = shade[y * 8 + 15 - fb]; }
+      var packed = ((ca * 5) << 4) | (cb * 5);
+      var tile = tile0 + (y >> 2) * 4 + (bx >> 1);
+      var a = TILES + tile * 16 + ((y & 3) << 2) + (bx & 1);
+      poke8(a, packed);
+      poke8(a + 2, packed);
+    }
+  }
+}
+// Three-shade palette for a monster from its seed: dark, mid, light.
+func monster_palette(slot, seed) {
+  var h = umod(seed >> 11, 6);
+  var r = 6; var g = 6; var b = 6;
+  if (h == 0) { r = 15; g = 6; b = 5; }
+  if (h == 1) { r = 15; g = 11; b = 3; }
+  if (h == 2) { r = 6; g = 14; b = 6; }
+  if (h == 3) { r = 4; g = 12; b = 15; }
+  if (h == 4) { r = 10; g = 6; b = 15; }
+  if (h == 5) { r = 15; g = 6; b = 12; }
+  // light, mid, dark (index 1, 2, 3); index 0 is transparent
+  obj_pal(slot, 0, ((min(15, r + 4)) << 8) | ((min(15, g + 4)) << 4) | min(15, b + 4), (r << 8) | (g << 4) | b, ((r >> 2) << 8) | ((g >> 2) << 4) | (b >> 2));
+}
+
+// ---------- HUD ----------
+func draw_bar(col, row, hp, maxhp) {
+  var filled = udiv(hp * 48, maxhp);
+  if (hp > 0 && filled == 0) { filled = 1; }
+  for (var i = 0; i < 6; i++) {
+    var px = clamp(filled - i * 8, 0, 8);
+    set_cell(col + i, row, BAR + px + (text_pal << 12));
+  }
+}
+func draw_hud() {
+  clear_bg();
+  // enemy (top left)
+  b_reset(); b_name(seed_e); text(1, 0, buf);
+  text(1, 1, "HP"); draw_bar(3, 1, hp_e, max_e);
+  // player (bottom right)
+  b_reset(); b_name(seed_p); text(11, 8, buf);
+  text(11, 9, "HP"); draw_bar(13, 9, hp_p, max_p);
+  b_reset(); b_num(hp_p); b_str("/"); b_num(max_p); b_pad(7); text(13, 10, buf);
+  text(1, 3, "TYPE"); text(6, 3, peek(type_names + type_of(seed_e) * 2));
+}
+
+// Monster generation takes a few frames (about 55,000 cycles each, a frame has 120,000):
+//   phase 0: player cells + top half   phase 1: bottom half, palette, sprite
+//   phase 2: enemy cells + top half    phase 3: bottom half, palette, sprite, HUD, menu
+func gen_step() {
+  if (gen_phase == 0) { gen_cells(seed_p); gen_rows(MON_P, 0, 8); }
+  else if (gen_phase == 1) {
+    gen_rows(MON_P, 8, 16);
+    monster_palette(0, seed_p);
+    sprite(0, 16, 44, MON_P, SPR_32X32 | SPR_FLIPX);
+  } else if (gen_phase == 2) {
+    seed_e = rnd() | 1;
+    max_e = max_hp_of(seed_e); hp_e = max_e;
+    hide_sprite(1);
+    gen_cells(seed_e); gen_rows(MON_E, 0, 8);
+  } else {
+    gen_rows(MON_E, 8, 16);
+    monster_palette(1, seed_e);
+    sprite(1, 100, 8, MON_E, SPR_32X32 | 1);
+    draw_hud();
+    open_main_menu();
+    return;
+  }
+  gen_phase++;
+}
+func next_encounter() { gen_phase = 2; state = S_GEN; }
+
+// ---------- the turn engine ----------
+func effect(move, def_seed) {
+  var mt = move_type[move];
+  var dt = type_of(def_seed);
+  if (mt == 3) { return 2; }                   // plain: normal damage
+  if (umod(mt + 1, 3) == dt) { return 4; }     // super effective (x2)
+  if (umod(dt + 1, 3) == mt) { return 1; }     // not very effective (x1/2)
+  return 2;
+}
+func damage(move, def_seed) {
+  return udiv(move_power[move] * effect(move, def_seed), 8) + rand(4);
+}
+// One attack: queue its messages and update the (virtual) HP values.
+func attack(player_attacks, move) {
+  var dmg;
+  var eff;
+  b_reset();
+  if (player_attacks) {
+    b_name(seed_p); b_str(" used "); b_str(peek(move_names + move * 2)); b_str("!");
+    eff = effect(move, seed_e);
+    dmg = min(damage(move, seed_e), hp_e);
+    say(hp_p, hp_e);
+    hp_e = hp_e - dmg;
+  } else {
+    b_name(seed_e); b_str(" used "); b_str(peek(move_names + move * 2)); b_str("!");
+    eff = effect(move, seed_p);
+    dmg = min(damage(move, seed_p), hp_p);
+    say(hp_p, hp_e);
+    hp_p = hp_p - dmg;
+  }
+  b_num(dmg); b_str(" damage.");
+  if (eff == 4) { b_str(" SUPER!"); }
+  if (eff == 1) { b_str(" Weak."); }
+  say(hp_p, hp_e);
+}
+func fainted(who_seed) { b_reset(); b_name(who_seed); b_str(" fainted!"); }
+
+func start_turn(move) {
+  ev_n = 0; ev_i = 0; pool_len = 0; ev_end = 0;
+  var emove = rand(4);
+  var player_first = speed_of(seed_p) > speed_of(seed_e) || (speed_of(seed_p) == speed_of(seed_e) && rand(2) == 0);
+  if (player_first) {
+    attack(1, move);
+    if (hp_e > 0) { attack(0, emove); }
+  } else {
+    attack(0, emove);
+    if (hp_p > 0) { attack(1, move); }
+  }
+  if (hp_e == 0) { fainted(seed_e); say(hp_p, hp_e); b_reset(); b_str("You win! Streak "); b_num(streak + 1); b_str("."); say(hp_p, hp_e); ev_end = 1; }
+  else if (hp_p == 0) { fainted(seed_p); say(hp_p, hp_e); b_reset(); b_str("You blacked out..."); say(hp_p, hp_e); ev_end = 2; }
+  // the first messages show the HP from before the turn
+  hp_p = ev_hp_p[0]; hp_e = ev_hp_e[0];
+  state = S_TALK;
+}
+
+var real_hp_p; var real_hp_e;
+func show_event() {
+  hp_p = ev_hp_p[ev_i]; hp_e = ev_hp_e[ev_i];
+  draw_hud();
+  dialog_open(WIN_MAP, 0, 0, 20, 6);
+  dialog_say(ev_ptr[ev_i]);
+}
+
+func open_main_menu() {
+  clear_win();
+  dialog_open(WIN_MAP, 0, 0, 12, 6);
+  b_reset(); b_str("What will "); b_name(seed_p); b_str(" do?");
+  dialog_say(buf);
+  state = S_MENU;
+  menu_open(WIN_MAP, 12, 0, main_items, 2);
+}
+
+func title() {
+  text(5, 4, "MONSTER BATTLE");
+  text(3, 7, "every monster is");
+  text(3, 8, "made from a seed");
+  text(5, 12, "PRESS START");
+  text(5, 14, "WIN STREAK"); print_u(15, 14, streak); text(5, 15, "BEST"); print_u(10, 15, best);
+  if (btnp(BTN_START)) {
+    srand(frames(), 0x4D4F);
+    seed_p = rnd() | 1;
+    max_p = max_hp_of(seed_p) + 10; hp_p = max_p;
+    clear_bg();
+    streak = 0;
+    gen_phase = 0;
+    state = S_GEN;
+  }
+}
+
+func frame() {
+  music_update(); sfx_update();
+  if (state == S_TITLE) { title(); return; }
+  if (state == S_GEN) { gen_step(); return; }
+  if (state == S_MENU) {
+    dialog_update();
+    var r = menu_update();
+    if (r == 0) {
+      menu_close();
+      menu_open(WIN_MAP, 10, 0, move_names, 4);
+      state = S_MOVES;
+    }
+    if (r == 1) { // run: a new encounter, no streak change
+      menu_close(); next_encounter();
+    }
+    return;
+  }
+  if (state == S_MOVES) {
+    var m = menu_update();
+    if (m == -2) { menu_close(); open_main_menu(); }
+    if (m >= 0) { menu_close(); start_turn(m); show_event(); }
+    return;
+  }
+  if (state == S_TALK) {
+    if (dialog_update() == 1) {
+      ev_i++;
+      if (ev_i < ev_n) { show_event(); }
+      else if (ev_end == 0) { open_main_menu(); }
+      else if (ev_end == 1) {
+        streak++;
+        if (streak > best) { best = streak; save_set(0, best); save_seal(); save_commit(); }
+        hp_p = min(max_p, hp_p + 12);
+        next_encounter();
+      } else { state = S_OVER; ev_i = 0; }
+    }
+    return;
+  }
+  if (state == S_OVER) {
+    hide_sprite(0); hide_sprite(1);
+    clear_bg(); clear_win();
+    state = S_TITLE;
+  }
+}
+
+func init() {
+  load_font(FONT0);
+  ui_init(UI_TILES);
+  load_tiles(ui, BAR, ui_COUNT);
+  bg_pal(0, rgb(14, 15, 12), rgb(11, 13, 9), rgb(6, 9, 5), rgb(1, 3, 1));
+  hide_all_sprites();
+  master_volume(8);
+  tune_play(TUNE_BOSS);
+  if (save_loaded() && save_valid()) { best = save_get(0); }
+  window_pos(0, 96);
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+  state = S_TITLE;
+}

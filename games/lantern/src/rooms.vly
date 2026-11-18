@@ -1,0 +1,97 @@
+// The rooms. The grids in the comments are a picture of each room; the table below is what the game reads (the same
+// characters, rows joined end to end), so change both. One character per 16x16 block, 10 across and 8 down.
+// main.vly explains each character.
+//   room 0
+//     TTTTTTTTTT
+//     T.,....,.T
+//     T........T
+//     T...M....:
+//     T........:
+//     T..,.....T
+//     T....,...T
+//     TTTT..TTTT
+//   room 1
+//     TTTTTTTTTT
+//     T..s.....T
+//     :........:
+//     :...,....:
+//     :........:
+//     T......s.T
+//     T.bb.....T
+//     TTTT..TTTT
+//   room 2
+//     RRRRDDRRRR
+//     R.,....s.R
+//     R........R
+//     :........R
+//     :...,....R
+//     R........R
+//     R.s..,...R
+//     RRRR..RRRR
+//   room 3
+//     TTTT..TTTT
+//     T.s......T
+//     T..bbb...T
+//     T..bCb...:
+//     T..bbb...:
+//     T......s.T
+//     T........T
+//     TTTTTTTTTT
+//   room 4
+//     TTTT..TTTT
+//     T..,.....T
+//     T...~~~..T
+//     :...~~~..:
+//     :.s.~~~..:
+//     T........T
+//     T....,.s.T
+//     TTTTTTTTTT
+//   room 5
+//     RRRR..RRRR
+//     R........R
+//     R...,..s.R
+//     :........R
+//     :........R
+//     R..s.....R
+//     R....h...R
+//     RRRRRRRRRR
+//   room 6
+//     ##########
+//     #________#
+//     #_##__##_#
+//     #_________
+//     #_________
+//     #_##__##_#
+//     #________#
+//     ####XX####
+//   room 7
+//     ####__####
+//     #________#
+//     #_a____a_#
+//     _________#
+//     _________#
+//     #_##__##_#
+//     #___h____#
+//     ##########
+//   room 8
+//     ##########
+//     #h______h#
+//     #________#
+//     #___K____#
+//     #________#
+//     #________#
+//     #________#
+//     ####__####
+table rooms = {
+  "TTTTTTTTTTT.,....,.TT........TT...M....:T........:T..,.....TT....,...TTTTT..TTTT",
+  "TTTTTTTTTTT..s.....T:........::...,....::........:T......s.TT.bb.....TTTTT..TTTT",
+  "RRRRDDRRRRR.,....s.RR........R:........R:...,....RR........RR.s..,...RRRRR..RRRR",
+  "TTTT..TTTTT.s......TT..bbb...TT..bCb...:T..bbb...:T......s.TT........TTTTTTTTTTT",
+  "TTTT..TTTTT..,.....TT...~~~..T:...~~~..::.s.~~~..:T........TT....,.s.TTTTTTTTTTT",
+  "RRRR..RRRRR........RR...,..s.R:........R:........RR..s.....RR....h...RRRRRRRRRRR",
+  "###########________##_##__##_##_________#_________#_##__##_##________#####XX####",
+  "####__#####________##_a____a_#_________#_________##_##__##_##___h____###########",
+  "###########h______h##________##___K____##________##________##________#####__####"
+};
+// neighbors of each room: north, south, west, east (255: none)
+btable nbr = { 255, 3, 255, 1, 255, 4, 0, 2, 255, 5, 1, 255, 0, 255, 255, 4, 1, 255, 3, 5, 2, 255, 4, 255, 255, 255, 255, 7, 8, 255, 6, 255, 255, 7, 255, 255 };

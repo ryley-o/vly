@@ -1,0 +1,743 @@
+// FRET RUSH: a four-lane guitar rhythm game for the VLY-1.
+//   LEFT, DOWN (or UP), B, A hit the four lanes. START pauses. SELECT opens SETUP (input offset).
+// The song clock `st` counts frames; step k of a song happens at frame k * sf (one step = a 16th note).
+// The notes you hit are the lead guitar; the backing band (rhythm, bass, drums) plays from the same clock.
+
+import "std/music";     // only for the note table mus_hz
+import "std/sfx";
+import "std/sprites";
+import "std/fade";
+import "std/anim";
+import "songdata.vly";
+
+tileset art bank 8 = "../assets/art.tiles";
+tileset gfx bank 8 = "../assets/big.tiles";
+
+const T_ART = 100;
+const T_GFX = T_ART + art_COUNT;
+const T_LANE_L = T_ART + art_lane_l;
+const T_LANE_R = T_ART + art_lane_r;
+const T_EDGE_L = T_ART + art_edge_l;
+const T_EDGE_R = T_ART + art_edge_r;
+const T_HLINE = T_ART + art_hline;
+const T_GEM = T_ART + art_gem;
+const T_RING = T_ART + art_ring;
+const T_LIT = T_ART + art_lit;
+const T_BEAT = T_GFX + gfx_beat32;
+const T_BAR = T_GFX + gfx_bar32;
+const T_SPARK = T_ART + art_spark;
+const T_SPARK2 = T_ART + art_spark2;
+const T_METER = T_GFX + gfx_meter0;
+
+const S_TITLE = 0; const S_SELECT = 1; const S_PLAY = 2; const S_PAUSE = 3; const S_RESULT = 4; const S_FAIL = 5; const S_SETUP = 6;
+const HIT_Y = 112;          // sprite top of a note that is exactly on time (the gem is drawn in rows 4-11 of its 16x16)
+const SPD = 2;              // pixels per frame
+const LANE_X = 48;          // left edge of the highway
+const SAVE_MAGIC = 0x4652;
+
+// ------------------------------------------------------------------------------------------------- state
+var state; var pending = -1; var tnow;
+var cur; var sel; var cal;                          // song being played, cursor, input offset in frames
+var sb; var sbank; var sf; var nst; var wp; var wg; var pen; var total;
+var st; var pstep; var seq_lim; var seq_auto;      // song clock (frames; negative during the count-in), next step to trigger
+var nxt[4]; byte done[672]; byte missd[672];
+var score; var combo; var maxcombo; var nperf; var ngood; var nmiss; var meter; var hud;
+var jkind; var jtime; var jdir;                     // last judgement: 1 perfect 2 good 3 miss
+var ov_s; var ov_t; var rc;                         // big overlay text, resume countdown
+var sp_x[8]; var sp_y[8]; var sp_vx[8]; var sp_vy[8]; var sp_t[8]; var sp_p[8]; var sp_n;
+var lit[4];
+var res_t; var res_new; var res_grade; var res_acc; var res_fc; var fail_t;
+var pm_sel; var beaten; var best_now;
+// setup screen
+var sc; var sc_taps; var sc_sum; var sc_flash;
+
+table lane_btn = { 4, 3, 32, 16 };                 // LEFT, DOWN or UP, B, A
+table diff_name = { "EASY", "NORMAL", "HARD", "EXPERT" };
+table star_str = { "*", "**", "***", "****" };
+
+// ------------------------------------------------------------------------------------------------- text helpers
+func slen(s) { var n = 0; while (peek8(s + n) != 0) { n++; } return n; }
+func ctext(row, s) { text(10 - (slen(s) >> 1), row, s); }
+func ptext(pal, col, row, s) { text_pal = pal; text(col, row, s); text_pal = 0; }
+func pctext(pal, row, s) { text_pal = pal; ctext(row, s); text_pal = 0; }
+func bigidx(c) {
+  var i = 0;
+  var s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?-";
+  while (peek8(s + i) != 0) { if (peek8(s + i) == c) { return i; } i++; }
+  return 37;
+}
+func big_cells(col, row, c, pal) {         // a 16x16 letter in the background
+  var t = T_GFX + bigidx(c) * 4;
+  set_cell(col, row, t | (pal << 12));
+  set_cell(col + 1, row, (t + 1) | (pal << 12));
+  set_cell(col, row + 1, (t + 2) | (pal << 12));
+  set_cell(col + 1, row + 1, (t + 3) | (pal << 12));
+}
+func big_text(col, row, s, pal) { var i = 0; while (peek8(s + i) != 0) { big_cells(col + i * 2, row, peek8(s + i), pal); i++; } }
+func big_ctext(row, s, pal) { big_text(10 - slen(s), row, s, pal); }
+func big_spr(x, y, s, pal) {               // big letters as sprites, centred on x
+  var n = slen(s);
+  var x0 = x - n * 8;
+  for (var i = 0; i < n; i++) { spr(x0 + i * 16, y, T_GFX + bigidx(peek8(s + i)) * 4, SPR_16X16 | pal); }
+}
+func ctext_spr(x, y, s, pal) { spr_text(x - slen(s) * 4, y, s, pal); }
+
+// ------------------------------------------------------------------------------------------------- sound
+// Every channel plays a decaying "pluck": hz, volume, duty and how many frames per volume step.
+var ch_hz[4]; var ch_vol[4]; var ch_duty[4]; var ch_dec[4]; var ch_cnt[4]; var ch_on[4];
+func ch_play(ch, hz, vol, duty, dec) {
+  ch_hz[ch] = hz; ch_vol[ch] = vol; ch_duty[ch] = duty; ch_dec[ch] = dec; ch_cnt[ch] = dec; ch_on[ch] = 1;
+  if (audio_hold[ch] == 0) { tone(ch, hz, vol, duty); }
+}
+func ch_update() {
+  for (var c = 0; c < 3; c++) {
+    if (ch_on[c] == 0) { continue; }
+    if (audio_hold[c] > 0) { continue; }
+    ch_cnt[c]--;
+    if (ch_cnt[c] <= 0) {
+      ch_cnt[c] = ch_dec[c];
+      ch_vol[c]--;
+      if (ch_vol[c] <= 0) { ch_on[c] = 0; tone_off(c); continue; }
+    }
+    tone(c, ch_hz[c], ch_vol[c], ch_duty[c]);
+  }
+}
+// drums on the noise channel: 1 kick, 2 snare, 3 hat, 4 crash, 5 click
+var dr_kind; var dr_t;
+table dr_len = { 0, 7, 8, 3, 18, 4 };
+table dr_h0 = { 0, 420, 2600, 11000, 6000, 4200 };
+table dr_h1 = { 0, 60, 2000, 11000, 6000, 4200 };
+table dr_v = { 0, 13, 11, 6, 9, 12 };
+func drum_play(k) { dr_kind = k; dr_t = 0; }
+func drum_update() {
+  if (dr_kind == 0) { return; }
+  if (audio_hold[3] > 0) { dr_kind = 0; return; }
+  var len = dr_len[dr_kind];
+  if (dr_t >= len) { tone_off(3); dr_kind = 0; return; }
+  var hz = dr_h0[dr_kind] + ((dr_h1[dr_kind] - dr_h0[dr_kind]) * dr_t) / len;
+  tone(3, hz, (dr_v[dr_kind] * (len - dr_t)) / len + 1, 0);
+  dr_t++;
+}
+func audio_stop() {
+  for (var c = 0; c < 4; c++) { ch_on[c] = 0; tone_off(c); }
+  dr_kind = 0;
+}
+func audio_tick() { ch_update(); drum_update(); sfx_update(); }
+
+// one step of the backing band (and the lead too when `seq_auto`): bytes per step are lanes, lead, arp, bass, drums
+func sd(k) { select_bank(sbank); return peek8(sb + k); }      // one byte of the song data; always selects the song's bank first
+func seq_step(s) {
+  var p = s * 5;
+  var ar = sd(p + 2); var bs = sd(p + 3); var dm = sd(p + 4);
+  if (ar != 0) { ch_play(1, mus_hz[ar], 5, 1, (sf >> 1) + 1); }
+  if (bs != 0) { ch_play(2, mus_hz[bs], 12, 0, sf); }
+  if (dm != 0 && audio_hold[3] == 0) {
+    if ((dm & 8) != 0) { drum_play(4); }
+    else if ((dm & 1) != 0) { drum_play(1); }
+    else if ((dm & 2) != 0) { drum_play(2); }
+    else { drum_play(3); }
+  }
+  if (seq_auto != 0) {
+    var ld = sd(p + 1);
+    if (ld != 0) { ch_play(0, mus_hz[ld], 9, 2, 3); }
+  }
+}
+// menu music: loop the first `lim` steps of a song with the lead played for you
+func seq_start(id, lim) {
+  audio_stop();
+  sb = song_base(id); sf = song_sf[id];
+  st = -1; pstep = 0; seq_lim = lim; seq_auto = 1;
+}
+func seq_menu() {
+  st++;
+  if (pstep < seq_lim && st == pstep * sf) { seq_step(pstep); pstep++; }
+  if (pstep >= seq_lim && st >= seq_lim * sf) { st = -1; pstep = 0; }
+}
+
+// ------------------------------------------------------------------------------------------------- save
+// word 0 magic, word 1 input offset; per song at 16 + 16 * i: best score, best combo, best accuracy, best grade (1 D .. 5 S), plays, full-combo flag
+func sv(i, off) { return save_get(16 + i * 16 + off); }
+func sv_set(i, off, v) { save_set(16 + i * 16 + off, v); }
+func load_save() {
+  cal = 0;
+  if (save_loaded() != 0 && save_valid() != 0 && save_get(0) == SAVE_MAGIC) { cal = save_get(2); }
+  else { save_clear(); }
+}
+func commit_save() { save_set(0, SAVE_MAGIC); save_set(2, cal); save_seal(); save_commit(); }
+
+// ------------------------------------------------------------------------------------------------- palettes
+func set_palettes() {
+  bg_pal(0, rgb(1,1,4), rgb(4,4,8), rgb(8,8,12), rgb(15,15,15));          // text and panels
+  bg_pal(1, rgb(0,2,1), rgb(2,6,3), rgb(1,4,2), rgb(6,15,8));             // lane 0 green
+  bg_pal(2, rgb(3,0,1), rgb(7,2,3), rgb(4,1,2), rgb(15,6,6));             // lane 1 red
+  bg_pal(3, rgb(3,2,0), rgb(7,6,1), rgb(4,3,0), rgb(15,14,4));            // lane 2 yellow
+  bg_pal(4, rgb(0,1,4), rgb(2,4,9), rgb(1,2,6), rgb(6,9,15));             // lane 3 blue
+  bg_pal(5, rgb(1,1,4), rgb(0,2,8), rgb(3,6,12), rgb(7,10,15));           // label text, blue letters
+  bg_pal(6, rgb(1,1,4), rgb(7,3,0), rgb(15,9,1), rgb(15,15,6));           // gold
+  bg_pal(7, rgb(1,1,4), rgb(6,0,1), rgb(12,2,2), rgb(15,5,5));            // red
+  obj_pal(0, 0, rgb(0,5,1), rgb(2,12,3), rgb(9,15,9));
+  obj_pal(1, 0, rgb(6,0,0), rgb(14,2,2), rgb(15,10,9));
+  obj_pal(2, 0, rgb(6,4,0), rgb(14,12,1), rgb(15,15,9));
+  obj_pal(3, 0, rgb(0,1,7), rgb(3,6,15), rgb(10,12,15));
+  obj_pal(4, 0, rgb(7,3,0), rgb(15,9,1), rgb(15,15,6));                   // gold: PERFECT, sparks, countdown
+  obj_pal(5, 0, rgb(0,3,5), rgb(2,10,13), rgb(8,15,15));                  // cyan: GOOD
+  obj_pal(6, 0, rgb(6,0,0), rgb(12,1,1), rgb(15,6,5));                    // red: MISS
+  obj_pal(7, 0, rgb(3,3,6), rgb(7,7,10), rgb(14,14,15));                  // grey: beat lines, missed notes
+  fade_save();
+}
+
+// ------------------------------------------------------------------------------------------------- drawing: screens
+func clear_screen() {
+  clear_bg(); clear_win();
+  scroll(0, 0);
+  hide_all_sprites();
+  spr_end();
+  lcd(LCD_BG | LCD_OBJ);
+}
+func draw_lab(col, row, lane) {          // lane label under the highway: 2 cells, in the lane's palette
+  var t = T_GFX + gfx_lab_L + lane * 2;
+  var p = (lane + 1) << 12;
+  set_cell(col, row, t | p); set_cell(col + 1, row, (t + 1) | p);
+}
+func draw_highway() {
+  for (var r = 0; r < 18; r++) {
+    set_cell(5, r, T_EDGE_L); set_cell(14, r, T_EDGE_R);
+    for (var l = 0; l < 4; l++) {
+      var p = (l + 1) << 12;
+      if (r < 16) { set_cell(6 + l * 2, r, T_LANE_L | p); set_cell(7 + l * 2, r, T_LANE_R | p); }
+      else { set_cell(6 + l * 2, r, p); set_cell(7 + l * 2, r, p); }
+    }
+  }
+  for (var l = 0; l < 4; l++) { draw_lab(6 + l * 2, 16, l); }
+}
+func hud_labels() {
+  text_pal = 5;
+  text(0, 0, "SCORE"); text(0, 3, "BEST"); text(0, 6, "ROCK");
+  text(15, 0, "COMBO"); text(15, 3, "MULT"); text(15, 6, "ACC"); text(15, 9, "SONG"); text(15, 12, "PERF"); text(15, 15, "MISS");
+  text_pal = 0;
+}
+func draw_meter() {                       // 9 cells, bottom to top; red / yellow / green zones
+  var px = (meter * 72) / 100;
+  for (var i = 0; i < 9; i++) {
+    var f = clamp(px - i * 8, 0, 8);
+    var pal = 2;                            // red, yellow, green zones use the lane palettes
+    if (i >= 3) { pal = 3; }
+    if (i >= 6) { pal = 1; }
+    set_cell(2, 15 - i, (T_METER + f) | (pal << 12));
+  }
+}
+func song_pct() { return clamp(st / max(1, (nst * sf) / 100), 0, 100); }
+func mult_of(c) { return 1 + min(c / 10, 3); }
+func acc_now() {
+  var n = nperf + ngood + nmiss;
+  if (n == 0) { return 100; }
+  return udiv(nperf * 100 + ngood * 70, n);
+}
+func pct(col, row, n) {
+  print_u(col, row, n);
+  text(col + (n >= 100 ? 3 : (n >= 10 ? 2 : 1)), row, "%");
+}
+func hud_update() {
+  if ((hud & 1) != 0) {
+    print_u(0, 1, score);
+    if (beaten == 0 && best_now > 0 && ugt(score, best_now)) { beaten = 1; ptext(6, 0, 3, "NEW!"); }
+  }
+  if ((hud & 2) != 0) { print_u(15, 1, combo); text(15, 4, "X"); print_u(16, 4, mult_of(combo)); }
+  if ((hud & 4) != 0) { draw_meter(); }
+  if ((hud & 8) != 0) { pct(15, 7, acc_now()); print_u(15, 13, nperf); print_u(15, 16, nmiss); }
+  if ((hud & 16) != 0) {
+    pct(15, 10, song_pct());
+    ptext(meter < 25 && ((st >> 4) & 1) != 0 ? 7 : 5, 0, 6, "ROCK");      // the label blinks red when the crowd is about to leave
+  }
+  hud = 0;
+}
+func draw_play_screen() {
+  clear_screen();
+  draw_highway();
+  hud_labels();
+  best_now = sv(cur, 0); beaten = 0;
+  print_u(0, 4, best_now);
+  hud = 31;
+  hud_update();
+}
+
+// ------------------------------------------------------------------------------------------------- the song
+func lane_next(l, from) {                  // the next step at or after `from` with a note in lane l
+  select_bank(sbank);
+  var p = sb + from * 5;
+  for (var s = from; s < nst; s++) {
+    if (((peek8(p) >> l) & 1) != 0) { return s; }
+    p += 5;
+  }
+  return 9999;
+}
+func start_song(id) {
+  audio_stop();
+  cur = id;
+  sb = song_base(id); sf = song_sf[id]; nst = song_steps[id]; wp = song_wp[id]; wg = song_wg[id]; pen = song_pen[id];
+  total = song_notes[id];
+  fill(done, 0, 672); fill(missd, 0, 672);
+  for (var l = 0; l < 4; l++) { nxt[l] = lane_next(l, 0); lit[l] = 0; }
+  score = 0; combo = 0; maxcombo = 0; nperf = 0; ngood = 0; nmiss = 0; meter = song_m0[id];
+  jkind = 0; jtime = 0; ov_t = 0; rc = 0; hud = 31;
+  for (var i = 0; i < 8; i++) { sp_t[i] = 0; }
+  seq_auto = 0; seq_lim = nst; pstep = 0;
+  st = -sf * 16 - 1;
+}
+func spark(l, pal) {
+  for (var i = 0; i < 3; i++) {
+    var n = sp_n; sp_n = (sp_n + 1) & 7;
+    sp_x[n] = LANE_X + l * 16 + 4 + rand(5) - 2; sp_y[n] = HIT_Y + 4;
+    sp_vx[n] = rand(3) - 1; sp_vy[n] = -3 - rand(2); sp_t[n] = 14; sp_p[n] = pal;
+  }
+}
+func do_miss(l) {
+  var k = nxt[l];
+  done[k] = done[k] | (1 << l); missd[k] = missd[k] | (1 << l);
+  nmiss++; combo = 0; meter = max(0, meter - pen);
+  jkind = 3; jtime = 22; jdir = 0;
+  ch_play(0, 85, 9, 3, 1);                // the dropped note: a dull thud
+  nxt[l] = lane_next(l, k + 1);
+  hud = hud | 15;
+}
+func do_hit(l, k, dt) {
+  var perfect = abs(dt) <= wp;
+  done[k] = done[k] | (1 << l);
+  combo++;
+  if (combo > maxcombo) { maxcombo = combo; }
+  var m = mult_of(combo);
+  if (perfect) { nperf++; score += 10 * m; meter = min(100, meter + 2); jkind = 1; spark(l, 4); }
+  else { ngood++; score += 6 * m; meter = min(100, meter + 1); jkind = 2; spark(l, 5); }
+  jtime = 22; jdir = 0;
+  if (!perfect) { jdir = dt < 0 ? -1 : 1; }
+  var pitch = sd(k * 5 + 1);
+  ch_play(0, mus_hz[pitch], perfect ? 12 : 9, 2, 3);
+  lit[l] = 5;
+  nxt[l] = lane_next(l, k + 1);
+  hud = hud | 15;
+  if (combo == 10 || combo == 25 || combo == 50 || combo == 100 || combo == 200) { ov_s = "COMBO!"; ov_t = 40; }
+}
+func stray(l) {
+  if (st < 0) { return; }                   // pressing during the count-in costs nothing
+  combo = 0; meter = max(0, meter - 1);
+  ch_play(0, 70, 7, 3, 1);
+  hud = hud | 14;
+}
+func judge(l) {
+  var k = nxt[l];
+  if (k >= nst) { stray(l); return; }
+  var dt = st - cal - k * sf;
+  if (dt < -wg) {
+    if (dt < -(wg + 10)) { stray(l); } else { lit[l] = 3; }
+    return;
+  }
+  do_hit(l, k, dt);
+}
+
+// the count-in: four clicks, then GO on the first note
+func count_in() {
+  var bf = sf * 4;
+  if ((-st) % bf != 0) { return; }
+  var n = (-st) / bf;
+  drum_play(5);
+  if (n == 4) { ov_s = "READY"; ov_t = bf; }
+  if (n == 3) { ov_s = "3"; ov_t = bf; }
+  if (n == 2) { ov_s = "2"; ov_t = bf; }
+  if (n == 1) { ov_s = "1"; ov_t = bf; }
+}
+
+func draw_play() {
+  spr_begin(0);
+  // overlay words and the judgement come first so they sit on top
+  if (ov_t > 0) { ov_t--; if (slen(ov_s) > 3) { ctext_spr(LANE_X + 32, 40, ov_s, 4); } else { big_spr(LANE_X + 32, 36, ov_s, 4); } }
+  if (jtime > 0) {
+    jtime--;
+    if (jkind == 1) { ctext_spr(LANE_X + 32, 72, "PERFECT", 4); }
+    if (jkind == 2) {
+      ctext_spr(LANE_X + 32, 72, "GOOD", 5);
+      if (jdir < 0) { ctext_spr(LANE_X + 32, 82, "EARLY", 7); }
+      if (jdir > 0) { ctext_spr(LANE_X + 32, 82, "LATE", 7); }
+    }
+    if (jkind == 3) { ctext_spr(LANE_X + 32, 72, "MISS", 6); }
+  }
+  for (var i = 0; i < 8; i++) {
+    if (sp_t[i] > 0) {
+      spr(sp_x[i], sp_y[i], (sp_t[i] & 2) != 0 ? T_SPARK : T_SPARK2, sp_p[i]);
+      sp_x[i] = clamp(sp_x[i] + sp_vx[i], LANE_X, LANE_X + 56); sp_y[i] += sp_vy[i];
+      if ((sp_t[i] & 1) != 0) { sp_vy[i]++; }
+      sp_t[i]--;
+    }
+  }
+  // notes
+  var klo = st - 18;
+  if (klo < 0) { klo = 0; } else { klo = (klo + sf - 1) / sf; }
+  var khi = st + 64;
+  if (khi < 0) { khi = -1; } else { khi = khi / sf; if (khi >= nst) { khi = nst - 1; } }
+  for (var k = klo; k <= khi; k++) {
+    var m = sd(k * 5);
+    if (m == 0) { continue; }
+    var y = HIT_Y + (st - k * sf) * SPD;
+    for (var l = 0; l < 4; l++) {
+      if (((m >> l) & 1) == 0) { continue; }
+      var bit = 1 << l;
+      if ((done[k] & bit) == 0) { spr(LANE_X + l * 16, y, T_GEM, SPR_16X16 | l); }
+      else if ((missd[k] & bit) != 0) { spr(LANE_X + l * 16, y, T_GEM, SPR_16X16 | 7); }
+    }
+  }
+  // beat and bar lines
+  var bf = sf * 4;
+  var u = st - 20 + bf * 4;
+  if (u < 0) { u = 0; }
+  var b = u / bf - 4;
+  while (b * bf <= st + 64 && b * bf < nst * sf) {
+    var by = HIT_Y + (st - b * bf) * SPD;
+    var tl = (b & 3) == 0 ? T_BAR : T_BEAT;
+    spr(LANE_X, by - 8, tl, SPR_32X32 | 7);
+    spr(LANE_X + 32, by - 8, tl, SPR_32X32 | 7);
+    b++;
+  }
+  // receptors
+  var h = held();
+  for (var l = 0; l < 4; l++) {
+    var on = (h & lane_btn[l]) != 0 || lit[l] > 0;
+    if (lit[l] > 0) { lit[l]--; }
+    spr(LANE_X + l * 16, HIT_Y, on ? T_LIT : T_RING, SPR_16X16 | l);
+  }
+  spr_end();
+}
+
+func finish_song() {
+  audio_stop();
+  res_acc = acc_now();
+  var g = 1;
+  if (res_acc >= 55) { g = 2; }
+  if (res_acc >= 70) { g = 3; }
+  if (res_acc >= 85) { g = 4; }
+  if (res_acc >= 95) { g = 5; }
+  res_grade = g;
+  res_fc = nmiss == 0 ? 1 : 0;
+  res_new = ugt(score, sv(cur, 0)) ? 1 : 0;
+  goto_state(S_RESULT);
+}
+
+func play_frame() {
+  if (rc > 0) {                              // the 3-2-1 after a pause: the song clock stays still
+    rc--;
+    if (rc == 60) { drum_play(5); ov_s = "2"; ov_t = 30; }
+    if (rc == 30) { drum_play(5); ov_s = "1"; ov_t = 30; }
+    audio_tick(); draw_play(); return;
+  }
+  if (btnp(BTN_START)) { enter_pause(); return; }
+  st++;
+  if (pstep < nst && st == pstep * sf) { seq_step(pstep); pstep++; }
+  if (st < 0) { count_in(); }
+  if (st == 0) { ov_s = "GO!"; ov_t = 30; }
+  for (var l = 0; l < 4; l++) {
+    while (nxt[l] < nst && st - cal - nxt[l] * sf > wg) { do_miss(l); }
+  }
+  var pr = pressed();
+  for (var l = 0; l < 4; l++) { if ((pr & lane_btn[l]) != 0) { judge(l); } }
+  if ((st & 15) == 0) { hud = hud | 16; }
+  hud_update();
+  audio_tick();
+  draw_play();
+  if (meter <= 0) { goto_state(S_FAIL); return; }
+  if (st >= nst * sf + 40) { finish_song(); }
+}
+
+// ------------------------------------------------------------------------------------------------- pause
+func pause_panel() {
+  clear_win();
+  for (var c = 0; c < 20; c++) { set_wcell(c, 0, T_HLINE | (6 << 12)); }
+  text_pal = 6; wtext(7, 2, "PAUSED"); text_pal = 0;
+  wtext(7, 4, "RESUME"); wtext(7, 5, "RETRY"); wtext(7, 6, "QUIT");
+  text_pal = 5; wtext(3, 9, "START: RESUME"); text_pal = 0;
+}
+func pause_cursor() {
+  for (var i = 0; i < 3; i++) { wtext(5, 4 + i, i == pm_sel ? ">" : " "); }
+}
+func enter_pause() {
+  state = S_PAUSE; pm_sel = 0;
+  audio_stop();
+  spr_begin(0); spr_end();
+  pause_panel(); pause_cursor();
+  window_pos(0, 48);
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+  sfx_play(SFX_PAUSE);
+}
+func pause_frame() {
+  sfx_update();
+  if (btnp(BTN_UP)) { pm_sel = (pm_sel + 2) % 3; pause_cursor(); sfx_play(SFX_SELECT); }
+  if (btnp(BTN_DOWN)) { pm_sel = (pm_sel + 1) % 3; pause_cursor(); sfx_play(SFX_SELECT); }
+  var go = -1;
+  if (btnp(BTN_START) || btnp(BTN_B)) { go = 0; }
+  if (btnp(BTN_A)) { go = pm_sel; }
+  if (go < 0) { return; }
+  if (go == 0) {
+    lcd(LCD_BG | LCD_OBJ);
+    state = S_PLAY; rc = 90;
+    ov_s = "3"; ov_t = 30; drum_play(5);
+  }
+  if (go == 1) { sel = cur; goto_state(S_PLAY); }
+  if (go == 2) { goto_state(S_SELECT); }
+}
+
+// ------------------------------------------------------------------------------------------------- title
+var fall_x[8]; var fall_y[8];
+func draw_title() {
+  clear_screen();
+  big_text(6, 2, "FRET", 6);
+  big_text(6, 5, "RUSH", 7);
+  ptext(5, 4, 8, "A GUITAR GAME");
+  for (var l = 0; l < 4; l++) { draw_lab(6 + l * 2, 11, l); }
+  ptext(5, 3, 14, "SELECT: SETUP");
+  pctext(5, 16, "SCORES SAVED");
+  for (var i = 0; i < 8; i++) { fall_x[i] = (i & 1) == 0 ? ((i >> 1) & 1) * 8 : 136 + ((i >> 1) & 1) * 8; fall_y[i] = i * 22 - 20; }
+}
+func title_frame() {
+  seq_menu(); audio_tick();
+  spr_begin(0);
+  for (var i = 0; i < 8; i++) {
+    fall_y[i] += 1 + (i & 1);
+    if (fall_y[i] > 150) { fall_y[i] = -16; }
+    spr(fall_x[i], fall_y[i], T_GEM, SPR_16X16 | ((i + (fall_y[i] >> 6)) & 3));
+  }
+  spr_end();
+  text(5, 12, blink(tnow, 28) != 0 ? "PRESS START" : "           ");
+  if (btnp(BTN_START) || btnp(BTN_A)) { sfx_play(SFX_SELECT); goto_state(S_SELECT); }
+  if (btnp(BTN_SELECT)) { sfx_play(SFX_SELECT); goto_state(S_SETUP); }
+}
+
+// ------------------------------------------------------------------------------------------------- song select
+func draw_song(i) {                        // one row of the list
+  var r = 2 + i * 2;
+  text_pal = i == sel ? 6 : 0;
+  text(0, r, i == sel ? ">" : " ");
+  text(2, r, "            ");
+  text(2, r, song_name[i]);
+  text_pal = 5;
+  var g = sv(i, 6);
+  text(15, r, g == 0 ? " " : (g == 1 ? "D" : (g == 2 ? "C" : (g == 3 ? "B" : (g == 4 ? "A" : "S")))));
+  text_pal = 6;
+  text(16, r, "    ");
+  text(16, r, star_str[song_stars[i] - 1]);
+  text_pal = 0;
+}
+func draw_detail() {                       // the chosen song's details
+  var g = sv(sel, 6);
+  text_pal = 5;
+  text(1, 11, "                  ");
+  print_u(1, 11, song_bpm[sel]); text(5, 11, "BPM"); text(10, 11, diff_name[song_stars[sel] - 1]);
+  text(1, 12, "NOTES"); text(1, 13, "BEST"); text(1, 14, "COMBO");
+  text_pal = 0;
+  print_u(7, 12, song_notes[sel]);
+  print_u(7, 13, sv(sel, 0));
+  print_u(7, 14, sv(sel, 2));
+  for (var c = 14; c < 18; c++) { set_cell(c, 12, 0); set_cell(c, 13, 0); set_cell(c, 14, 0); }
+  if (g != 0) {
+    text_pal = 5; text(14, 12, "GRADE"); text_pal = 0;
+    big_cells(15, 13, peek8("-DCBAS" + g), g >= 5 ? 6 : (g >= 3 ? 5 : 7));
+  }
+}
+func draw_select() {
+  clear_screen();
+  pctext(6, 0, "CHOOSE A SONG");
+  for (var i = 0; i < NSONGS; i++) { draw_song(i); }
+  for (var c = 0; c < 20; c++) { set_cell(c, 10, T_HLINE | (5 << 12)); }
+  draw_detail();
+  ptext(5, 1, 16, "SELECT: SETUP");
+  ptext(5, 1, 17, "A: PLAY   B: BACK");
+}
+func select_frame() {
+  seq_menu(); audio_tick();
+  var old = sel;
+  if (btnp(BTN_DOWN)) { sel = (sel + 1) % NSONGS; }
+  if (btnp(BTN_UP)) { sel = (sel + NSONGS - 1) % NSONGS; }
+  if (old != sel) { draw_song(old); draw_song(sel); draw_detail(); sfx_play(SFX_SELECT); seq_start(sel, 128); }
+  if (btnp(BTN_A) || btnp(BTN_START)) { sfx_play(SFX_POWER); goto_state(S_PLAY); }
+  if (btnp(BTN_B)) { sfx_play(SFX_BACK); goto_state(S_TITLE); }
+  if (btnp(BTN_SELECT)) { sfx_play(SFX_SELECT); goto_state(S_SETUP); }
+}
+
+// ------------------------------------------------------------------------------------------------- results
+table res_at = { 14, 24, 34, 44, 54, 64, 90, 104 };
+var res_i; var res_saved;
+func res_row(i) {
+  var r = 5 + i;
+  text_pal = 5;
+  if (i == 0) { text(2, r, "SCORE"); }
+  if (i == 1) { text(2, r, "MAX COMBO"); }
+  if (i == 2) { text(2, r, "PERFECT"); }
+  if (i == 3) { text(2, r, "GOOD"); }
+  if (i == 4) { text(2, r, "MISS"); }
+  if (i == 5) { text(2, r, "ACCURACY"); }
+  text_pal = 0;
+  if (i == 0) { print_u(13, r, score); }
+  if (i == 1) { print_u(13, r, maxcombo); }
+  if (i == 2) { print_u(13, r, nperf); }
+  if (i == 3) { print_u(13, r, ngood); }
+  if (i == 4) { print_u(13, r, nmiss); }
+  if (i == 5) { pct(13, r, res_acc); }
+  sfx_play(SFX_SELECT);
+}
+func res_reveal(i) {
+  if (i < 6) { res_row(i); }
+  if (i == 6) {
+    ptext(5, 2, 13, "GRADE");
+    big_cells(12, 12, peek8("-DCBAS" + res_grade), res_grade >= 5 ? 6 : (res_grade >= 3 ? 5 : 7));
+    sfx_play(res_grade >= 3 ? SFX_WIN : SFX_DEATH);
+  }
+  if (i == 7) {
+    if (res_fc != 0) { pctext(6, 15, "FULL COMBO!"); }
+    else if (res_new != 0) { pctext(6, 15, "NEW BEST!"); }
+    if (res_new != 0 || res_fc != 0) { sfx_play(SFX_POWER); }
+  }
+}
+func draw_result() {
+  clear_screen();
+  big_ctext(0, "RESULTS", 6);
+  pctext(5, 3, song_name[cur]);
+  res_t = 0; res_i = 0; res_saved = 0;
+}
+func result_frame() {
+  res_t++;
+  sfx_update();
+  var skip = btnp(BTN_A) || btnp(BTN_START);
+  if (res_i < 8) {
+    if (skip) { while (res_i < 8) { res_reveal(res_i); res_i++; } res_t = res_at[7]; }   // jump to the end: draw the rest at once
+    else if (res_t >= res_at[res_i]) { res_reveal(res_i); res_i++; }
+    return;
+  }
+  if (res_saved == 0 && res_t >= res_at[7] + 8) {          // save the result: one commit, in a frame of its own
+    if (res_new != 0) { sv_set(cur, 0, score); }
+    if (maxcombo > sv(cur, 2)) { sv_set(cur, 2, maxcombo); }
+    if (res_acc > sv(cur, 4)) { sv_set(cur, 4, res_acc); }
+    if (res_grade > sv(cur, 6)) { sv_set(cur, 6, res_grade); }
+    sv_set(cur, 8, sv(cur, 8) + 1);
+    if (res_fc != 0) { sv_set(cur, 10, 1); }
+    commit_save();
+    res_saved = 1;
+    ptext(5, 1, 17, "A: RETRY   B: SONGS");
+    return;
+  }
+  if (res_saved != 0) {
+    if (skip) { sel = cur; goto_state(S_PLAY); }
+    if (btnp(BTN_B)) { goto_state(S_SELECT); }
+  }
+}
+
+// ------------------------------------------------------------------------------------------------- fail
+func draw_fail() {
+  clear_screen();
+  big_ctext(3, "FAILED", 7);
+  pctext(5, 7, "THE CROWD LEFT");
+  text(3, 9, "SCORE"); print_u(10, 9, score);
+  text(3, 10, "PROGRESS"); pct(12, 10, song_pct());
+  ptext(5, 1, 14, "A: RETRY   B: SONGS");
+  fail_t = 0;
+}
+func fail_frame() {
+  fail_t++;
+  sfx_update();
+  if (fail_t == 4) { sfx_play(SFX_DEATH); }
+  if (fail_t > 20) {
+    if (btnp(BTN_A) || btnp(BTN_START)) { sel = cur; goto_state(S_PLAY); }
+    if (btnp(BTN_B)) { goto_state(S_SELECT); }
+  }
+}
+
+// ------------------------------------------------------------------------------------------------- setup: input offset
+func setup_show() {
+  text(2, 5, "<");
+  text(4, 5, cal < 0 ? "-" : "+");
+  print_u(5, 5, abs(cal));
+  text(7, 5, "FRAMES LATE");
+  text(19, 5, ">");
+  text(1, 13, "TAPS"); print_u(6, 13, sc_taps);
+}
+func draw_setup() {
+  clear_screen();
+  big_ctext(0, "SETUP", 6);
+  text(2, 3, "INPUT OFFSET");
+  text_pal = 5;
+  text(0, 7, "TAP A WITH THE CLICK.");
+  text(0, 8, "8 TAPS MEASURE YOUR");
+  text(0, 9, "DELAY. LEFT AND RIGHT");
+  text(0, 10, "FINE-TUNE IT.");
+  text(1, 16, "B: SAVE AND BACK");
+  text_pal = 0;
+  sc = 0; sc_taps = 0; sc_sum = 0; sc_flash = 0;
+  setup_show();
+}
+func setup_frame() {
+  sc++;
+  sfx_update(); drum_update();
+  if (sc % 36 == 0) { drum_play(5); sc_flash = 6; }
+  spr_begin(0);
+  if (sc_flash > 0) { sc_flash--; spr(72, 108, T_LIT, SPR_16X16 | 4); } else { spr(72, 108, T_RING, SPR_16X16 | 4); }
+  spr_end();
+  if (btnp(BTN_A)) {
+    var ph = sc % 36;
+    var d = ph < 18 ? ph : ph - 36;
+    sc_sum += d; sc_taps++;
+    if (sc_taps >= 8) {
+      cal = clamp(sc_sum / 8, -9, 9);
+      sc_taps = 0; sc_sum = 0;
+      sfx_play(SFX_POWER);
+    }
+    setup_show();
+  }
+  if (btnp(BTN_RIGHT)) { cal = min(cal + 1, 9); setup_show(); sfx_play(SFX_SELECT); }
+  if (btnp(BTN_LEFT)) { cal = max(cal - 1, -9); setup_show(); sfx_play(SFX_SELECT); }
+  if (btnp(BTN_B) || btnp(BTN_START)) { commit_save(); sfx_play(SFX_BACK); goto_state(S_SELECT); }
+}
+
+// ------------------------------------------------------------------------------------------------- state changes
+func goto_state(s) {
+  pending = s;
+  fade_to(0, 3);
+}
+func enter(s) {
+  state = s;
+  lcd(LCD_BG | LCD_OBJ);
+  tnow = 0;
+  if (s == S_TITLE) { draw_title(); seq_start(TITLE_SONG, 256); }
+  if (s == S_SELECT) { draw_select(); seq_start(sel, 128); }
+  if (s == S_PLAY) { start_song(sel); draw_play_screen(); }
+  if (s == S_RESULT) { draw_result(); }
+  if (s == S_FAIL) { audio_stop(); draw_fail(); }
+  if (s == S_SETUP) { audio_stop(); draw_setup(); }
+}
+
+func init() {
+  master_volume(10);
+  load_font(0);
+  select_bank(bankof(art));
+  load_tiles(art, T_ART, art_COUNT);
+  load_tiles(gfx, T_GFX, gfx_COUNT);
+  set_palettes();
+  load_save();
+  hide_all_sprites();
+  fade_set(0);
+  enter(S_TITLE);
+  fade_to(4, 3);
+}
+
+func frame() {
+  tnow++;
+  fade_update();
+  if (pending >= 0) {
+    if (!fade_busy()) { var s = pending; pending = -1; enter(s); fade_to(4, 3); }
+    audio_tick();
+    return;
+  }
+  if (state == S_TITLE) { title_frame(); }
+  else if (state == S_SELECT) { select_frame(); }
+  else if (state == S_PLAY) {
+    if (fade_busy()) { draw_play(); } else { play_frame(); }
+  }
+  else if (state == S_PAUSE) { pause_frame(); }
+  else if (state == S_RESULT) { result_frame(); }
+  else if (state == S_FAIL) { fail_frame(); }
+  else if (state == S_SETUP) { setup_frame(); }
+}

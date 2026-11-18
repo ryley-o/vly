@@ -1,0 +1,714 @@
+// NINJA CHEF: a three-stage platformer. A ninja chef hunts the stolen ramen ingredients through a bamboo garden,
+// moonlit rooftops and a volcano kitchen, beats a boss in each, and cooks the dish at the end of every stage.
+//   D-pad move   A jump (hold = higher; scroll = double jump)   B throw a ninja star   START pause
+import "std/tunes";
+import "std/anim";
+import "std/sprites";
+import "std/fade";
+
+tileset gfx = "../assets/gfx.tiles";
+tileset bgx = "../assets/big.tiles";
+asset lvd1 bank 3 = incbin("../assets/lv1.bin");
+asset lvd2 bank 4 = incbin("../assets/lv2.bin");
+asset lvd3 bank 5 = incbin("../assets/lv3.bin");
+
+const T = 100;
+const TB = T + gfx_COUNT;
+const W = 240;
+const LVSIZE = 4080;
+const LOCK = (W - 20) * 8;           // camera position of the boss arena
+const ST_TITLE = 0; const ST_CARD = 1; const ST_PLAY = 2; const ST_PAUSE = 3; const ST_DEAD = 4; const ST_OVER = 5;
+const ST_COOK = 6; const ST_END = 7; const ST_LOAD = 8; const ST_FADE = 9;
+const GRAV = 64; const JUMPV = -1024; const MAXFALL = 1152; const ACC = 40; const FRIC = 56; const WALK = 384; const RUN = 576;
+
+byte lv[4080];
+var state; var nextst; var tick; var ld; var ldmode; var stt;
+var level; var unlocked = 1; var sel = 1; var best; var stars[3];
+var score; var score0; var lives; var hearts; var coins; var ings; var chili; var hasscroll;
+var px; var py; var fx; var fy; var vx; var vy; var face; var grounded; var coyote; var jbuf; var djump; var cut;
+var inv; var hurtt; var stop; var shoot_cd; var cam; var shake; var safe_x; var safe_y; var cpcol; var dt; var lastvy;
+var lo; var hi; var hud_dirty; var warn;
+var ek[8]; var ex[8]; var ey[8]; var evx[8]; var evy[8]; var efy[8]; var et[8]; var ehp[8]; var edir[8];
+var pon[4]; var pxx[4]; var pyy[4]; var pvx[4]; var pvy[4];
+var kon[2]; var kx[2]; var ky[2]; var kd[2];
+var pfx[4]; var pfy[4]; var pft[4];
+var bon; var bk; var bx; var by; var bvx; var bvy; var bfy; var bhp; var bmax; var bst; var bt; var binv; var bdir; var bdead; var bclock;
+
+table cellv = {
+  T + gfx_sky + (1 << 12), T + gfx_grass + (2 << 12), T + gfx_dirt + (2 << 12), T + gfx_brick + (3 << 12),
+  T + gfx_wood + (3 << 12), T + gfx_spikes + (5 << 12), T + gfx_lava_a + (5 << 12), T + gfx_coin_a + (4 << 12),
+  T + gfx_ing_egg + (6 << 12), T + gfx_pw_chili + (6 << 12), T + gfx_pw_scroll + (6 << 12), T + gfx_pw_rice + (6 << 12),
+  T + gfx_cp_a + (7 << 12), T + gfx_bamboo1 + (1 << 12), T + gfx_bamboo2 + (1 << 12), T + gfx_lantern + (1 << 12),
+  T + gfx_cp_b + (7 << 12)
+};
+table sname = { "BAMBOO GARDEN", "MOONLIT ROOFTOPS", "VOLCANO KITCHEN" };
+table bname = { "BIG DAIKON", "TENGU CROW CHEF", "ONI MASTER CHEF" };
+table iname = { "EGGS", "MUSHROOMS", "NARUTO" };
+table dname = { "TAMAGO ROLL", "MUSHROOM TEMPURA", "DRAGON RAMEN" };
+
+func slen(s) { var n = 0; while (peek8(s + n) != 0) { n++; } return n; }
+func ctext(row, s) { text((20 - slen(s)) >> 1, row, s); }
+func bgp(p, a, b, c, d) { fade_bg[p * 4] = a; fade_bg[p * 4 + 1] = b; fade_bg[p * 4 + 2] = c; fade_bg[p * 4 + 3] = d; }
+func objp(p, a, b, c, d) { fade_obj[p * 4] = a; fade_obj[p * 4 + 1] = b; fade_obj[p * 4 + 2] = c; fade_obj[p * 4 + 3] = d; }
+
+// scene 0 = title and cards (black sky), 1..3 = the three stages
+func pals(s) {
+  bgp(0, rgb(0, 0, 0), rgb(14, 3, 3), rgb(15, 12, 2), rgb(15, 15, 15));
+  objp(0, 0, rgb(15, 15, 15), rgb(14, 4, 2), rgb(1, 2, 6));
+  objp(1, 0, rgb(15, 14, 11), rgb(11, 8, 5), rgb(3, 1, 1));
+  objp(2, 0, rgb(11, 15, 5), rgb(4, 11, 3), rgb(1, 4, 2));
+  objp(3, 0, rgb(12, 11, 15), rgb(6, 5, 11), rgb(1, 0, 3));
+  objp(4, 0, rgb(15, 14, 5), rgb(15, 7, 1), rgb(5, 1, 0));
+  objp(5, 0, rgb(15, 15, 15), rgb(10, 11, 13), rgb(15, 15, 15));   // white: stars, puffs, hit flash, banner text
+  if (s == 0) {
+    bgp(1, rgb(0, 0, 0), rgb(11, 15, 8), rgb(6, 12, 6), rgb(3, 7, 3));
+    bgp(2, rgb(0, 0, 0), rgb(8, 14, 3), rgb(10, 6, 2), rgb(3, 2, 1));
+    bgp(6, rgb(0, 0, 0), rgb(15, 14, 11), rgb(15, 6, 2), rgb(5, 2, 1));
+    objp(6, 0, rgb(15, 15, 14), rgb(5, 12, 3), rgb(2, 3, 2));
+    objp(7, 0, rgb(15, 15, 10), rgb(5, 6, 10), rgb(2, 2, 6));
+  }
+  if (s == 1) {
+    bgp(1, rgb(8, 12, 15), rgb(11, 15, 8), rgb(6, 12, 6), rgb(3, 7, 3));
+    bgp(2, rgb(8, 12, 15), rgb(8, 14, 3), rgb(10, 6, 2), rgb(3, 2, 1));
+    bgp(3, rgb(8, 12, 15), rgb(14, 11, 6), rgb(10, 6, 3), rgb(4, 2, 1));
+    bgp(4, rgb(8, 12, 15), rgb(15, 15, 9), rgb(15, 12, 2), rgb(7, 3, 0));
+    bgp(5, rgb(8, 12, 15), rgb(15, 15, 15), rgb(10, 10, 12), rgb(3, 3, 6));
+    bgp(6, rgb(8, 12, 15), rgb(15, 14, 11), rgb(15, 6, 2), rgb(5, 2, 1));
+    bgp(7, rgb(8, 12, 15), rgb(15, 15, 15), rgb(14, 3, 3), rgb(3, 1, 1));
+    objp(6, 0, rgb(15, 15, 14), rgb(5, 12, 3), rgb(2, 3, 2));
+    objp(7, 0, rgb(15, 14, 6), rgb(15, 15, 15), rgb(11, 13, 15));
+  }
+  if (s == 2) {
+    bgp(1, rgb(3, 3, 8), rgb(15, 13, 6), rgb(13, 6, 2), rgb(5, 2, 1));
+    bgp(2, rgb(3, 3, 8), rgb(8, 9, 13), rgb(6, 5, 10), rgb(1, 1, 4));
+    bgp(3, rgb(3, 3, 8), rgb(12, 9, 12), rgb(8, 5, 9), rgb(2, 1, 3));
+    bgp(4, rgb(3, 3, 8), rgb(15, 15, 9), rgb(15, 12, 2), rgb(7, 3, 0));
+    bgp(5, rgb(3, 3, 8), rgb(15, 15, 15), rgb(10, 10, 12), rgb(3, 3, 6));
+    bgp(6, rgb(3, 3, 8), rgb(15, 14, 11), rgb(15, 6, 2), rgb(5, 2, 1));
+    bgp(7, rgb(3, 3, 8), rgb(15, 15, 15), rgb(14, 3, 3), rgb(3, 1, 1));
+    objp(6, 0, rgb(15, 15, 12), rgb(8, 5, 12), rgb(2, 1, 4));
+    objp(7, 0, rgb(15, 15, 11), rgb(6, 5, 11), rgb(3, 2, 7));
+  }
+  if (s == 3) {
+    bgp(1, rgb(4, 1, 1), rgb(15, 12, 3), rgb(14, 5, 1), rgb(5, 1, 0));
+    bgp(2, rgb(4, 1, 1), rgb(12, 5, 2), rgb(7, 2, 1), rgb(2, 0, 0));
+    bgp(3, rgb(4, 1, 1), rgb(13, 10, 8), rgb(8, 5, 4), rgb(2, 1, 1));
+    bgp(4, rgb(4, 1, 1), rgb(15, 15, 9), rgb(15, 12, 2), rgb(7, 3, 0));
+    bgp(5, rgb(4, 1, 1), rgb(15, 14, 5), rgb(15, 7, 1), rgb(8, 1, 0));
+    bgp(6, rgb(4, 1, 1), rgb(15, 14, 11), rgb(15, 6, 2), rgb(5, 2, 1));
+    bgp(7, rgb(4, 1, 1), rgb(15, 15, 15), rgb(14, 3, 3), rgb(3, 1, 1));
+    objp(6, 0, rgb(15, 15, 15), rgb(14, 3, 2), rgb(3, 0, 1));
+    objp(7, 0, rgb(15, 9, 2), rgb(8, 3, 3), rgb(4, 1, 1));
+  }
+}
+
+// ---------------------------------------------------------------- level access
+func cell(tx, ty) {
+  if (tx < 0 || tx >= W) { return 1; }
+  if (ty < 0 || ty >= 17) { return 0; }
+  return lv[tx * 17 + ty];
+}
+func rect_solid(x, y, w, h) {
+  var tx1 = (x + w - 1) >> 3;
+  var ty1 = (y + h - 1) >> 3;
+  for (var ty = y >> 3; ty <= ty1; ty++) {
+    for (var tx = x >> 3; tx <= tx1; tx++) {
+      var c = cell(tx, ty);
+      if (c >= 1 && c <= 3) { return 1; }
+    }
+  }
+  return 0;
+}
+// a one-way plank: solid only for a body that enters its top pixel row from above
+func oneway(x, yb) {
+  if ((yb & 7) != 0) { return 0; }
+  var ty = yb >> 3;
+  return cell(x >> 3, ty) == 4 || cell((x + 7) >> 3, ty) == 4;
+}
+func floor_at(x, yb) { return rect_solid(x, yb, 1, 1) || oneway(x, yb); }
+func col_top(c) { for (var r = 0; r < 17; r++) { var k = cell(c, r); if (k >= 1 && k <= 3) { return r; } } return 13; }
+func cellof(c) {
+  if (c == 8) { return cellv[8] + level; }
+  if (c < 17) { return cellv[c]; }
+  return cellv[0];
+}
+func clear_cell(tx, ty) { lv[tx * 17 + ty] = 0; set_cell(tx & 31, ty, cellv[0]); }
+
+func spawn_enemy(kind, c, r) {
+  for (var i = 0; i < 8; i++) {
+    if (ek[i] == 0) {
+      ek[i] = kind; ex[i] = c * 8; ey[i] = r * 8; evx[i] = 0; evy[i] = 0; efy[i] = r * 8; edir[i] = -1; et[i] = 30 + rand(60); ehp[i] = 1;
+      if (kind == 4) { ehp[i] = 2; et[i] = rand(60); }
+      return;
+    }
+  }
+}
+func col_write(c) {
+  var s = c & 31;
+  for (var r = 0; r < 17; r++) {
+    var k = lv[c * 17 + r];
+    if (k >= 20) { spawn_enemy(k - 19, c, r); lv[c * 17 + r] = 0; k = 0; }
+    set_cell(s, r, cellof(k));
+  }
+}
+func stream_fill(n) {
+  var tgt = min((cam >> 3) + 25, W - 1);
+  while (hi < tgt && n > 0) { hi++; col_write(hi); n--; }
+}
+
+// ---------------------------------------------------------------- hud
+func put2(col, n) { set_wcell(col, 0, font_base + 16 + (n / 10) % 10); set_wcell(col + 1, 0, font_base + 16 + n % 10); }
+func draw_hud() {
+  hud_dirty = 0;
+  for (var i = 0; i < 5; i++) { set_wcell(i, 0, T + (i < hearts ? gfx_heart : gfx_heart_e)); }
+  if (bon) {
+    wtext(6, 0, "BOSS");
+    var n = (bhp * 5 + bmax - 1) / bmax;
+    if (bhp <= 0) { n = 0; }
+    for (var j = 0; j < 5; j++) { set_wcell(10 + j, 0, T + (j < n ? gfx_heart : gfx_heart_e)); }
+  } else {
+    set_wcell(5, 0, 0); set_wcell(6, 0, T + gfx_hud_coin); put2(7, coins % 100); set_wcell(9, 0, 0);
+    set_wcell(10, 0, T + gfx_hud_ing); set_wcell(11, 0, font_base + 16 + ings); set_wcell(12, 0, font_base + 15); set_wcell(13, 0, font_base + 21);
+    set_wcell(14, 0, 0);
+  }
+  set_wcell(15, 0, hasscroll ? T + gfx_pw_scroll : 0);
+  set_wcell(16, 0, chili > 0 ? T + gfx_pw_chili : 0);
+  set_wcell(17, 0, 0); set_wcell(18, 0, font_base + 88 - 32); set_wcell(19, 0, font_base + 16 + max(lives, 0));
+}
+
+// ---------------------------------------------------------------- effects and projectiles
+func puff(x, y) {
+  for (var i = 0; i < 4; i++) { if (pft[i] == 0) { pfx[i] = x; pfy[i] = y; pft[i] = 16; return; } }
+}
+func fire(x, y, dx, dy) {
+  for (var i = 0; i < 4; i++) { if (!pon[i]) { pon[i] = 1; pxx[i] = x; pyy[i] = y; pvx[i] = dx; pvy[i] = dy; return; } }
+}
+func add_score(n) { score = min(score + n, 30000); }
+
+func hurt(dirx) {
+  if (inv > 0 || state != ST_PLAY) { return; }
+  hearts--;
+  hud_dirty = 1;
+  if (hearts <= 0) { die(); return; }
+  inv = 90; stop = 3; hurtt = 10;
+  vx = dirx * 640; vy = -520; grounded = 0; fy = 0;
+  sfx_tone(1, 150, 13, 2, 10);
+}
+func die() {
+  state = ST_DEAD; dt = 50; vy = -900; vx = 0; stop = 0;
+  sfx_play(SFX_DEATH); music_mute(1);
+  hud_dirty = 1;
+}
+func pit_fall() {
+  hearts--;
+  hud_dirty = 1;
+  if (hearts <= 0) { die(); return; }
+  sfx_tone(1, 150, 13, 2, 10);
+  px = safe_x; py = safe_y; vx = 0; vy = 0; fx = 0; fy = 0; inv = 70; stop = 10;
+}
+
+func touch() {
+  var tx1 = (px + 11) >> 3; var ty1 = (py + 15) >> 3;
+  for (var ty = (py + 3) >> 3; ty <= ty1; ty++) {
+    for (var tx = (px + 4) >> 3; tx <= tx1; tx++) {
+      var c = cell(tx, ty);
+      if (c >= 5 && c <= 12) {
+        if (c == 7) { coins++; add_score(10); sfx_play(SFX_COIN); clear_cell(tx, ty); hud_dirty = 1; if (coins % 30 == 0) { lives = min(lives + 1, 9); sfx_play(SFX_POWER); } }
+        else if (c == 8) { ings++; add_score(500); sfx_play(SFX_WIN); clear_cell(tx, ty); hud_dirty = 1; puff(tx * 8, ty * 8); }
+        else if (c == 9) { chili = 600; sfx_play(SFX_POWER); clear_cell(tx, ty); hud_dirty = 1; }
+        else if (c == 10) { hasscroll = 1; djump = 1; sfx_play(SFX_POWER); clear_cell(tx, ty); hud_dirty = 1; }
+        else if (c == 11) { if (hearts < 5) { hearts++; } else { add_score(200); } sfx_play(SFX_POWER); clear_cell(tx, ty); hud_dirty = 1; }
+        else if (c == 12) { if (tx != cpcol) { cpcol = tx; sfx_play(SFX_SELECT); lv[tx * 17 + ty] = 16; set_cell(tx & 31, ty, cellv[16]); } }
+        else if (c == 5) { if (py + 15 >= ty * 8 + 3) { hurt(face ? 1 : -1); } }
+        else if (c == 6) { pit_fall(); return; }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- hero
+func hero_step() {
+  var dir = btn(BTN_RIGHT) - btn(BTN_LEFT);
+  var maxv = WALK;
+  if (chili > 0) { maxv = RUN; chili--; if (chili == 0) { hud_dirty = 1; } }
+  if (hurtt > 0) { hurtt--; }
+  else if (dir != 0) {
+    var acc = ACC;
+    if ((dir > 0 && vx < 0) || (dir < 0 && vx > 0)) { acc = 72; }
+    vx = clamp(vx + dir * acc, 0 - maxv, maxv);
+    face = dir < 0;
+  } else { vx = approach(vx, 0, FRIC); }
+  if (hurtt == 0) { vx = clamp(vx, 0 - maxv, maxv); }
+  if (btnp(BTN_A)) { jbuf = 6; }
+  if (jbuf > 0) { jbuf--; }
+  if (grounded) { coyote = 5; djump = hasscroll; } else if (coyote > 0) { coyote--; }
+  if (jbuf > 0 && coyote > 0) { vy = JUMPV; jbuf = 0; coyote = 0; grounded = 0; cut = 0; sfx_play(SFX_JUMP); }
+  else if (jbuf > 0 && djump > 0 && !grounded) { vy = -900; djump = 0; jbuf = 0; cut = 0; sfx_play(SFX_SELECT); puff(px + 4, py + 12); }
+  if (vy < 0 && !btn(BTN_A) && !cut) { vy = vy / 2; cut = 1; }
+  lastvy = vy;
+  vy = min(vy + GRAV, MAXFALL);
+  fx += vx;
+  var dx = fx >> 8;
+  fx = fx - (dx << 8);
+  while (dx != 0) {
+    var s = dx > 0 ? 1 : -1;
+    if (rect_solid(px + s + 4, py + 3, 8, 13)) { vx = 0; fx = 0; break; }
+    px += s; dx -= s;
+  }
+  if (px + 4 < cam) { px = cam - 4; vx = max(vx, 0); }
+  fy += vy;
+  var dy = fy >> 8;
+  fy = fy - (dy << 8);
+  while (dy != 0) {
+    var s2 = dy > 0 ? 1 : -1;
+    var blocked = rect_solid(px + 4, py + s2 + 3, 8, 13);
+    if (!blocked && s2 > 0) { blocked = oneway(px + 4, py + 15 + s2); }
+    if (blocked) { vy = 0; fy = 0; break; }
+    py += s2; dy -= s2;
+  }
+  var was = grounded;
+  grounded = rect_solid(px + 4, py + 16, 8, 1) || (vy >= 0 && oneway(px + 4, py + 16));
+  if (grounded && !was && lastvy > 500) { sfx_play(SFX_LAND); puff(px + 4, py + 12); }
+  if (grounded && floor_at(px - 2, py + 16) && floor_at(px + 17, py + 16) && px > cam + 8) { safe_x = px; safe_y = py; }
+  touch();
+  if (py > 116) { pit_fall(); }
+  // throw a ninja star
+  if (shoot_cd > 0) { shoot_cd--; }
+  if (btnp(BTN_B) && shoot_cd == 0) {
+    for (var i = 0; i < 2; i++) {
+      if (!kon[i]) { kon[i] = 1; kx[i] = face ? px - 2 : px + 10; ky[i] = py + 6; kd[i] = face ? -3 : 3; shoot_cd = 12; sfx_play(SFX_SHOOT); break; }
+    }
+  }
+  if (inv > 0) { inv--; }
+  // camera: small look-ahead, never moves backwards, at most 3 px a frame
+  var tgt = px - 72 + (vx >> 4);
+  if (tgt > cam) { cam = min(cam + min(tgt - cam, 3), LOCK); }
+}
+
+func knives_step() {
+  for (var i = 0; i < 2; i++) {
+    if (kon[i]) {
+      kx[i] += kd[i];
+      if (kx[i] < cam - 8 || kx[i] > cam + 160 || rect_solid(kx[i] + 2, ky[i] + 2, 4, 4)) { kon[i] = 0; puff(kx[i], ky[i]); }
+    }
+  }
+}
+
+func kill_enemy(i, by_stomp) {
+  puff(ex[i], ey[i] + 4);
+  ek[i] = 0;
+  add_score(100);
+  sfx_play(by_stomp ? SFX_HIT : SFX_EXPLODE);
+}
+
+func enemies_step() {
+  for (var i = 0; i < 8; i++) {
+    var k = ek[i];
+    if (k != 0) {
+      if (ex[i] < cam - 40) { ek[i] = 0; }
+      else if (ex[i] < cam + 172) {
+        if (k == 1) {                      // walker: patrols, turns at walls and ledges
+          if ((tick & 1) == 0) {
+            var nx = ex[i] + edir[i];
+            var front = nx + (edir[i] > 0 ? 14 : 1);
+            if (rect_solid(front, ey[i] + 4, 1, 8) || !floor_at(front, ey[i] + 16)) { edir[i] = 0 - edir[i]; } else { ex[i] = nx; }
+          }
+        } else if (k == 2) {               // hopper: waits, squats, then leaps at you
+          if (evy[i] == 0 && floor_at(ex[i] + 8, ey[i] + 16)) {
+            et[i]--;
+            if (et[i] <= 0) { evy[i] = -832; edir[i] = px > ex[i] ? 1 : -1; et[i] = 50 + rand(50); efy[i] = ey[i] << 8; ehp[i] = 99; }
+          } else {
+            ex[i] += edir[i];
+            efy[i] += evy[i]; evy[i] += GRAV;
+            ey[i] = efy[i] >> 8;
+            if (evy[i] > 0 && floor_at(ex[i] + 8, ey[i] + 16)) { ey[i] = (ey[i] + 7) & 0xFFF8; ey[i] = ((ey[i] + 16) & 0xFFF8) - 16; evy[i] = 0; ehp[i] = 1; }
+          }
+        } else if (k == 3) {               // crow: flies left in a wave
+          if ((tick & 1) == 0 || true) { ex[i]--; }
+          et[i]++;
+          ey[i] = efy[i] + (sin(et[i] * 4) * 12) / 256;
+        } else {                           // fire pot: flares, then spits a fireball at you
+          et[i]++;
+          if (et[i] == 120) { fire(ex[i] + 4, ey[i] + 6, px > ex[i] ? 2 : -2, 0); sfx_tone(3, 200, 9, 0, 6); }
+          if (et[i] >= 150) { et[i] = 0; }
+        }
+        if (ek[i] != 0 && inv == 0 && overlap(px + 4, py + 3, 8, 13, ex[i] + 2, ey[i] + 3, 12, 13)) {
+          if (vy > 0 && py + 10 < ey[i] + 3 && k != 4) { kill_enemy(i, 1); vy = -700; fy = 0; cut = 1; }
+          else { hurt(px + 8 < ex[i] + 8 ? -1 : 1); }
+        }
+        for (var j = 0; j < 2; j++) {
+          if (ek[i] != 0 && kon[j] && overlap(kx[j], ky[j], 8, 8, ex[i] + 2, ey[i] + 3, 12, 13)) {
+            kon[j] = 0;
+            ehp[i]--;
+            if (ehp[i] <= 0) { kill_enemy(i, 0); } else { sfx_play(SFX_HIT); puff(kx[j], ky[j]); }
+          }
+        }
+      }
+    }
+  }
+  for (var p = 0; p < 4; p++) {
+    if (pon[p]) {
+      pxx[p] += pvx[p]; pyy[p] += pvy[p];
+      if (pxx[p] < cam - 8 || pxx[p] > cam + 168 || pyy[p] > 140 || rect_solid(pxx[p] + 2, pyy[p] + 2, 4, 4)) { pon[p] = 0; }
+      else if (inv == 0 && overlap(px + 4, py + 3, 8, 13, pxx[p] + 1, pyy[p] + 1, 6, 6)) { pon[p] = 0; hurt(pvx[p] > 0 ? 1 : -1); }
+    }
+  }
+  for (var q = 0; q < 4; q++) { if (pft[q] > 0) { pft[q]--; } }
+}
+
+// ---------------------------------------------------------------- bosses
+func boss_spawn() {
+  bon = 1; bk = level; bx = LOCK + 176; bvx = 0; bvy = 0; bfy = 0; bst = 0; bt = 0; binv = 0; bdir = -1; bdead = 0; warn = 100;
+  by = 72; bhp = 6; bmax = 6;
+  if (bk == 1) { by = 40; bhp = 8; bmax = 8; }
+  if (bk == 2) { bhp = 12; bmax = 12; }
+  tune_play(TUNE_BOSS);
+  hud_dirty = 1;
+}
+func boss_hit(n) {
+  if (binv > 0 || bst == 0 || bdead > 0) { return; }
+  bhp -= n; binv = 30; sfx_play(SFX_HIT); hud_dirty = 1;
+  if (bhp <= 0) { bhp = 0; bdead = 120; sfx_play(SFX_EXPLODE); add_score(2000); music_stop_all(); }
+}
+func boss_step() {
+  if (binv > 0) { binv--; }
+  if (bdead > 0) {
+    bdead--;
+    if ((bdead & 7) == 0) { puff(bx + rand(24), by + rand(28)); sfx_play(SFX_EXPLODE); }
+    if (bdead == 0) { sfx_play(SFX_WIN); go(ST_COOK); }
+    return;
+  }
+  if (warn > 0) { warn--; if ((warn & 15) == 0) { sfx_tone(1, 500 + (warn & 16) * 20, 11, 2, 8); } }
+  var toward = px > bx + 12 ? 1 : -1;
+  if (bst == 0) { bx--; if (bx <= LOCK + 104) { bst = 1; bt = 50; } return; }
+  if (bk == 0) {
+    if (bst == 1) { if ((tick & 1) == 0) { bx += toward; } bt--; if (bt <= 0) { bst = 2; bt = 22; } }
+    else if (bst == 2) { bt--; if (bt <= 0) { bst = 3; bvy = -1100; bfy = by << 8; bdir = toward; sfx_play(SFX_JUMP); } }
+    else {
+      bx += bdir * (bhp <= 3 ? 2 : 1);
+      bfy += bvy; bvy += GRAV; by = bfy >> 8;
+      if (bvy > 0 && by >= 72) {
+        by = 72; bst = 1; bt = bhp <= 3 ? 25 : 55; shake = 8; sfx_play(SFX_LAND);
+        if (bhp <= 3) { fire(bx + 4, 98, -2, 0); fire(bx + 20, 98, 2, 0); }
+      }
+    }
+    bx = clamp(bx, LOCK + 8, LOCK + 120);
+  } else if (bk == 1) {
+    bclock++;
+    if (bst == 1) {
+      bx += bdir; if (bx < LOCK + 8 || bx > LOCK + 120) { bdir = 0 - bdir; }
+      by = 40 + (sin(bclock * 3) * 10) / 256;
+      if (bclock % (bhp <= 4 ? 50 : 75) == 0) { fire(bx + 12, by + 26, 0, 2); sfx_tone(3, 300, 9, 0, 5); }
+      if (bhp <= 4 && bclock % 220 == 150) { bst = 2; bt = 30; }
+    } else if (bst == 2) {
+      bt--; if (bx + 12 < px) { bx += 2; } else if (bx + 12 > px + 8) { bx -= 2; }
+      if (bt <= 0) { bst = 3; }
+    } else if (bst == 3) { by += 3; if (by >= 72) { by = 72; bst = 4; bt = 40; shake = 6; sfx_play(SFX_LAND); } }
+    else { bt--; if (bt <= 0) { by -= 2; if (by <= 42) { bst = 1; } } }
+    bx = clamp(bx, LOCK + 8, LOCK + 120);
+  } else {
+    if (bst == 1) {
+      if ((tick & 3) != 0 && (bhp <= 4 || (tick & 1) == 0)) { bx += toward; }
+      bt++;
+      if (bt > (bhp <= 4 ? 45 : 70)) { bst = 2; bt = 22; }
+    } else if (bst == 2) {
+      bt--;
+      if (bt <= 0) {
+        if (bhp <= 4) { fire(bx + 4, 94, -2, 0); fire(bx + 4, 80, -2, 0); fire(bx + 20, 94, 2, 0); }
+        else { fire(bx + 12, 94, toward * 2, 0); }
+        sfx_tone(3, 200, 10, 0, 8);
+        if (bhp <= 8 && rand(2) == 0) { bst = 3; bvy = -1200; bfy = by << 8; bdir = toward; sfx_play(SFX_JUMP); }
+        else { bst = 1; bt = 0; }
+      }
+    } else {
+      bx += bdir; bfy += bvy; bvy += GRAV; by = bfy >> 8;
+      if (bvy > 0 && by >= 72) { by = 72; bst = 1; bt = 0; shake = 8; sfx_play(SFX_LAND); fire(bx + 4, 98, -2, 0); fire(bx + 20, 98, 2, 0); }
+    }
+    bx = clamp(bx, LOCK + 8, LOCK + 120);
+  }
+  if (bdead == 0 && bst > 0) {
+    if (inv == 0 && overlap(px + 4, py + 3, 8, 13, bx + 4, by + 4, 24, 28)) {
+      if (vy > 0 && py + 10 < by + 6 && binv == 0) { boss_hit(2); vy = -800; fy = 0; cut = 1; }
+      else { hurt(px + 8 < bx + 16 ? -1 : 1); }
+    }
+    for (var j = 0; j < 2; j++) {
+      if (kon[j] && overlap(kx[j], ky[j], 8, 8, bx + 4, by + 4, 24, 28)) { kon[j] = 0; puff(kx[j], ky[j]); boss_hit(1); }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- drawing
+func dspr(x, y, tile, attr) {
+  var sx = x - cam;
+  if (sx > -32 && sx < 160) { spr(sx, y, tile, attr); }
+}
+func banner(x, y, s) {
+  var i = 0; var c = peek8(s);
+  while (c != 0) { if (c != 32) { sprite(i, x + i * 8, y, font_base + c - 32, 5); } else { hide_sprite(i); } i++; c = peek8(s + i); }
+  while (i < 8) { hide_sprite(i); i++; }
+}
+func banner_off() { for (var i = 0; i < 8; i++) { hide_sprite(i); } }
+func draw_back() {
+  // slow parallax: sun or moon fixed in the sky, three clouds at half the camera speed
+  spr(124, 10, TB + bgx_sun, SPR_16X16 | SPR_BEHIND | 7);
+  for (var i = 0; i < 3; i++) {
+    var cx = ((i * 83 + 20 - (cam >> 1)) & 255) - 48;
+    if (cx > -16 && cx < 160) { spr(cx, 14 + i * 13, TB + bgx_cloud, SPR_16X16 | SPR_BEHIND | 7); }
+  }
+}
+func draw_play() {
+  spr_begin(8);
+  var hide = (inv > 0 && (inv & 4) != 0 && state == ST_PLAY) || py > 118;
+  if (!hide) {
+    var ht = T + gfx_hero_idle;
+    if (state == ST_DEAD || hurtt > 4) { ht = T + gfx_hero_hurt; }
+    else if (!grounded) { ht = T + gfx_hero_jump; }
+    else if (abs(vx) > 100) { ht = anim_frame(tick, 2, 6) == 0 ? T + gfx_hero_walk1 : T + gfx_hero_walk2; }
+    var pal = 0;
+    if (chili > 0 && (chili > 120 || (tick & 4) != 0)) { pal = 4; }
+    spr(px - cam, py, ht, SPR_16X16 | pal | (face ? SPR_FLIPX : 0));
+  }
+  for (var i = 0; i < 8; i++) {
+    var k = ek[i];
+    if (k != 0) {
+      if (k == 1) { dspr(ex[i], ey[i], anim_frame(tick, 2, 8) == 0 ? T + gfx_walker_a : T + gfx_walker_b, SPR_16X16 | 1); }
+      else if (k == 2) { dspr(ex[i] + ((et[i] < 14 && evy[i] == 0) ? (tick & 2) - 1 : 0), ey[i], evy[i] != 0 ? T + gfx_hopper_b : T + gfx_hopper_a, SPR_16X16 | 2); }
+      else if (k == 3) { dspr(ex[i], ey[i], anim_frame(tick, 2, 7) == 0 ? T + gfx_crow_a : T + gfx_crow_b, SPR_16X16 | 3); }
+      else { dspr(ex[i], ey[i], et[i] >= 100 ? T + gfx_pot_b : T + gfx_pot_a, SPR_16X16 | 4); }
+    }
+  }
+  for (var j = 0; j < 2; j++) { if (kon[j]) { dspr(kx[j], ky[j], T + gfx_shu_a + ((tick >> 1) & 1), 5); } }
+  for (var p = 0; p < 4; p++) { if (pon[p]) { dspr(pxx[p], pyy[p], T + gfx_fire_a + ((tick >> 2) & 1), 4); } }
+  for (var q = 0; q < 4; q++) { if (pft[q] > 0) { dspr(pfx[q], pfy[q], T + gfx_puff_a + (pft[q] < 8), 5); } }
+  if (bon && (bdead == 0 || (bdead & 2) != 0)) {
+    var bp = 6;
+    if (binv > 0 && (binv & 2) != 0) { bp = 5; }
+    if (bst == 2 && (tick & 2) != 0) { bp = 5; }
+    var sh = bst == 2 ? (tick & 2) - 1 : 0;
+    dspr(bx + sh, by, TB + bgx_bossA + bk * 16, SPR_32X32 | bp | (bdir > 0 && bk != 1 ? SPR_FLIPX : 0));
+  }
+  draw_back();
+  spr_end();
+}
+
+// ---------------------------------------------------------------- flow
+func go(st) { nextst = st; state = ST_FADE; fade_to(0, 4); }
+func save_game() {
+  save_set(0, unlocked); save_set(2, stars[0]); save_set(4, stars[1]); save_set(6, stars[2]); save_set(8, best); save_set(10, 0x4E43);
+  save_seal(); save_commit();
+}
+func load_stage_music() {
+  if (level == 0) { tune_play(TUNE_ADVENTURE); } else if (level == 1) { tune_play(TUNE_SPACE); } else { tune_play(TUNE_ACTION); }
+}
+func new_stage() {
+  lives = 3; hearts = 3; coins = 0; ings = 0; chili = 0; hasscroll = 0; score = score0; cpcol = 0; bon = 0; bclock = 0;
+  ldmode = 0; go(ST_CARD); stt = 110;
+}
+func enter(st) {
+  state = st;
+  hide_all_sprites(); spr_ready = 0;
+  lcd(LCD_BG | LCD_OBJ);
+  scroll(0, 0);
+  if (st == ST_TITLE) {
+    pals(0); clear_bg(); text_pal = 0;
+    ctext(3, "N I N J A  C H E F"); ctext(5, "FOR A YOUNG NINJA");
+    ctext(11, "A JUMP   B STAR");
+    for (var c = 0; c < 20; c++) { set_cell(c, 14, T + gfx_grass + (2 << 12)); for (var r = 15; r < 18; r++) { set_cell(c, r, T + gfx_dirt + (2 << 12)); } }
+    for (var d = 0; d < 6; d++) { set_cell(d * 4 + 1, 13, T + gfx_bamboo1 + (1 << 12)); set_cell(d * 4 + 3, 13, T + gfx_bamboo2 + (1 << 12)); }
+    tune_play(TUNE_TITLE); music_mute(0);
+    stt = 0;
+  } else if (st == ST_CARD) {
+    pals(0); clear_bg(); music_stop_all(); music_mute(0);
+    text(7, 4, "STAGE"); text(13, 4, utoa(level + 1));
+    ctext(7, peek(sname + level * 2));
+    ctext(10, "FIND 5"); ctext(12, peek(iname + level * 2));
+    ctext(14, "BEAT THE BOSS!");
+    ctext(16, peek(bname + level * 2));
+    sfx_play(SFX_POWER);
+  } else if (st == ST_LOAD) {
+    ld = 0;
+  } else if (st == ST_COOK) {
+    pals(0); clear_bg(); music_stop_all(); music_mute(0);
+    tune_play(TUNE_TITLE);
+    ctext(2, "STAGE CLEAR!");
+    ctext(4, peek(dname + level * 2));
+    stt = 0;
+  } else if (st == ST_OVER) {
+    pals(0); clear_bg(); music_stop_all(); music_mute(0);
+    tune_play(TUNE_SPACE);
+    ctext(5, "GAME OVER");
+    text(5, 8, "SCORE"); print_u(11, 8, score);
+    text(5, 10, "BEST"); print_u(11, 10, best);
+    ctext(13, "START: TRY AGAIN"); ctext(15, "SELECT: TITLE");
+    sfx_play(SFX_DEATH);
+  } else if (st == ST_END) {
+    pals(0); clear_bg(); music_stop_all(); music_mute(0);
+    ctext(2, "YOU DID IT!"); ctext(4, "THE DRAGON RAMEN IS");
+    ctext(6, "SERVED! THE JUDGES"); ctext(8, "CHEER FOR THE");
+    ctext(10, "NINJA CHEF!");
+    stt = 0;
+  }
+  if (st != ST_LOAD) { fade_to(4, 4); }
+}
+
+func place_hero() {
+  px = cpcol * 8; if (cpcol == 0) { px = 24; }
+  py = col_top(px >> 3) * 8 - 16;
+  vx = 0; vy = 0; fx = 0; fy = 0; face = 0; inv = 0; hurtt = 0; grounded = 1; stop = 0;
+  cam = clamp(px - 72, 0, LOCK);
+  safe_x = px; safe_y = py;
+  for (var i = 0; i < 2; i++) { kon[i] = 0; }
+  for (var p = 0; p < 4; p++) { pon[p] = 0; pft[p] = 0; }
+  bon = 0; warn = 0;
+}
+func load_step() {
+  if (ld == 0) {
+    if (ldmode == 0) {
+      pals(level + 1);
+      if (level == 0) { select_bank(bankof(lvd1)); copy(lv, lvd1, LVSIZE); }
+      else if (level == 1) { select_bank(bankof(lvd2)); copy(lv, lvd2, LVSIZE); }
+      else { select_bank(bankof(lvd3)); copy(lv, lvd3, LVSIZE); }
+      for (var i = 0; i < 8; i++) { ek[i] = 0; }
+    }
+    clear_bg(); clear_win();
+    place_hero();
+    lo = (cam >> 3) - 1; hi = lo;
+    lcd(LCD_BG | LCD_WIN | LCD_OBJ); window_pos(0, 136);
+    scroll(cam & 255, 0);
+    ld = 1;
+  } else if (ld < 5) { stream_fill(9); ld++; }
+  else {
+    draw_hud(); draw_play();
+    load_stage_music(); music_mute(0);
+    state = ST_PLAY; fade_to(4, 4);
+  }
+}
+
+func title_step() {
+  if (btnp(BTN_RIGHT) && sel < unlocked) { sel++; sfx_play(SFX_SELECT); }
+  if (btnp(BTN_LEFT) && sel > 1) { sel--; sfx_play(SFX_SELECT); }
+  if (stt == 0 || btnp(BTN_LEFT | BTN_RIGHT)) {
+    stt = 1;
+    text(6, 9, "STAGE"); text(12, 9, utoa(sel));
+    text(4, 9, sel > 1 ? "<" : " "); text(15, 9, sel < unlocked ? ">" : " ");
+  }
+  if (blink(tick, 24)) { ctext(7, "PRESS START"); } else { ctext(7, "           "); }
+  spr_begin(0);
+  spr(72, 96, T + gfx_hero_idle, SPR_16X16);
+  spr(120, 8, TB + bgx_sun, SPR_16X16 | 7);
+  spr(((tick >> 2) & 255) - 40, 28, TB + bgx_cloud, SPR_16X16 | SPR_BEHIND | 7);
+  spr(((tick >> 1) & 255) - 90, 52, TB + bgx_cloud, SPR_16X16 | SPR_BEHIND | 7);
+  spr_end();
+  if (btnp(BTN_START)) {
+    srand(frames(), 0x1D2B);
+    level = sel - 1; score0 = 0; sfx_play(SFX_POWER); new_stage();
+  }
+}
+
+func cook_step() {
+  stt++;
+  spr_begin(0);
+  spr(40, 80, T + gfx_hero_idle, SPR_16X16);
+  var pt = T + gfx_pot_a;
+  if (stt < 140) { pt = anim_frame(tick, 2, 6) == 0 ? T + gfx_pot_a : T + gfx_pot_b; }
+  spr(72, 80, stt < 140 ? pt : T + gfx_bowl, SPR_16X16 | 4);
+  spr(96, 88 - (tick & 7), T + gfx_steam_a + ((tick >> 3) & 1), 5);
+  for (var i = 0; i < 5; i++) {
+    if (stt > 20 + i * 14) { spr(24 + i * 24, 112, T + gfx_hud_ing, 0); }
+    if (stt > 20 + i * 14 && i >= ings) { spr(24 + i * 24, 112, T + gfx_heart_e, 0); }
+  }
+  spr_end();
+  if (stt == 20 + 5 * 14) { text(1, 15, "INGREDIENTS"); print_u(13, 15, ings); }
+  if (stt == 150) {
+    sfx_play(SFX_WIN);
+    if (ings == 5) { ctext(6, "5 STARS! PERFECT!"); } else if (ings >= 3) { ctext(6, "DELICIOUS!"); } else { ctext(6, "TASTY. TRY FOR MORE!"); }
+    add_score(ings * 300);
+    if (ings > stars[level]) { stars[level] = ings; }
+    if (level + 1 > unlocked && level < 2) { unlocked = level + 2; }
+    if (score > best) { best = score; }
+    text(5, 8, "SCORE"); print_u(11, 8, score);
+  }
+  if (stt == 160) { save_game(); }
+  if (stt > 190) { if (blink(tick, 24)) { ctext(17, "PRESS START"); } else { ctext(17, "           "); } }
+  if (stt > 190 && btnp(BTN_START)) {
+    sfx_play(SFX_SELECT); score0 = score;
+    if (level < 2) { level++; new_stage(); } else { go(ST_END); }
+  }
+}
+
+func end_step() {
+  stt++;
+  spr_begin(0);
+  spr(72, 92, T + gfx_bowl, SPR_16X16 | 4);
+  spr(98, 101 - (tick & 7), T + gfx_steam_a + ((tick >> 3) & 1), 5);
+  spr(44, 92 - (anim_frame(tick, 2, 12) * 4), T + gfx_hero_jump, SPR_16X16);
+  spr(100, 92 - (anim_frame(tick + 12, 2, 12) * 4), T + gfx_hero_jump, SPR_16X16 | SPR_FLIPX);
+  spr_end();
+  if (stt == 30) { tune_play(TUNE_ADVENTURE); }
+  if (stt == 40) { ctext(14, "FINAL SCORE"); print_u(8, 15, score); }
+  if (stt > 200) { if (blink(tick, 24)) { ctext(17, "PRESS START"); } else { ctext(17, "           "); } }
+  if (stt > 200 && btnp(BTN_START)) { go(ST_TITLE); }
+}
+
+func play_step() {
+  if (stop > 0) { stop--; draw_play(); return; }
+  if (btnp(BTN_START)) { state = ST_PAUSE; master_volume(4); sfx_play(SFX_PAUSE); banner(64, 64, "PAUSED"); return; }
+  hero_step();
+  stream_fill(2);
+  knives_step();
+  enemies_step();
+  if (!bon && cam >= LOCK && px > LOCK + 24) { boss_spawn(); }
+  if (bon) { boss_step(); }
+  if (hud_dirty) { draw_hud(); }
+  if (warn > 0) { banner(52, 40, "WARNING"); } else { banner_off(); }
+  if (shake > 0) { shake--; scroll((cam & 255) + (shake & 1) * 2 - 1, 0); } else { scroll(cam & 255, 0); }
+  draw_play();
+}
+
+func frame() {
+  tick++;
+  fade_update(); music_update(); sfx_update();
+  if (tick % 8 == 0) {
+    var k = (tick >> 3) & 1;
+    copy(TILES + (T + gfx_coin_a) * 16, gfx + (gfx_coin_a + k) * 16, 16);
+    copy(TILES + (T + gfx_lava_a) * 16, gfx + (gfx_lava_a + k) * 16, 16);
+  }
+  if (state == ST_PLAY) { play_step(); }
+  else if (state == ST_TITLE) { title_step(); }
+  else if (state == ST_FADE) { if (!fade_busy()) { enter(nextst); } }
+  else if (state == ST_LOAD) { load_step(); }
+  else if (state == ST_CARD) { stt--; if (stt <= 0) { ldmode = 0; go(ST_LOAD); } }
+  else if (state == ST_PAUSE) { if (btnp(BTN_START)) { state = ST_PLAY; master_volume(9); banner_off(); sfx_play(SFX_PAUSE); } }
+  else if (state == ST_DEAD) {
+    dt--;
+    if (dt > 20) { py += 0; } else { vy = min(vy + GRAV, MAXFALL); fy += vy; py += fy >> 8; fy = fy - ((fy >> 8) << 8); }
+    draw_play();
+    if (dt <= 0) {
+      lives--;
+      if (lives < 0) { go(ST_OVER); } else { hearts = 3; ldmode = 1; music_mute(0); go(ST_LOAD); }
+    }
+  }
+  else if (state == ST_COOK) { cook_step(); }
+  else if (state == ST_END) { end_step(); }
+  else if (state == ST_OVER) {
+    if (btnp(BTN_START)) { score0 = 0; level = sel - 1; if (level < 0) { level = 0; } new_stage(); }
+    if (btnp(BTN_SELECT)) { go(ST_TITLE); }
+  }
+}
+
+func init() {
+  load_font(0);
+  load_tiles(gfx, T, gfx_COUNT);
+  load_tiles(bgx, TB, bgx_COUNT);
+  hide_all_sprites();
+  master_volume(9);
+  if (save_loaded() && save_valid() && save_get(10) == 0x4E43) {
+    unlocked = clamp(save_get(0), 1, 3); stars[0] = save_get(2); stars[1] = save_get(4); stars[2] = save_get(6); best = save_get(8);
+  }
+  sel = 1;
+  fade_saved = 1;
+  pals(0);
+  fade_apply(4);
+  fade_set(0);
+  enter(ST_TITLE);
+}

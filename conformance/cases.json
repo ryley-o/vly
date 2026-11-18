@@ -1,0 +1,275 @@
+{
+  "description": "VLY-1 conformance cases. Run each cart for N frames with the given input and compare per-frame state/frame hashes.",
+  "cases": [
+    {
+      "name": "memory_map",
+      "cart": "carts/memory_map.vlc",
+      "frames": 4,
+      "input": ""
+    },
+    {
+      "name": "banking",
+      "cart": "carts/banking.vlc",
+      "frames": 3,
+      "input": ""
+    },
+    {
+      "name": "budget",
+      "cart": "carts/budget.vlc",
+      "frames": 12,
+      "input": ""
+    },
+    {
+      "name": "stack_edge",
+      "cart": "carts/stack_edge.vlc",
+      "frames": 3,
+      "input": ""
+    },
+    {
+      "name": "alu_ops",
+      "cart": "carts/alu_ops.vlc",
+      "frames": 3458,
+      "input": ""
+    },
+    {
+      "name": "audio",
+      "cart": "carts/audio.vlc",
+      "frames": 200,
+      "input": ""
+    },
+    {
+      "name": "fuzz_cpu_00",
+      "cart": "carts/fuzz_cpu_00.vlc",
+      "frames": 40,
+      "input": "RIGHT@4-28"
+    },
+    {
+      "name": "fuzz_cpu_01",
+      "cart": "carts/fuzz_cpu_01.vlc",
+      "frames": 40,
+      "input": "LEFT+DOWN@1-19"
+    },
+    {
+      "name": "fuzz_cpu_02",
+      "cart": "carts/fuzz_cpu_02.vlc",
+      "frames": 40,
+      "input": "START@2-12"
+    },
+    {
+      "name": "fuzz_cpu_03",
+      "cart": "carts/fuzz_cpu_03.vlc",
+      "frames": 40,
+      "input": "LEFT+DOWN@1-21"
+    },
+    {
+      "name": "fuzz_cpu_04",
+      "cart": "carts/fuzz_cpu_04.vlc",
+      "frames": 40,
+      "input": "UP+B@7-10"
+    },
+    {
+      "name": "fuzz_cpu_05",
+      "cart": "carts/fuzz_cpu_05.vlc",
+      "frames": 40,
+      "input": "START@5-25"
+    },
+    {
+      "name": "fuzz_cpu_06",
+      "cart": "carts/fuzz_cpu_06.vlc",
+      "frames": 40,
+      "input": "RIGHT@6-29"
+    },
+    {
+      "name": "fuzz_cpu_07",
+      "cart": "carts/fuzz_cpu_07.vlc",
+      "frames": 40,
+      "input": "START@2-22"
+    },
+    {
+      "name": "fuzz_cpu_08",
+      "cart": "carts/fuzz_cpu_08.vlc",
+      "frames": 40,
+      "input": "A@6-26"
+    },
+    {
+      "name": "fuzz_cpu_09",
+      "cart": "carts/fuzz_cpu_09.vlc",
+      "frames": 40,
+      "input": "LEFT+DOWN@6-13"
+    },
+    {
+      "name": "fuzz_cpu_10",
+      "cart": "carts/fuzz_cpu_10.vlc",
+      "frames": 40,
+      "input": "LEFT+DOWN@4-19"
+    },
+    {
+      "name": "fuzz_cpu_11",
+      "cart": "carts/fuzz_cpu_11.vlc",
+      "frames": 40,
+      "input": "LEFT+DOWN@8-28"
+    },
+    {
+      "name": "fuzz_cpu_12",
+      "cart": "carts/fuzz_cpu_12.vlc",
+      "frames": 40,
+      "input": "A@6-22"
+    },
+    {
+      "name": "fuzz_cpu_13",
+      "cart": "carts/fuzz_cpu_13.vlc",
+      "frames": 40,
+      "input": "LEFT+DOWN@4-17"
+    },
+    {
+      "name": "fuzz_cpu_14",
+      "cart": "carts/fuzz_cpu_14.vlc",
+      "frames": 40,
+      "input": "START@6-20"
+    },
+    {
+      "name": "fuzz_cpu_15",
+      "cart": "carts/fuzz_cpu_15.vlc",
+      "frames": 40,
+      "input": "START@0-28"
+    },
+    {
+      "name": "fuzz_cpu_16",
+      "cart": "carts/fuzz_cpu_16.vlc",
+      "frames": 40,
+      "input": "RIGHT@8-10"
+    },
+    {
+      "name": "fuzz_cpu_17",
+      "cart": "carts/fuzz_cpu_17.vlc",
+      "frames": 40,
+      "input": "UP+B@9-15"
+    },
+    {
+      "name": "fuzz_cpu_18",
+      "cart": "carts/fuzz_cpu_18.vlc",
+      "frames": 40,
+      "input": "A@9-13"
+    },
+    {
+      "name": "fuzz_cpu_19",
+      "cart": "carts/fuzz_cpu_19.vlc",
+      "frames": 40,
+      "input": "A@9-18"
+    },
+    {
+      "name": "fuzz_cpu_20",
+      "cart": "carts/fuzz_cpu_20.vlc",
+      "frames": 40,
+      "input": "UP+B@6-20"
+    },
+    {
+      "name": "fuzz_cpu_21",
+      "cart": "carts/fuzz_cpu_21.vlc",
+      "frames": 40,
+      "input": "LEFT+DOWN@1-25"
+    },
+    {
+      "name": "fuzz_cpu_22",
+      "cart": "carts/fuzz_cpu_22.vlc",
+      "frames": 40,
+      "input": "UP+B@7-23"
+    },
+    {
+      "name": "fuzz_cpu_23",
+      "cart": "carts/fuzz_cpu_23.vlc",
+      "frames": 40,
+      "input": "RIGHT@1-13"
+    },
+    {
+      "name": "fuzz_video_0",
+      "cart": "carts/fuzz_video_0.vlc",
+      "frames": 25,
+      "input": ""
+    },
+    {
+      "name": "fuzz_video_1",
+      "cart": "carts/fuzz_video_1.vlc",
+      "frames": 25,
+      "input": ""
+    },
+    {
+      "name": "fuzz_video_2",
+      "cart": "carts/fuzz_video_2.vlc",
+      "frames": 25,
+      "input": ""
+    },
+    {
+      "name": "fuzz_video_3",
+      "cart": "carts/fuzz_video_3.vlc",
+      "frames": 25,
+      "input": ""
+    },
+    {
+      "name": "fuzz_video_4",
+      "cart": "carts/fuzz_video_4.vlc",
+      "frames": 25,
+      "input": ""
+    },
+    {
+      "name": "fuzz_video_5",
+      "cart": "carts/fuzz_video_5.vlc",
+      "frames": 25,
+      "input": ""
+    },
+    {
+      "name": "fuzz_video_6",
+      "cart": "carts/fuzz_video_6.vlc",
+      "frames": 25,
+      "input": ""
+    },
+    {
+      "name": "fuzz_video_7",
+      "cart": "carts/fuzz_video_7.vlc",
+      "frames": 25,
+      "input": ""
+    },
+    {
+      "name": "template_hello",
+      "cart": "carts/template_hello.vlc",
+      "frames": 90,
+      "input": "RIGHT@0-40, DOWN@20-60, A@10, A@12, START@50"
+    },
+    {
+      "name": "template_game",
+      "cart": "carts/template_game.vlc",
+      "frames": 90,
+      "input": "RIGHT@0-40, DOWN@20-60, A@10, A@12, START@50"
+    },
+    {
+      "name": "template_pong",
+      "cart": "carts/template_pong.vlc",
+      "frames": 90,
+      "input": "RIGHT@0-40, DOWN@20-60, A@10, A@12, START@50"
+    },
+    {
+      "name": "template_battle",
+      "cart": "carts/template_battle.vlc",
+      "frames": 90,
+      "input": "RIGHT@0-40, DOWN@20-60, A@10, A@12, START@50"
+    },
+    {
+      "name": "template_platformer",
+      "cart": "carts/template_platformer.vlc",
+      "frames": 170,
+      "input": "START@5, RIGHT@10-165, A@45-59, A@91-105, A@108-122"
+    },
+    {
+      "name": "template_puzzle",
+      "cart": "carts/template_puzzle.vlc",
+      "frames": 90,
+      "input": "START@5, RIGHT@10, RIGHT@13, RIGHT@16, RIGHT@19, A@30, RIGHT@40, DOWN@43, B@46"
+    },
+    {
+      "name": "template_shooter",
+      "cart": "carts/template_shooter.vlc",
+      "frames": 240,
+      "input": "LEFT@6, LEFT@34-38, LEFT@83, LEFT@89, LEFT@116, LEFT@119, LEFT@125, LEFT@131, LEFT@135-136, LEFT@141, LEFT@146-147, LEFT@151, LEFT@156, LEFT@161-165, LEFT@204-210, LEFT@225-227, RIGHT@27, RIGHT@53, RIGHT@55, RIGHT@59, RIGHT@65, RIGHT@95-100, RIGHT@186, RIGHT@191, RIGHT@193, RIGHT@196, RIGHT@201, RIGHT@221, A@8, A@10, A@12, A@14, A@16, A@18, A@20, A@22, A@24, A@26, A@28, A@30, A@32, A@40, A@42, A@44, A@46, A@48, A@50, A@52, A@54, A@56, A@58, A@60, A@62, A@64, A@66, A@68, A@70, A@72, A@74, A@76, A@78, A@80, A@82, A@84, A@86, A@88, A@90, A@92, A@94, A@102, A@104, A@106, A@108, A@110, A@112, A@114, A@118, A@120, A@122, A@124, A@126, A@128, A@130, A@132, A@134, A@138, A@140, A@142, A@144, A@148, A@150, A@152, A@154, A@158, A@160, A@166, A@168, A@170, A@172, A@174, A@176, A@178, A@180, A@182, A@184, A@188, A@190, A@192, A@194, A@198, A@200, A@202, A@212, A@214, A@216, A@218, A@220, A@222, A@224, A@228, A@230, A@232, A@234, A@236, A@238, START@5"
+    }
+  ]
+}

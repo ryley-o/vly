@@ -1,0 +1,39 @@
+name: CI
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install SDL2 and the WebAssembly toolchain
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev clang lld
+      - name: JavaScript tests (includes the C player, WebAssembly and exporter)
+        run: npm test
+      - name: The committed WebAssembly build is reproducible
+        run: |
+          sh scripts/build-wasm.sh
+          git diff --exit-code -- src/wasm/vly.wasm || echo "::warning::vly.wasm differs from the committed build (a different clang version can do this); conformance still passed"
+
+      - name: Generated files are up to date
+        run: |
+          npm run gen
+          git diff --exit-code -- spec c/isa_table.h c/font_data.h docs/stdlib.md
+      - name: C implementation matches the JavaScript reference
+        run: npm run difftest
+      - name: Device layer on the host, and the RP2040 firmware type-check
+        run: |
+          make -C hardware test
+          make -C hardware check-rp2040
+      - name: Fuzz campaign (JS vs C on random programs)
+        run: node scripts/fuzz.js 150 200000
+      - name: Conformance suite is reproducible
+        run: |
+          npm run conformance
+          git diff --exit-code -- conformance

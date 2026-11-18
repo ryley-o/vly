@@ -1,0 +1,564 @@
+{
+  "specVersion": 1,
+  "ops": [
+    {
+      "op": 0,
+      "name": "NOP",
+      "form": "none",
+      "cycles": 1,
+      "group": "system",
+      "desc": "Do nothing.",
+      "length": 2
+    },
+    {
+      "op": 1,
+      "name": "HALT",
+      "form": "none",
+      "cycles": 1,
+      "group": "system",
+      "desc": "End the current routine (like a top-level RET).",
+      "length": 2
+    },
+    {
+      "op": 2,
+      "name": "MOV",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "data",
+      "desc": "rd = rs",
+      "length": 2
+    },
+    {
+      "op": 3,
+      "name": "LDI",
+      "form": "rd,imm",
+      "cycles": 2,
+      "group": "data",
+      "desc": "rd = imm",
+      "length": 4
+    },
+    {
+      "op": 4,
+      "name": "LD",
+      "form": "rd,[rs]",
+      "cycles": 3,
+      "group": "data",
+      "desc": "rd = 16-bit load from [rs]",
+      "length": 2
+    },
+    {
+      "op": 5,
+      "name": "LDB",
+      "form": "rd,[rs]",
+      "cycles": 3,
+      "group": "data",
+      "desc": "rd = 8-bit load from [rs], zero-extended",
+      "length": 2
+    },
+    {
+      "op": 6,
+      "name": "ST",
+      "form": "[rd],rs",
+      "cycles": 3,
+      "group": "data",
+      "desc": "16-bit store of rs to [rd]",
+      "length": 2
+    },
+    {
+      "op": 7,
+      "name": "STB",
+      "form": "[rd],rs",
+      "cycles": 3,
+      "group": "data",
+      "desc": "8-bit store of the low byte of rs to [rd]",
+      "length": 2
+    },
+    {
+      "op": 8,
+      "name": "LDX",
+      "form": "rd,[rs+imm]",
+      "cycles": 4,
+      "group": "data",
+      "desc": "rd = 16-bit load from [rs+imm]",
+      "length": 4
+    },
+    {
+      "op": 9,
+      "name": "LDBX",
+      "form": "rd,[rs+imm]",
+      "cycles": 4,
+      "group": "data",
+      "desc": "rd = 8-bit load from [rs+imm], zero-extended",
+      "length": 4
+    },
+    {
+      "op": 10,
+      "name": "STX",
+      "form": "[rd+imm],rs",
+      "cycles": 4,
+      "group": "data",
+      "desc": "16-bit store of rs to [rd+imm]",
+      "length": 4
+    },
+    {
+      "op": 11,
+      "name": "STBX",
+      "form": "[rd+imm],rs",
+      "cycles": 4,
+      "group": "data",
+      "desc": "8-bit store of the low byte of rs to [rd+imm]",
+      "length": 4
+    },
+    {
+      "op": 12,
+      "name": "PUSH",
+      "form": "rs",
+      "cycles": 3,
+      "group": "data",
+      "desc": "SP -= 2; store rs at [SP]. (PUSH R15 pushes the old SP.)",
+      "length": 2
+    },
+    {
+      "op": 13,
+      "name": "POP",
+      "form": "rd",
+      "cycles": 3,
+      "group": "data",
+      "desc": "Load [SP]; SP += 2; then rd = loaded value. (POP R15 yields the loaded value.)",
+      "length": 2
+    },
+    {
+      "op": 16,
+      "name": "ADD",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = rd + rs",
+      "flags": "ZNCV",
+      "length": 2
+    },
+    {
+      "op": 17,
+      "name": "SUB",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = rd - rs (C = borrow)",
+      "flags": "ZNCV",
+      "length": 2
+    },
+    {
+      "op": 18,
+      "name": "AND",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = rd & rs",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 19,
+      "name": "OR",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = rd | rs",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 20,
+      "name": "XOR",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = rd ^ rs",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 21,
+      "name": "SHL",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = rd << (rs & 15)",
+      "flags": "ZNC",
+      "length": 2
+    },
+    {
+      "op": 22,
+      "name": "SHR",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = rd >> (rs & 15), logical",
+      "flags": "ZNC",
+      "length": 2
+    },
+    {
+      "op": 23,
+      "name": "SAR",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = rd >> (rs & 15), arithmetic",
+      "flags": "ZNC",
+      "length": 2
+    },
+    {
+      "op": 24,
+      "name": "MUL",
+      "form": "rd,rs",
+      "cycles": 3,
+      "group": "alu",
+      "desc": "rd = low 16 bits of rd * rs",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 25,
+      "name": "FMUL",
+      "form": "rd,rs",
+      "cycles": 3,
+      "group": "alu",
+      "desc": "rd = (signed rd * signed rs) >> 8 (8.8 fixed-point multiply)",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 26,
+      "name": "DIV",
+      "form": "rd,rs",
+      "cycles": 8,
+      "group": "alu",
+      "desc": "rd = rd / rs, unsigned. Divide by zero: rd = 0xFFFF and DIV0 fault",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 27,
+      "name": "MOD",
+      "form": "rd,rs",
+      "cycles": 8,
+      "group": "alu",
+      "desc": "rd = rd % rs, unsigned. Modulo by zero: rd unchanged and DIV0 fault",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 28,
+      "name": "NEG",
+      "form": "rd",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = 0 - rd",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 29,
+      "name": "NOT",
+      "form": "rd",
+      "cycles": 1,
+      "group": "alu",
+      "desc": "rd = ~rd",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 32,
+      "name": "ADDI",
+      "form": "rd,imm",
+      "cycles": 2,
+      "group": "alu-imm",
+      "desc": "rd = rd + imm",
+      "flags": "ZNCV",
+      "length": 4
+    },
+    {
+      "op": 33,
+      "name": "ANDI",
+      "form": "rd,imm",
+      "cycles": 2,
+      "group": "alu-imm",
+      "desc": "rd = rd & imm",
+      "flags": "ZN",
+      "length": 4
+    },
+    {
+      "op": 34,
+      "name": "ORI",
+      "form": "rd,imm",
+      "cycles": 2,
+      "group": "alu-imm",
+      "desc": "rd = rd | imm",
+      "flags": "ZN",
+      "length": 4
+    },
+    {
+      "op": 35,
+      "name": "XORI",
+      "form": "rd,imm",
+      "cycles": 2,
+      "group": "alu-imm",
+      "desc": "rd = rd ^ imm",
+      "flags": "ZN",
+      "length": 4
+    },
+    {
+      "op": 36,
+      "name": "SHLI",
+      "form": "rd,n",
+      "cycles": 1,
+      "group": "alu-imm",
+      "desc": "rd = rd << n (n = 0..15)",
+      "flags": "ZNC",
+      "length": 2
+    },
+    {
+      "op": 37,
+      "name": "SHRI",
+      "form": "rd,n",
+      "cycles": 1,
+      "group": "alu-imm",
+      "desc": "rd = rd >> n, logical",
+      "flags": "ZNC",
+      "length": 2
+    },
+    {
+      "op": 38,
+      "name": "SARI",
+      "form": "rd,n",
+      "cycles": 1,
+      "group": "alu-imm",
+      "desc": "rd = rd >> n, arithmetic",
+      "flags": "ZNC",
+      "length": 2
+    },
+    {
+      "op": 39,
+      "name": "MULI",
+      "form": "rd,imm",
+      "cycles": 4,
+      "group": "alu-imm",
+      "desc": "rd = low 16 bits of rd * imm",
+      "flags": "ZN",
+      "length": 4
+    },
+    {
+      "op": 40,
+      "name": "CMP",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "compare",
+      "desc": "Set flags from rd - rs",
+      "flags": "ZNCV",
+      "length": 2
+    },
+    {
+      "op": 41,
+      "name": "CMPI",
+      "form": "rd,imm",
+      "cycles": 2,
+      "group": "compare",
+      "desc": "Set flags from rd - imm",
+      "flags": "ZNCV",
+      "length": 4
+    },
+    {
+      "op": 42,
+      "name": "TST",
+      "form": "rd,rs",
+      "cycles": 1,
+      "group": "compare",
+      "desc": "Set flags from rd & rs",
+      "flags": "ZN",
+      "length": 2
+    },
+    {
+      "op": 48,
+      "name": "JMP",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "PC = imm",
+      "length": 4
+    },
+    {
+      "op": 49,
+      "name": "JZ",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if Z (equal)",
+      "cond": "Z",
+      "length": 4
+    },
+    {
+      "op": 50,
+      "name": "JNZ",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if !Z (not equal)",
+      "cond": "!Z",
+      "length": 4
+    },
+    {
+      "op": 51,
+      "name": "JC",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if C (unsigned below)",
+      "cond": "C",
+      "length": 4
+    },
+    {
+      "op": 52,
+      "name": "JNC",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if !C (unsigned above or equal)",
+      "cond": "!C",
+      "length": 4
+    },
+    {
+      "op": 53,
+      "name": "JLT",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if N != V (signed less)",
+      "cond": "N!=V",
+      "length": 4
+    },
+    {
+      "op": 54,
+      "name": "JGE",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if N == V (signed greater or equal)",
+      "cond": "N==V",
+      "length": 4
+    },
+    {
+      "op": 55,
+      "name": "JLE",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if Z or N != V (signed less or equal)",
+      "cond": "Z|N!=V",
+      "length": 4
+    },
+    {
+      "op": 56,
+      "name": "JGT",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if !Z and N == V (signed greater)",
+      "cond": "!Z&N==V",
+      "length": 4
+    },
+    {
+      "op": 57,
+      "name": "JA",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if !C and !Z (unsigned above)",
+      "cond": "!C&!Z",
+      "length": 4
+    },
+    {
+      "op": 58,
+      "name": "JBE",
+      "form": "imm",
+      "cycles": 2,
+      "group": "control",
+      "desc": "Jump if C or Z (unsigned below or equal)",
+      "cond": "C|Z",
+      "length": 4
+    },
+    {
+      "op": 60,
+      "name": "CALL",
+      "form": "imm",
+      "cycles": 4,
+      "group": "control",
+      "desc": "Push return address; PC = imm",
+      "length": 4
+    },
+    {
+      "op": 61,
+      "name": "RET",
+      "form": "none",
+      "cycles": 3,
+      "group": "control",
+      "desc": "Pop PC. If SP == 0 the routine ends instead.",
+      "length": 2
+    },
+    {
+      "op": 62,
+      "name": "JMPR",
+      "form": "rs",
+      "cycles": 2,
+      "group": "control",
+      "desc": "PC = rs",
+      "length": 2
+    },
+    {
+      "op": 63,
+      "name": "CALLR",
+      "form": "rs",
+      "cycles": 4,
+      "group": "control",
+      "desc": "Push return address; PC = rs",
+      "length": 2
+    },
+    {
+      "op": 64,
+      "name": "MCPY",
+      "form": "hw",
+      "cycles": 8,
+      "group": "hardware",
+      "desc": "Copy R2 bytes from [R1] to [R0] (overlap-safe). Cost 8 + R2/4",
+      "dynamic": true,
+      "length": 2
+    },
+    {
+      "op": 65,
+      "name": "MSET",
+      "form": "hw",
+      "cycles": 8,
+      "group": "hardware",
+      "desc": "Set R2 bytes at [R0] to the low byte of R1. Cost 8 + R2/8",
+      "dynamic": true,
+      "length": 2
+    },
+    {
+      "op": 66,
+      "name": "RND",
+      "form": "rd",
+      "cycles": 2,
+      "group": "hardware",
+      "desc": "rd = next 16-bit pseudorandom value",
+      "length": 2
+    },
+    {
+      "op": 67,
+      "name": "SRND",
+      "form": "rd,rs",
+      "cycles": 2,
+      "group": "hardware",
+      "desc": "Reseed the PRNG with (rd << 16) | rs",
+      "length": 2
+    }
+  ]
+}

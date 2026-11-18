@@ -1,0 +1,109 @@
+{
+  "name": "lantern",
+  "entry": "src/main.vly",
+  "out": "build/lantern.vlc",
+  "tests": [
+    {
+      "name": "title screen with a walking hero and slime",
+      "frames": 60,
+      "expect": {
+        "words": {
+          "state": 0,
+          "has_save": 0
+        },
+        "frameHash": "c0b2207f1f27a3aa4632c3563547d5d2f1c8789f722b1526a7af5aa55d446d73",
+        "maxCycles": 60000
+      }
+    },
+    {
+      "name": "START begins in the village with three hearts and no sword",
+      "frames": 40,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 1,
+          "room": 0,
+          "hp": 3,
+          "flags": 0
+        },
+        "frameHash": "b185a4cf85afd46e618c00a9471e67db31591fd750af3832cddc99670ae032c2"
+      }
+    },
+    {
+      "name": "walking into the old man gives the sword",
+      "frames": 140,
+      "input": "START@30, UP@60-120",
+      "expect": {
+        "words": {
+          "flags": 1,
+          "hx": 72,
+          "hy": 56
+        },
+        "frameHash": "2795eb8c24801e0850d62637169d721276cc68c84824350154cb5796658d763e"
+      }
+    },
+    {
+      "name": "walls stop you: a tree line blocks the way",
+      "frames": 100,
+      "input": "START@30, LEFT@40-100",
+      "expect": {
+        "words": {
+          "hx": 13
+        }
+      }
+    },
+    {
+      "name": "walking off the south edge goes to the next screen, and cutting the bush leads to the chest and its key",
+      "frames": 340,
+      "input": "START@30, UP@60-120, DOWN@125-260, A@265, A@285, DOWN@300-330",
+      "expect": {
+        "words": {
+          "room": 3,
+          "flags": 7
+        },
+        "frameHash": "a4513604cde306d7e3cb0e2003bd976bf7d93c01089b3cdd17e9dc8f85bf52a1"
+      }
+    },
+    {
+      "name": "the key opens the locked door and the doorway leads down into the dungeon",
+      "frames": 700,
+      "input": "START@30, UP@60-120, DOWN@125-260, A@265, A@285, DOWN@300-330, UP@340-470, RIGHT@480-648, UP@650-720",
+      "expect": {
+        "words": {
+          "room": 6,
+          "flags": 11
+        },
+        "frameHash": "5e7e33cb1c2c3b1f175cca0551c3c9fa0df6f10e22f7f18692480c59b49bb378",
+        "maxCycles": 90000
+      }
+    },
+    {
+      "name": "a bot crosses the dungeon and defeats the Slime King (recorded in tests/win.input)",
+      "frames": 1235,
+      "inputFile": "tests/win.input",
+      "expect": {
+        "words": {
+          "state": 3,
+          "flags": 27
+        },
+        "saves": 12,
+        "frameHash": "a6f44e8fe5fae0453073c5ecbc15d93f81cf0730f961d252773da6d308010b49",
+        "maxCycles": 100000
+      }
+    },
+    {
+      "name": "the win is saved: starting again offers to continue with the sword and the opened door",
+      "save": "tests/won.sav",
+      "frames": 40,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "has_save": 1,
+          "state": 1,
+          "flags": 27
+        },
+        "frameHash": "55e32af5cae3168aef469e73a0814688335adc06c32d75823ab3eb649ebfb8b7"
+      }
+    }
+  ]
+}

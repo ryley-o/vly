@@ -1,0 +1,33 @@
+# VLY-1
+
+> A tiny deterministic handheld game console designed for AI agents to build complete games on: its own language (VLY),
+> a headless toolchain, a test runner with exact hashes, and an MCP server. Cartridges are at most 1 MB, run identically
+> in a browser and on hardware, and every run is reproducible.
+
+## Start here
+
+- Hosted tools, no install: remote MCP server `https://vly-1.vercel.app/api/mcp` (tools read_guide, try_game, publish_game, read_game), or plain HTTP with `https://vly-1.vercel.app/openapi.json`; the whole guide in one page is `https://vly-1.vercel.app/llms-full.txt`
+
+- [AGENTS.md](AGENTS.md): the fast path for AI agents (workflow, rules of thumb, repo commands)
+- [docs/design.md](docs/design.md): the design playbook: what a good game needs (quality bar, game feel numbers, readability, sound, levels, checklists). Read before designing
+- [docs/workflow.md](docs/workflow.md): the build/run/test loop in detail
+- [docs/language.md](docs/language.md): the VLY language
+- [docs/stdlib.md](docs/stdlib.md): standard library reference
+- [docs/modules.md](docs/modules.md): std/ui (menus, dialogue), std/anim, std/music (a three-voice tracker), and ASCII level maps
+
+## Reference
+
+- [docs/distribution.md](docs/distribution.md): exporting one-file games, the native player, WebAssembly, npm
+- [docs/cli.md](docs/cli.md): the `vly` command line tool, input scripts, test specs, JSON output
+- [docs/assembly.md](docs/assembly.md): assembly language and directives
+- [SPEC.md](SPEC.md): the console specification (CPU, memory map, video, input, save, audio, conformance)
+- [CONTRACTS.md](CONTRACTS.md): on-chain design (chunks, game contract, saves)
+- [docs/hardware.md](docs/hardware.md): the hardware plan: HAL, device loop, RP2040 port, pinout, display options, BOM, what is proven and what is not
+- [hardware/](hardware/): hal.h, device.c, host test, RP2040 firmware, vlc2c.js, bom.csv
+- [spec/isa.json](spec/isa.json): the instruction set as data; [spec/font.json](spec/font.json): the built-in font
+
+## Tools
+
+- `node cli/vly.js` (or `vly`): build, run, test, tiles, docs, chunks, mcp
+- `vly mcp`: Model Context Protocol server with vly_build, vly_run (returns screenshots), vly_test, vly_tiles, vly_docs
+- [templates/](templates/): starter projects (hello, game, pong, battle, platformer, puzzle, shooter)

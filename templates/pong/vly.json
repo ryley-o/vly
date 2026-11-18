@@ -1,0 +1,53 @@
+{
+  "name": "{{name}}",
+  "entry": "src/main.vly",
+  "out": "build/{{name}}.vlc",
+  "tests": [
+    {
+      "name": "the title screen shows until START",
+      "frames": 20,
+      "expect": {
+        "words": {
+          "state": 0
+        },
+        "frameHash": "d2c76d055abf82cf9da308116c6b09e7a41d583483b42b3f395c3dbfdd97b2e7"
+      }
+    },
+    {
+      "name": "START begins a game",
+      "frames": 30,
+      "input": "START@5",
+      "expect": {
+        "words": {
+          "state": 1,
+          "misses": 0
+        },
+        "frameHash": "7c5cd42a940d5e2a9cea8bddcc9183392341ca403bcd9e3bd2fcff8154f56be1"
+      }
+    },
+    {
+      "name": "an idle player eventually loses and the game ends",
+      "frames": 3000,
+      "input": "START@5",
+      "expect": {
+        "words": {
+          "state": 2,
+          "misses": 3
+        },
+        "frameHash": "dd659a999d019285b05247b7f5b54b68c605cf6a0a78b30c2184b496d945e14d",
+        "maxCycles": 30000
+      }
+    },
+    {
+      "name": "game over saves the best rally exactly once",
+      "frames": 3000,
+      "input": "START@5",
+      "expect": {
+        "saves": 1,
+        "saveWords": {
+          "0": "0x0000"
+        }
+      }
+    }
+  ]
+}

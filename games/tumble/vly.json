@@ -1,0 +1,89 @@
+{
+  "name": "tumble",
+  "entry": "src/main.vly",
+  "out": "build/tumble.vlc",
+  "tests": [
+    {
+      "name": "title screen with a shower of blocks down the sides",
+      "frames": 200,
+      "expect": {
+        "words": {
+          "state": 0
+        },
+        "frameHash": "69af47b952c027b7dafae8222a4c93756dbf74f901ccd6afd618652ea974e031",
+        "maxCycles": 60000
+      }
+    },
+    {
+      "name": "START deals a piece from a fair bag of seven",
+      "frames": 40,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 1,
+          "px": 3,
+          "score": 0,
+          "lines": 0,
+          "bag_n": 2
+        },
+        "frameHash": "824ba20b7ad0dc3c0bc52987d2d18c278734b89fb4ac43907d0272ddc14093f9"
+      }
+    },
+    {
+      "name": "taps slide the piece, A turns it, UP drops it and deals the next",
+      "frames": 70,
+      "input": "START@30, LEFT@40, LEFT@42, LEFT@44, A@50, UP@60",
+      "expect": {
+        "words": {
+          "px": 3,
+          "rot": 0,
+          "bag_n": 3
+        },
+        "frameHash": "7f75d9e3f1ff12a44e7cdcaffcae4ac6bf60f5f5feb83a6754f8beb249fee920"
+      }
+    },
+    {
+      "name": "START pauses and resumes",
+      "frames": 100,
+      "input": "START@30, START@50, START@80",
+      "expect": {
+        "words": {
+          "state": 1
+        }
+      }
+    },
+    {
+      "name": "a bot that weighs every landing spot clears ten rows and reaches level 2 (recorded in tests/ten-lines.input)",
+      "frames": 463,
+      "inputFile": "tests/ten-lines.input",
+      "expect": {
+        "words": {
+          "state": 1,
+          "lines": 10,
+          "level": 1,
+          "score": 42
+        },
+        "frameHash": "bdb78f448db968d3cb9fc75694546fe192aa3cdff41b6bc65fdcd7832d360dc5",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "dropping everything down the middle fills the well: game over, and the best score is saved",
+      "frames": 1400,
+      "input": "UP@470-1400/9",
+      "inputFile": "tests/ten-lines.input",
+      "expect": {
+        "words": {
+          "state": 3,
+          "best": 42
+        },
+        "saves": 1,
+        "saveWords": {
+          "0": 42
+        },
+        "frameHash": "02c63905415a2c3a5c7973c00f26971d1f4a739543c0aaa49852d4a3b6bf3bb0",
+        "maxCycles": 80000
+      }
+    }
+  ]
+}

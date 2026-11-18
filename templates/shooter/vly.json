@@ -1,0 +1,89 @@
+{
+  "name": "{{name}}",
+  "entry": "src/main.vly",
+  "out": "build/{{name}}.vlc",
+  "tests": [
+    {
+      "name": "title screen",
+      "frames": 20,
+      "expect": {
+        "words": {
+          "state": 0
+        },
+        "frameHash": "3be354d172ef14f7917c27a5127d2c798679add642f37e65959113e3715711cc"
+      }
+    },
+    {
+      "name": "START begins a game: 32 invaders, 3 lives",
+      "frames": 40,
+      "input": "START@5",
+      "expect": {
+        "words": {
+          "state": 1,
+          "left": 32,
+          "lives": 3,
+          "wave": 0,
+          "score": 0
+        },
+        "frameHash": "2352946ac9fcd94a1d809a0c258ef24535be8d4021e2406b5a7f2903be4b47da",
+        "maxCycles": 60000
+      }
+    },
+    {
+      "name": "the first shots of the recorded bot score 30 points (two kills)",
+      "frames": 40,
+      "expect": {
+        "words": {
+          "state": 1,
+          "score": 30,
+          "left": 30
+        },
+        "frameHash": "62f226099ef631f572f771af75ee7733b6f74461f30ae87d61365f96acb60994"
+      },
+      "inputFile": "tests/wave1.input"
+    },
+    {
+      "name": "a bot that leads its shots clears wave 1 with every life (recorded in tests/wave1.input)",
+      "frames": 2711,
+      "inputFile": "tests/wave1.input",
+      "expect": {
+        "words": {
+          "state": 2,
+          "wave": 1,
+          "left": 0,
+          "lives": 3,
+          "score": 640
+        },
+        "frameHash": "5df6f12d261272822c86ef880d0776d1ba6aefdea3b46cebf3a365100c19fc2e",
+        "maxCycles": 100000
+      }
+    },
+    {
+      "name": "an idle ship is eventually destroyed and the game ends",
+      "frames": 6000,
+      "input": "START@5",
+      "expect": {
+        "words": {
+          "state": 3
+        },
+        "frameHash": "c9a7281f66393003f136980d0baa0b24e8668627a4f1952374e6b2d490152b8f",
+        "maxCycles": 100000
+      }
+    },
+    {
+      "name": "the high score is saved when the game ends",
+      "frames": 9000,
+      "inputFile": "tests/wave1.input",
+      "expect": {
+        "words": {
+          "state": 3
+        },
+        "saves": 1,
+        "saveWords": {
+          "0": 640
+        },
+        "maxCycles": 100000
+      }
+    }
+  ]
+}

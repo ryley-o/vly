@@ -1,0 +1,259 @@
+# Built-in modules and level maps
+
+## Importing modules
+
+```
+import "std/ui";       // boxes, menus, typewriter dialogue
+import "std/anim";     // animation and timing helpers
+import "std/music";    // a three-voice tracker for background music and jingles
+```
+
+Built-in modules are written in VLY. Like the standard library, only the functions and variables your program uses are
+included in the cartridge, and you can redefine any of them. They need `load_font()` (text) and, for `std/ui`, one call
+to `ui_init(first_tile)`, which loads 11 small frame and cursor tiles into tile RAM starting at `first_tile`.
+
+## std/ui
+
+All drawing goes into one of the 32x32 maps: `BG_MAP`, or `WIN_MAP` for a box that does not scroll. Cells use the
+palette in `text_pal` (default 0). Coordinates are in 8x8 cells.
+
+| Function | What it does |
+|---|---|
+| `ui_init(first)` | load the UI tiles at tile `first` (call once, after `load_font`) |
+| `ui_box(map, col, row, w, h)` | draw a framed blank box, `w` x `h` cells including the frame |
+| `ui_clear(map, col, row, w, h)` | blank a rectangle |
+| `menu_open(map, col, row, items, count)` | draw a menu; `items` is a word table of strings: `table items = {"FIGHT", "ITEM"};` |
+| `menu_update()` | call every frame: returns `-1` (nothing yet), the chosen index when A is pressed, or `-2` when B is pressed. UP/DOWN move the cursor and wrap |
+| `menu_close()` | erase the menu |
+| `dialog_open(map, col, row, w, h)` | draw a dialogue box |
+| `dialog_say(text)` | start typing `text` into it (`\n` starts a new line; long lines wrap) |
+| `dialog_update()` | call every frame: types a character every other frame (hold A to hurry); when the text is complete a small arrow shows and pressing A returns `1` |
+| `dialog_close()` | erase the box |
+
+```
+import "std/ui";
+table choices = { "FIGHT", "ITEM", "RUN" };
+
+func init() {
+  load_font(0);
+  ui_init(60);
+  lcd(LCD_BG | LCD_WIN);
+  window_pos(0, 96);
+  dialog_open(WIN_MAP, 0, 0, 20, 6);
+  dialog_say("A wild BLOCK appeared!\nWhat will you do?");
+}
+func frame() {
+  if (dialog_update() == 1) {
+    dialog_close();
+    menu_open(WIN_MAP, 10, 0, choices, 3);
+  }
+}
+```
+
+## std/anim
+
+| Function | What it does |
+|---|---|
+| `anim_frame(t, count, speed)` | which of `count` frames to show at time `t` when each frame lasts `speed` ticks |
+| `blink(t, period)` | 1 for `period` ticks then 0 for `period` ticks, repeating |
+| `approach(v, target, step)` | move `v` toward `target` by at most `step`, never overshooting |
+
+## `std/music`: a tiny tracker
+
+Up to three voices, each playing a `btable` of `(note, steps)` pairs on one audio channel.
+
+```
+import "std/music";
+
+btable lead = { N_E4, 2, N_G4, 2, N_C5, 4, 0, 2, MUS_LOOP };   // 0 is a rest
+btable bass = { N_C3, 4, N_G3, 4, MUS_LOOP };
+btable jingle = { N_C5, 1, N_E5, 1, N_G5, 1, N_C6, 3, MUS_END };
+
+func init() {
+  music_tempo(8);                 // frames per step: 8 is 7.5 steps a second
+  music_play(0, 0, lead, 8);      // voice 0 on channel 0 (pulse) at volume 8
+  music_play(1, 2, bass, 9);      // voice 1 on channel 2 (triangle)
+}
+func frame() { music_update(); }  // once per frame
+```
+
+| Call | Meaning |
+|---|---|
+| `music_tempo(frames_per_step)` | speed for every voice |
+| `music_play(voice, channel, song, volume)` | start a song on voice 0-2; channels 0-1 are pulse, 2 is triangle |
+| `music_duty(voice, d)` | pulse width 0-3 for that voice (call after `music_play`) |
+| `music_update()` | advance the music; call once per frame |
+| `music_stop(voice)`, `music_stop_all()` | stop and silence |
+| `music_playing(voice)` | 1 while the voice still has notes (a `MUS_END` song stops itself) |
+| `music_mute(on)` | silence the music without losing the beat |
+
+Notes are semitones named `N_C2` (1) up to `N_B6` (60); sharps are `N_CS4`, `N_DS4`, `N_FS4`, `N_GS4`, `N_AS4`. End a
+song with `MUS_LOOP` (repeat forever) or `MUS_END` (play once: good for fanfares on a spare voice). Each note starts
+at full volume and fades toward half, which gives a soft pluck. Keep one or two channels free for sound effects
+(`tone(1, hz, vol, duty)`, and channel 3 is noise).
+
+## Tilemaps: levels as ASCII art
+
+A `.map` file draws a level with characters and says what each one means:
+
+```
+legend:
+  // a character, an equals sign, and a constant expression for the 16-bit map cell
+  # = T + art_wall
+  . = T + art_floor
+  P = T + art_floor, marker
+  C = T + art_coin, marker
+map:
+##########
+#P.....C.#
+#..###...#
+#C.....C.#
+##########
+```
+
+```
+const T = 100;                      // where the art tiles live in tile RAM
+tileset art = "art.tiles";
+tilemap level = "level.map";
+
+func init() {
+  load_tiles(art, T, art_COUNT);
+  load_map(level, level_W, level_H, 2, 2);        // draw it into the background at cell (2, 2)
+  player_x = level_P_X * 8;                         // where the P was (cell coordinates)
+  for (var i = 0; i < level_C_COUNT; i++) {         // every C
+    spawn_coin(level_C_list[i * 2], level_C_list[i * 2 + 1]);   // (x, y) cell pairs
+  }
+}
+```
+
+- The legend value is any constant expression. **It must include the tile offset** (`T + art_wall`), because tile
+  indices in a map refer to tile RAM, not to the art file. Add `| (palette << 12)`, `| CELL_FLIPX` and friends for
+  attributes.
+- `, marker` (letters and digits only) records where a character appears. You get `level_P_X`, `level_P_Y` (the first
+  one), `level_P_COUNT`, and `level_P_list`, a word table of x, y pairs in cell coordinates.
+- `level_W`, `level_H` and `level_SIZE` (bytes) are constants. `level` itself is the address of the cell data (one
+  16-bit word per cell, row-major), so `map_cell(level, level_W, x, y)` reads a cell, e.g. to test for walls.
+- Maps may be larger than the 32x32 background (up to 255 x 255); copy the part you want to show, or scroll by
+  streaming rows as the camera moves.
+- Errors name the `.map` file and line: a character missing from the legend, uneven row widths, a legend value that
+  is not constant.
+
+
+## std/sprites: a sprite manager
+
+There are 64 sprite slots. Assigning indices by hand and forgetting to hide one leaves stale sprites on screen (a rival from
+the last level, a flag from the last lap). `std/sprites` hands slots out each frame and hides the ones you did not use:
+
+```
+import "std/sprites";
+func frame() {
+  spr_begin(0);                         // slots 0..first-1 stay yours; hand out from `first`
+  spr(hero_x, hero_y, TILE_HERO, 0);    // returns the slot used, or -1 when all 64 are in use
+  for (var i = 0; i < enemy_n; i++) { spr(ex[i], ey[i], TILE_ENEMY, 1); }
+  spr_end();                            // hides every slot not used this frame
+}
+```
+
+`spr_used()` tells you how many slots this frame has used so far; keep well under 64. Multi-tile sprites still take one
+slot (set the size flag in `attr`).
+
+## std/sfx: sound effects that cooperate with the music
+
+`sfx_play(SFX_JUMP)` and call `sfx_update()` once a frame (next to `music_update()`). Effects: `SFX_JUMP`, `SFX_LAND`,
+`SFX_COIN`, `SFX_HIT`, `SFX_POWER`, `SFX_SELECT`, `SFX_BACK`, `SFX_EXPLODE`, `SFX_SHOOT`, `SFX_DEATH`, `SFX_PAUSE`,
+`SFX_WIN`. Tonal effects use audio channel 1 and noise effects channel 3. While one plays, the music voice on that channel
+yields, and it comes back at its next note. One effect plays at a time (a new one replaces the old).
+
+```
+import "std/music"; import "std/sfx";
+func frame() { music_update(); sfx_update(); if (btnp(BTN_A)) { sfx_play(SFX_JUMP); } }
+```
+
+For a sound you drive yourself, such as an engine whose pitch follows speed, `sfx_tone(ch, hz, vol, duty, frames)` takes the
+channel for `frames` frames (call it every frame while the sound runs). Plan the four channels first: music on 0 (lead),
+1 (harmony, yields to effects), 2 (bass) and 3 (drums, yields to noise effects). See the design playbook.
+
+
+## std/stream: an endless scrolling world
+
+The background is a 32 x 32 map that wraps, so a world wider than 256 pixels is built by writing columns just before they scroll into
+view. `std/stream` does that for you. You define the world as a function; it keeps the 32 columns around the camera written and sets
+the hardware scroll.
+
+```
+import "std/stream";
+var cam;
+// the cell at world column wx (0, 1, 2, ...) and map row 0..19: tile | palette << 12 (flip flags allowed)
+func stream_tile(wx, row) {
+  var ground = 12 + sin(wx * 5) / 90;               // a rolling hill: the row where the ground starts
+  if (row == ground) { return T_GRASS; }
+  if (row > ground) { return T_DIRT; }
+  return T_SKY;
+}
+func init() { /* load tiles, palettes */ stream_start(cam); }
+func frame() { cam += 2; stream_scroll(cam); }
+```
+
+It scrolls either way. A column is about 20 cells, so keep `stream_tile` cheap (a lookup, a height table). Because `scroll()` moves the whole
+background, put the HUD in the window layer (`lcd(LCD_BG | LCD_WIN | LCD_OBJ)`, `window_pos(0, 128)`, `wtext`, `wprint_u`) and fake a
+second, slower layer with a few large sprites moving at half the camera speed. Use the same height function for drawing and for
+physics, so nothing floats above the ground.
+
+
+## std/fade and `spr_text`
+
+`std/fade` fades the whole screen to black and back by scaling every palette colour (4 is normal, 0 is black):
+
+```
+import "std/fade";
+func init() { /* set bg_pal / obj_pal */ fade_save(); fade_set(0); fade_to(4, 6); }      // start black, fade in, a step every 6 frames
+func frame() {
+  fade_update();                                                                       // once per frame
+  if (leaving && !fade_busy()) { start_next_screen(); fade_to(4, 6); }
+  if (btnp(BTN_START)) { leaving = 1; fade_to(0, 6); }
+}
+```
+
+Call `fade_save()` after you set palettes on purpose (it remembers the real colours); `fade_set(n)` jumps to a level; a step costs about 15,000 cycles (so fade in steps, not in one frame, and do not combine it with another big call). Set or change palettes at full brightness (`fade_set(4)` first), then `fade_save()`; palette changes made while faded are lost when you save. To change colours *during* a fade (a lava stage, a flash), write the faded copy as well as the
+real one: set `fade_bg[]`/`fade_obj[]` words directly and the next `fade_update` shows them, then update your saved palette the same way.
+`spr_text(x, y, "WARNING", pal)` (in `std/sprites`) draws big letters as sprites, for banners and messages over the action; call it first in the frame so
+the letters get the low slot numbers and sit on top. The letters are drawn in **palette colour 3**, so choose an object palette whose colour 3 contrasts with the
+background (a dark colour 3 over a dark scene is unreadable).
+
+## Long songs from patterns: `music_build`
+
+A tune that does not audibly loop needs 16 or more bars. Write each distinct bar once and list the order:
+
+```
+import "std/music";
+btable lead_pats = { N_A4,0,N_C5,N_A4,0,N_E5,N_D5,N_C5,   N_G4,0,N_B4,N_G4,0,N_D5,N_C5,N_B4 };   // 2 patterns of 8 steps
+btable lead_order = { 0, 1, 0, 1, 0, 1, 0, 1 };                                                   // 8 bars
+byte lead_buf[8 * 8 * 2 + 1];                                                                      // 2 bytes per step + the loop mark
+func init() { music_tempo(7); music_play(0, 0, music_build(lead_buf, lead_pats, 8, lead_order, 8), 7); }
+```
+
+Each step is one note (0 is a rest) lasting one step. Give each voice its own buffer and play the voices together: lead on channel 0,
+bass on channel 2 (see the channel plan in the design playbook). Hill Racer builds a 24-bar race song and a 16-bar title song this way.
+
+
+## std/tunes: music you do not have to compose
+
+Five ready-made loops, 16 to 24 bars each (20 to 30 seconds before they repeat), melody on channel 0 and bass on channel 2, so
+channels 1 and 3 stay free for sound effects.
+
+```
+import "std/tunes";                                   // also brings in std/music and std/sfx
+func init() { tune_play(TUNE_ADVENTURE); }
+func frame() { music_update(); sfx_update(); }
+```
+
+| Tune | Mood |
+|---|---|
+| `TUNE_TITLE` | calm, A minor, slow: a title or menu |
+| `TUNE_ADVENTURE` | bright and bouncy, C major: exploring, platforming |
+| `TUNE_ACTION` | driving, A minor: racing, shooting |
+| `TUNE_BOSS` | fast and tense, D minor: a boss or a final push |
+| `TUNE_SPACE` | spacious, E minor: space, caves, night |
+
+`tune_play` builds the song (about one frame of work), so call it when a scene starts. Switch tunes at scene changes (title to play to boss);
+`tune_stop()` silences it. For a signature tune of your own, see `music_build` above.

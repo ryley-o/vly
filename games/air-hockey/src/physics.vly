@@ -1,0 +1,216 @@
+// physics.vly: puck, mallets, walls, posts. Positions are in 1/64 pixel (a 160 px screen is 10,240 units: fits a signed word),
+// velocities in 1/256 pixel per frame. Every frame is two sub-steps, so nothing ever moves more than 2.75 px between checks.
+const T_X0 = 8;  const T_X1 = 152; const T_Y0 = 16; const T_Y1 = 136;      // table interior in pixels
+const GOAL_Y0 = 48; const GOAL_Y1 = 104;                                      // goal mouth in pixels
+const PUCK_XMIN = 12 * 64; const PUCK_XMAX = 148 * 64;                       // where the puck centre can be (radius 4)
+const PUCK_YMIN = 20 * 64; const PUCK_YMAX = 132 * 64;
+const MOUTH_Y0 = GOAL_Y0 * 64; const MOUTH_Y1 = GOAL_Y1 * 64;
+const CONTACT = 11;                                                          // mallet radius 7 + puck radius 4
+const POST_R = 5;                                                            // goal post radius 1 + puck radius 4
+const REST_MALLET = 180;                                                     // bounce off a mallet: 0.70 (a held mallet absorbs a good part of a shot)
+const REST_WALL = 236;                                                       // 0.92
+const REST_POST = 200;
+const MAL_XMIN = 15; const MAL_XMAX = 73;                                    // player's mallet centre range (px)
+const CPU_XMIN = 87; const CPU_XMAX = 145;
+const MAL_YMIN = 24; const MAL_YMAX = 128;
+const PUCK_VMAX = 88;                                                        // 1/16 px per frame: 5.5 px per frame
+const PLAYER_SPD = 760;                                                      // 1/256 px per frame: 2.97 px per frame
+const MAL_ACC = 170;                                                         // acceleration (1/256 px/frame per frame)
+const MAL_BRAKE = 300;
+
+var pux; var puy; var pvx; var pvy;          // puck
+var mx[2]; var my[2]; var mvx[2]; var mvy[2];     // mallets: 0 = player (left), 1 = CPU (right)
+var hit_str;                                 // strength of the last contact in 1/8 px per frame (0 = none)
+var ev_mallet;                               // 1 or 2 when a mallet hit the puck this frame (1 = player, 2 = CPU), with ev_str
+var ev_mallet_str;
+var ev_wall;                                 // strength of a wall bounce this frame
+var ev_post;                                 // strength of a post hit this frame
+var goal_side;                               // 0 none, 1 = puck entered the CPU's goal (player scores), 2 = player's goal
+var last_touch;                              // 0 none, 1 player, 2 CPU
+var touches;                                 // mallet hits since the last goal
+
+func isqrt(n) {
+  var res = 0;
+  var bit = 16384;
+  while (ugt(bit, n)) { bit = bit >>> 2; }
+  while (bit != 0) {
+    if (uge(n, res + bit)) { n -= res + bit; res = (res >>> 1) + bit; } else { res = res >>> 1; }
+    bit = bit >>> 2;
+  }
+  return res;
+}
+
+// Puck against a circle (a mallet or a post): combined radius `rad` px, circle velocity (cvx, cvy), bounce `rest` (8.8).
+// Pushes the puck out and bounces it; returns 1 when they overlapped. hit_str gets the approach speed.
+func hit_circle(cx, cy, cvx, cvy, rad, rest) {
+  var dx = pux - cx;
+  var dy = puy - cy;
+  var lim = rad << 6;
+  hit_str = 0;
+  if (dx >= lim || dx <= -lim || dy >= lim || dy <= -lim) { return 0; }
+  var sx = dx >> 3;
+  var sy = dy >> 3;
+  var r8 = rad << 3;
+  var d2 = sx * sx + sy * sy;
+  if (d2 >= r8 * r8) { return 0; }
+  var d = isqrt(d2);
+  if (d == 0) { sx = 1; sy = 0; d = 1; }
+  var nx = sx * 256 / d;
+  var ny = sy * 256 / d;
+  pux = cx + fmul(nx, lim);
+  puy = cy + fmul(ny, lim);
+  var un = fmul(pvx - cvx, nx) + fmul(pvy - cvy, ny);
+  if (un < 0) {
+    var j = fmul(0 - un, 256 + rest);
+    pvx += fmul(nx, j);
+    pvy += fmul(ny, j);
+    hit_str = (0 - un) >> 5;
+    if (hit_str < 1) { hit_str = 1; }
+  }
+  return 1;
+}
+
+func puck_speed16() {                          // puck speed in 1/16 px per frame (5.5 px per frame = 88)
+  var a = pvx >> 4;
+  var b = pvy >> 4;
+  return isqrt(a * a + b * b);
+}
+func puck_speed8() { return puck_speed16() >> 1; }       // in 1/8 px per frame
+
+func limit_speed() {
+  var sp = puck_speed16();
+  if (sp > PUCK_VMAX) {
+    var k = PUCK_VMAX * 256 / sp;
+    pvx = fmul(pvx, k);
+    pvy = fmul(pvy, k);
+  }
+}
+
+func puck_walls() {
+  // top and bottom
+  if (puy < PUCK_YMIN) { puy = PUCK_YMIN; if (pvy < 0) { ev_wall = max(ev_wall, (0 - pvy) >> 5); pvy = fmul(0 - pvy, REST_WALL); } }
+  if (puy > PUCK_YMAX) { puy = PUCK_YMAX; if (pvy > 0) { ev_wall = max(ev_wall, pvy >> 5); pvy = fmul(0 - pvy, REST_WALL); } }
+  // end walls, except in the goal mouths
+  if (puy < MOUTH_Y0 || puy > MOUTH_Y1) {
+    if (pux < PUCK_XMIN) { pux = PUCK_XMIN; if (pvx < 0) { ev_wall = max(ev_wall, (0 - pvx) >> 5); pvx = fmul(0 - pvx, REST_WALL); } }
+    if (pux > PUCK_XMAX) { pux = PUCK_XMAX; if (pvx > 0) { ev_wall = max(ev_wall, pvx >> 5); pvx = fmul(0 - pvx, REST_WALL); } }
+  }
+}
+
+func puck_posts() {
+  if (pux > 22 * 64 && pux < 138 * 64) { return; }
+  var px = T_X0 * 64;
+  if (pux > 80 * 64) { px = T_X1 * 64; }
+  if (hit_circle(px, MOUTH_Y0, 0, 0, POST_R, REST_POST)) { if (hit_str > 1) { ev_post = max(ev_post, hit_str); } }
+  if (hit_circle(px, MOUTH_Y1, 0, 0, POST_R, REST_POST)) { if (hit_str > 1) { ev_post = max(ev_post, hit_str); } }
+}
+
+// The puck is pinned between a mallet and a wall (or in a corner): slide the puck along the wall, away from the mallet; if that does not
+// free it (a corner), the mallet yields instead and is pushed back out along the line between the two.
+func squeeze(i) {
+  var dx = pux - mx[i];
+  var dy = puy - my[i];
+  var lim = (CONTACT - 1) << 6;
+  if (dx >= lim || dx <= -lim || dy >= lim || dy <= -lim) { return; }
+  var sx = dx >> 3;
+  var sy = dy >> 3;
+  var r8 = (CONTACT - 1) << 3;
+  if (sx * sx + sy * sy >= r8 * r8) { return; }
+  if (puy <= PUCK_YMIN || puy >= PUCK_YMAX) {
+    var h = isqrt(r8 * r8 - sy * sy) << 3;
+    var sgn = 1;
+    if (dx < 0) { sgn = -1; }
+    if (dx == 0 && i == 1) { sgn = -1; }
+    pux = mx[i] + sgn * (h + 8);
+    pvx = sgn * 160;
+  } else if (pux <= PUCK_XMIN || pux >= PUCK_XMAX) {
+    var h2 = isqrt(r8 * r8 - sx * sx) << 3;
+    var sg2 = 1;
+    if (dy < 0) { sg2 = -1; }
+    puy = my[i] + sg2 * (h2 + 8);
+    pvy = sg2 * 160;
+  }
+  puck_walls();
+  // still overlapping (a corner)? then the mallet gives way
+  dx = pux - mx[i]; dy = puy - my[i];
+  if (dx >= lim || dx <= -lim || dy >= lim || dy <= -lim) { return; }
+  sx = dx >> 3; sy = dy >> 3;
+  var d2 = sx * sx + sy * sy;
+  if (d2 >= r8 * r8) { return; }
+  var d = isqrt(d2);
+  if (d == 0) { sx = 0 - 1; sy = 0 - 1; d = 1; }
+  mx[i] = pux - fmul(sx * 256 / d, CONTACT << 6);
+  my[i] = puy - fmul(sy * 256 / d, CONTACT << 6);
+  mallet_limits(i);
+}
+
+func mallet_limits(i) {
+  var xmin = MAL_XMIN * 64; var xmax = MAL_XMAX * 64;
+  if (i == 1) { xmin = CPU_XMIN * 64; xmax = CPU_XMAX * 64; }
+  if (mx[i] < xmin) { mx[i] = xmin; if (mvx[i] < 0) { mvx[i] = 0; } }
+  if (mx[i] > xmax) { mx[i] = xmax; if (mvx[i] > 0) { mvx[i] = 0; } }
+  if (my[i] < MAL_YMIN * 64) { my[i] = MAL_YMIN * 64; if (mvy[i] < 0) { mvy[i] = 0; } }
+  if (my[i] > MAL_YMAX * 64) { my[i] = MAL_YMAX * 64; if (mvy[i] > 0) { mvy[i] = 0; } }
+}
+
+// Accelerate mallet i toward the wanted velocity (tvx, tvy in 1/256 px per frame).
+func mallet_drive(i, tvx, tvy) {
+  var a = MAL_ACC;
+  if (abs(tvx) < abs(mvx[i])) { a = MAL_BRAKE; }
+  mvx[i] += clamp(tvx - mvx[i], 0 - a, a);
+  a = MAL_ACC;
+  if (abs(tvy) < abs(mvy[i])) { a = MAL_BRAKE; }
+  mvy[i] += clamp(tvy - mvy[i], 0 - a, a);
+}
+
+func mallet_hit_event(i) {
+  if (hit_str > 1) {
+    ev_mallet = i + 1;
+    ev_mallet_str = max(ev_mallet_str, hit_str);
+    last_touch = i + 1;
+    touches++;
+  }
+}
+
+// One physics frame in two sub-steps. The mallet drives (mallet_drive) are set before calling this.
+func physics_step() {
+  ev_mallet = 0; ev_mallet_str = 0; ev_wall = 0; ev_post = 0; goal_side = 0;
+  for (var s = 0; s < 2; s++) {
+    for (var i = 0; i < 2; i++) {
+      mx[i] += mvx[i] / 8;
+      my[i] += mvy[i] / 8;
+      mallet_limits(i);
+    }
+    pux += pvx / 8;
+    puy += pvy / 8;
+    for (var m = 0; m < 2; m++) {
+      if (hit_circle(mx[m], my[m], mvx[m], mvy[m], CONTACT, REST_MALLET)) { mallet_hit_event(m); }
+    }
+    puck_posts();
+    puck_walls();
+    squeeze(0);
+    squeeze(1);
+    limit_speed();
+  }
+  // a little drag: 1/512 per frame plus a tiny constant friction, the same for both signs
+  var dv = (abs(pvx) >> 9) + 1;
+  if (abs(pvx) <= dv) { pvx = 0; } else if (pvx > 0) { pvx -= dv; } else { pvx += dv; }
+  dv = (abs(pvy) >> 9) + 1;
+  if (abs(pvy) <= dv) { pvy = 0; } else if (pvy > 0) { pvy -= dv; } else { pvy += dv; }
+  // goals: the puck centre has crossed the goal line
+  if (pux < T_X0 * 64) { goal_side = 2; }
+  if (pux > T_X1 * 64) { goal_side = 1; }
+}
+
+// After a goal the puck rolls into the net and stops.
+func net_step() {
+  pux += pvx / 4;
+  puy += pvy / 4;
+  if (pux < 5 * 64) { pux = 5 * 64; pvx = fmul(0 - pvx, 100); }
+  if (pux > 155 * 64) { pux = 155 * 64; pvx = fmul(0 - pvx, 100); }
+  if (puy < 53 * 64) { puy = 53 * 64; pvy = fmul(0 - pvy, 100); }
+  if (puy > 99 * 64) { puy = 99 * 64; pvy = fmul(0 - pvy, 100); }
+  pvx -= pvx >> 4;
+  pvy -= pvy >> 4;
+}
+

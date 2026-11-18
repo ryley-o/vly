@@ -1,0 +1,533 @@
+// HILL RACER: a side-view monster-truck race over rolling hills, ramps, mud and rocks.
+//
+//   A  gas        B  turbo (it heats up: let it cool when the bar goes red)
+//   LEFT / RIGHT  tilt in the air: land on your wheels or you crash        START  pause / begin        LEFT / RIGHT on the title: pick a track
+//
+// Beat the rival to the flag. Win a track to open the next one. Your best times are saved on the cartridge.
+//
+// This is the worked example for the design playbook (docs/design.md). It shows: an endless-scrolling ground from a height table
+// (std/stream) with ONE ground function used for drawing and physics, a HUD in the window layer, a sprite manager (std/sprites),
+// pre-rotated tilt frames (the `rotate` line in art.tiles), slope-carried ramp launches, a landing rule that matches what the player
+// sees, rubber-banding for the rival, effects that share channels with long music built from patterns (std/sfx, std/music), a
+// loading state spread over frames, and parallax from a few big slow sprites.
+
+import "std/music";
+import "std/sfx";
+import "std/sprites";
+import "std/stream";
+import "std/anim";
+
+tileset art = "../assets/art.tiles";
+
+const T = 100;                          // art tiles in tile RAM (the font is 0..94)
+const S_TITLE = 0; const S_GEN = 1; const S_READY = 2; const S_RACE = 3; const S_PAUSE = 4; const S_CRASH = 5; const S_DONE = 6;
+const BASE = 96;                        // ground height of a flat stretch, in pixels from the top of the screen
+const GRAV = 64;                        // 1/256 pixel per frame per frame
+const FRACTIONS = 256;
+
+// ---------- the tracks ----------
+const NTRACK = 3;
+table t_len = { 1800, 2200, 2600 };                  // columns of 8 pixels: 14,400 to 20,800 pixels, a minute and a half or more
+table t_rival = { 620, 690, 760 };                   // the rival's cruising speed, in 1/256 pixel per frame
+table t_ramps = { 110, 260, 410, 560, 710, 860, 1010, 1160, 1310, 1460, 1610, 1760,
+                  100, 280, 460, 640, 820, 1000, 1180, 1360, 1540, 1720, 1900, 2080,
+                  90, 300, 510, 720, 930, 1140, 1350, 1560, 1770, 1980, 2190, 2400 };      // 12 per track: the column where each ramp starts
+table t_mud = { 510, 960, 1410, 0, 0, 0,
+                  380, 740, 1100, 1460, 1820, 0,
+                  400, 610, 1030, 1450, 1870, 2290 };      // 6 per track: the column where a 24-column bog starts (0 = none)
+table t_rocks = { 185, 335, 485, 635, 785, 935, 1085, 1235, 1385, 1535, 1685, 1835,
+                  175, 355, 535, 715, 895, 1075, 1255, 1435, 1615, 1795, 1975, 2155,
+                  165, 375, 585, 795, 1005, 1215, 1425, 1635, 1845, 2055, 2265, 2475 };      // 12 per track: the column of each rock
+
+// ---------- songs, built from short patterns ----------
+btable lead_pats = {
+  N_A4,0,N_C5,N_A4,0,N_E5,N_D5,N_C5,   N_G4,0,N_B4,N_G4,0,N_D5,N_C5,N_B4,   N_F4,0,N_A4,N_F4,0,N_C5,N_B4,N_A4,   N_E4,0,N_GS4,N_B4,0,N_E5,N_B4,N_GS4,
+  N_E5,0,N_E5,N_D5,N_C5,0,N_D5,N_E5,   N_D5,0,N_D5,N_C5,N_B4,0,N_C5,N_D5,   N_C5,0,N_C5,N_B4,N_A4,0,N_B4,N_C5,   N_B4,N_B4,0,N_GS4,N_B4,0,N_E5,0 };
+btable lead_order = { 0,1,2,3, 0,1,2,3,  4,5,6,7, 4,5,6,7,  0,1,2,3, 0,1,2,3 };           // 24 bars: verse, chorus, verse
+btable bass_pats = {
+  N_A2,N_A2,0,N_A2,N_E3,0,N_A2,0,   N_G2,N_G2,0,N_G2,N_D3,0,N_G2,0,   N_F2,N_F2,0,N_F2,N_C3,0,N_F2,0,   N_E2,N_E2,0,N_E2,N_B2,0,N_E2,0 };
+btable bass_order = { 0,1,2,3, 0,1,2,3,  0,1,2,3, 0,1,2,3,  0,1,2,3, 0,1,2,3 };
+btable tlead_pats = {
+  N_E5,0,0,N_C5,0,0,N_A4,0,   N_D5,0,0,N_B4,0,0,N_G4,0,   N_C5,0,0,N_A4,0,0,N_F4,0,   N_B4,0,N_GS4,0,N_E4,0,0,0 };
+btable tlead_order = { 0,1,2,3, 0,1,2,3, 0,1,2,3, 0,1,2,3 };                             // 16 bars
+btable tbass_pats = { N_A2,0,0,0,N_E3,0,0,0,   N_G2,0,0,0,N_D3,0,0,0,   N_F2,0,0,0,N_C3,0,0,0,   N_E2,0,0,0,N_B2,0,0,0 };
+byte lead_buf[24 * 8 * 2 + 1];
+byte bass_buf[24 * 8 * 2 + 1];
+byte tlead_buf[16 * 8 * 2 + 1];
+byte tbass_buf[16 * 8 * 2 + 1];
+
+// ---------- state ----------
+byte hgt[2600];                         // ground height of every column of the track being raced
+var state; var track; var len; var finish_x;
+var gen_col; var fill_col; var timer; var t_total;
+var best[3]; var unlocked;
+// the truck: position in whole pixels plus a fraction (1/256), speed and vertical speed in 1/256 pixel per frame
+var tx; var txf; var ty; var tyf; var tspd; var tvy; var onground; var pitch; var heat; var hot; var crash_t;
+var rx; var rxf; var rspd; var ry; var rdone; var place;
+var cam; var shake; var turbo_on; var air_t;
+var rock_gone[12];
+var dust_x[4]; var dust_y[4]; var dust_t[4]; var dust_n;
+var hud_t; var hud_heat; var penalty; var newbest;
+var msg_a; var msg_ax; var msg_ay; var msg_b; var msg_bx; var msg_by;      // up to two lines of big letters, drawn first so they sit on top
+
+// ---------- the ground: ONE function for drawing and physics ----------
+func in_flat(c) {
+  for (var i = 0; i < 12; i++) {
+    var r = t_ramps[track * 12 + i];
+    if (c >= r - 8 && c < r + 40) { return 1; }
+  }
+  return 0;
+}
+func ramp_rise(c) {                    // each ramp climbs 2, 3 or 4 pixels a column for 14 columns, then drops away
+  for (var i = 0; i < 12; i++) {
+    var r = t_ramps[track * 12 + i];
+    if (c >= r && c < r + 14) { return (c - r) * (2 + i % 3); }
+  }
+  return 0;
+}
+func in_mud_col(c) {
+  for (var i = 0; i < 6; i++) {
+    var m = t_mud[track * 6 + i];
+    if (m != 0 && c >= m && c < m + 24) { return 1; }
+  }
+  return 0;
+}
+func gen_height(c) {
+  var h = BASE;
+  if (!in_flat(c)) { h = BASE + sin(c * 3 + track * 40) / 12 + sin(c * 7) / 40; }
+  return h - ramp_rise(c);
+}
+func gen_step() {
+  var n = gen_col + 24;
+  if (n > len) { n = len; }
+  while (gen_col < n) { hgt[gen_col] = gen_height(gen_col); gen_col++; }
+}
+// ground height under world pixel x, blended between the two columns around it
+func ground(x) {
+  if (x < 0) { x = 0; }
+  var c = x >> 3;
+  if (c >= len - 1) { return hgt[len - 1]; }
+  var a = hgt[c];
+  var b = hgt[c + 1];
+  return a + ((b - a) * (x & 7)) / 8;
+}
+func slope(x) { return clamp(ground(x + 8) - ground(x - 8), -6, 6); }  // pixels of height change over 16 pixels, kept sane at a cliff edge
+func ground_pitch(x) { return slope(x) / 3; }                            // -2 (nose up) .. 2 (nose down)
+
+// the background cell at world column wx and map row (called by std/stream as the camera moves)
+func stream_tile(wx, row) {
+  var c = wx;
+  if (c >= len) { c = len - 1; }
+  var h = hgt[c];
+  var sr = h >> 3;
+  var pal = 0;
+  if (in_mud_col(c)) { pal = 4; }
+  if (wx >= len - 6 && wx < len - 4 && row >= sr - 4 && row < sr) { return (T + art_chk) | (5 << 12); }   // the finish banner
+  if (row < sr) {
+    if (row < 5) { return 1 << 12; }                // sky bands: the blank tile in three palettes
+    if (row < 9) { return 2 << 12; }
+    return 3 << 12;
+  }
+  if (row == sr) { return (T + art_g0 + (h & 7)) | (pal << 12); }
+  return (T + art_dirt0 + ((wx * 5 + row * 3) & 1)) | (pal << 12);
+}
+
+// ---------- palettes: one look per track ----------
+func theme(t) {
+  if (t == 0) {            // a bright morning
+    bg_pal(1, rgb(4, 8, 14), 0, 0, 0); bg_pal(2, rgb(7, 11, 15), 0, 0, 0); bg_pal(3, rgb(10, 13, 15), 0, 0, 0);
+    bg_pal(0, rgb(10, 13, 15), rgb(10, 6, 3), rgb(5, 11, 3), rgb(6, 3, 2));
+    bg_pal(4, rgb(10, 13, 15), rgb(6, 4, 2), rgb(8, 6, 3), rgb(3, 2, 1));
+  } else if (t == 1) {     // dusk
+    bg_pal(1, rgb(6, 3, 8), 0, 0, 0); bg_pal(2, rgb(12, 5, 6), 0, 0, 0); bg_pal(3, rgb(15, 9, 5), 0, 0, 0);
+    bg_pal(0, rgb(15, 9, 5), rgb(9, 4, 2), rgb(8, 8, 2), rgb(5, 2, 1));
+    bg_pal(4, rgb(15, 9, 5), rgb(5, 3, 2), rgb(7, 5, 3), rgb(3, 1, 1));
+  } else {                 // night
+    bg_pal(1, rgb(1, 1, 4), 0, 0, 0); bg_pal(2, rgb(2, 2, 7), 0, 0, 0); bg_pal(3, rgb(4, 4, 10), 0, 0, 0);
+    bg_pal(0, rgb(4, 4, 10), rgb(5, 3, 2), rgb(2, 6, 3), rgb(3, 2, 1));
+    bg_pal(4, rgb(4, 4, 10), rgb(3, 2, 2), rgb(4, 3, 3), rgb(2, 1, 1));
+  }
+  bg_pal(5, rgb(15, 15, 15), rgb(15, 15, 15), rgb(0, 0, 0), rgb(0, 0, 0));           // the finish checker
+  obj_pal(0, 0, rgb(15, 15, 15), rgb(12, 12, 14), rgb(9, 9, 12));                    // clouds
+  obj_pal(5, 0, rgb(8, 9, 12), rgb(15, 15, 15), rgb(4, 4, 7));                       // mountains
+  obj_pal(2, 0, rgb(3, 5, 14), rgb(12, 14, 15), rgb(2, 2, 5));                       // the rival
+  if (t == 2) { obj_pal(0, 0, rgb(6, 6, 9), rgb(4, 4, 8), rgb(3, 3, 6)); obj_pal(5, 0, rgb(3, 3, 6), rgb(8, 8, 11), rgb(2, 2, 4)); }
+  if (t == 1) { obj_pal(5, 0, rgb(9, 4, 6), rgb(15, 10, 8), rgb(5, 2, 3)); }
+}
+func ui_pals() {
+  bg_pal(6, rgb(2, 2, 5), rgb(8, 8, 8), rgb(15, 11, 2), rgb(15, 15, 15));            // the HUD strip and the loading screen
+  bg_pal(7, rgb(4, 8, 14), rgb(8, 8, 8), rgb(15, 11, 2), rgb(15, 15, 15));           // the title screen
+  obj_pal(1, 0, rgb(14, 3, 2), rgb(12, 14, 15), rgb(3, 2, 2));                       // the player's truck
+  obj_pal(3, 0, rgb(12, 12, 12), rgb(9, 9, 9), rgb(4, 4, 4));                        // rocks
+  obj_pal(4, 0, rgb(15, 15, 15), rgb(15, 11, 2), rgb(15, 15, 15));                   // dust, flags, message letters
+}
+
+// ---------- the window layer: HUD strip, title and loading screens ----------
+func wclear(pal) {
+  for (var r = 0; r < 18; r++) { for (var c = 0; c < 20; c++) { set_wcell(c, r, pal << 12); } }
+}
+func wchar(col, row, ch) { set_wcell(col, row, (ch - 32) | (text_pal << 12)); }
+func wtime(col, row, t) {               // M:SS.T  (t in frames)
+  var secs = t / 60;
+  var tenths = (t - secs * 60) / 6;
+  var m = secs / 60;
+  var s = secs - m * 60;
+  wchar(col, row, 48 + m); wchar(col + 1, row, 58);
+  wchar(col + 2, row, 48 + s / 10); wchar(col + 3, row, 48 + s - (s / 10) * 10);
+  wchar(col + 4, row, 46); wchar(col + 5, row, 48 + tenths);
+}
+func hud_static() {
+  wclear(6);
+  text_pal = 6;
+  wtext(0, 0, "T"); wtext(9, 0, "BEST");
+  wtext(0, 1, "HEAT"); wtext(14, 1, "POS");
+  hud_t = -1; hud_heat = -1;
+}
+func hud_update() {
+  text_pal = 6;
+  var t = t_total;
+  if (t != hud_t && (frames() & 3) == 0) {
+    wtime(2, 0, t);
+    if (best[track] > 0) { wtime(14, 0, best[track]); } else { wtext(14, 0, "-:--.-"); }
+    hud_t = t;
+  }
+  var h = heat >> 5;                                        // 0..7
+  if (h != hud_heat) {
+    for (var i = 0; i < 8; i++) {
+      var tile = T + art_bar_empty;
+      if (i < h) { tile = T + art_bar_full; if (i >= 5) { tile = T + art_bar_hot; } }
+      set_wcell(5 + i, 1, tile | (6 << 12));
+    }
+    hud_heat = h;
+  }
+  wchar(18, 1, 49 + (place - 1));
+}
+
+// ---------- drawing ----------
+func say(x, y, s) {                     // letters as sprites, for big messages over the race (lower sprite numbers draw on top)
+  var i = 0;
+  var c = peek8(s);
+  while (c != 0) { if (c != 32) { spr(x + i * 8, y, c - 32, 4); } i++; c = peek8(s + i); }
+}
+func truck_tile(p) {                         // pitch -3 (nose high) .. 3 (nose low), 15 degrees a step: big enough to see at a glance
+  if (p <= -3) { return T + art_truck_tilt_m45; }
+  if (p == -2) { return T + art_truck_tilt_m30; }
+  if (p == -1) { return T + art_truck_tilt_m15; }
+  if (p == 0) { return T + art_truck; }
+  if (p == 1) { return T + art_truck_tilt_p15; }
+  if (p == 2) { return T + art_truck_tilt_p30; }
+  return T + art_truck_tilt_p45;
+}
+func puff(x, y) { dust_x[dust_n] = x; dust_y[dust_n] = y; dust_t[dust_n] = 16; dust_n = (dust_n + 1) & 3; }
+func msg(x, y, s) { if (msg_a == 0) { msg_a = s; msg_ax = x; msg_ay = y; } else { msg_b = s; msg_bx = x; msg_by = y; } }
+func draw_scene() {
+  spr_begin(0);
+  if (msg_a != 0) { say(msg_ax, msg_ay, msg_a); msg_a = 0; }
+  if (msg_b != 0) { say(msg_bx, msg_by, msg_b); msg_b = 0; }
+  // rocks, flags
+  var rocks = track * 12;
+  for (var i = 0; i < 12; i++) {
+    var rc = t_rocks[rocks + i];
+    var sx = rc * 8 - cam;
+    if (sx > -10 && sx < 170 && !rock_gone[i]) { spr(sx, ground(rc * 8 + 4) - 7, T + art_rock, 3); }
+  }
+  var fx = finish_x - cam;
+  if (fx > -16 && fx < 170) { spr(fx - 4, ground(finish_x) - 16, T + art_flag, 0x40 | 4); spr(fx + 14, ground(finish_x + 18) - 16, T + art_flag, 0x40 | 4 | SPR_FLIPX); }
+  // dust
+  for (var i = 0; i < 4; i++) { if (dust_t[i] > 0) { if (dust_t[i] > 4 || (dust_t[i] & 1)) { spr(dust_x[i] - cam, dust_y[i] - 8 - (16 - dust_t[i]) / 3, T + art_dust, 4); } } }
+  // the rival and the player (the player is drawn last so it is on top)
+  var rp = ground_pitch(rx);
+  spr(rx - cam - 8, ry - 15, truck_tile(rp), 0x80 | 2);
+  if (state != S_CRASH || (crash_t & 4)) { spr(tx - cam - 8, ty - 15, truck_tile(pitch), 0x80 | 1); }
+  // far scenery last: the sprite manager gives later sprites higher slots, and higher slots draw behind
+  // parallax: mountains drift at a quarter of the camera speed, clouds at half
+  for (var i = 0; i < 3; i++) {
+    var mx = umod(i * 104 - (cam >> 2) + 4000, 312) - 40;
+    spr(mx, BASE - 30, T + art_mountain, SPR_BEHIND | 0xC0 | 5);
+  }
+  for (var i = 0; i < 3; i++) {
+    var cx = umod(i * 136 - (cam >> 1) + 4000, 340) - 40;
+    spr(cx, 6 + i * 16, T + art_cloud, 0x80);
+  }
+  spr_end();
+}
+func scroll_camera() {
+  cam = tx - 60;
+  if (cam < 0) { cam = 0; }
+  stream_scroll(cam);
+  var sy = 0;
+  if (shake > 0) { sy = (shake & 1) * 2 - 1; shake--; }
+  scroll(cam & 255, sy);
+}
+
+// ---------- save ----------
+func save_best() {
+  save_clear();
+  save_set(0, 0x4852);
+  save_set(2, best[0]); save_set(4, best[1]); save_set(6, best[2]); save_set(8, unlocked);
+  save_seal(); save_commit();
+}
+func load_save() {
+  best[0] = 0; best[1] = 0; best[2] = 0; unlocked = 1;
+  if (save_loaded() && save_valid() && save_get(0) == 0x4852) {
+    best[0] = save_get(2); best[1] = save_get(4); best[2] = save_get(6); unlocked = save_get(8);
+    if (unlocked < 1 || unlocked > NTRACK) { unlocked = 1; }
+  }
+}
+
+// ---------- states ----------
+func start_title() {
+  state = S_TITLE; timer = 0;
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+  window_pos(0, 0);
+  text_pal = 7; wclear(7);
+  wtext(5, 2, "HILL RACER");
+  wtext(3, 4, "A GAS    B TURBO");
+  wtext(2, 5, "D-PAD TILTS IN AIR");
+  for (var c = 0; c < 20; c++) { set_wcell(c, 15, (T + art_g0) | (0 << 12)); set_wcell(c, 16, (T + art_dirt0 + (c & 1)) | (0 << 12)); set_wcell(c, 17, (T + art_dirt1 - (c & 1)) | (0 << 12)); }
+  theme(0); ui_pals();
+  title_track();
+  scroll(0, 0);
+  hide_all_sprites(); spr_end();
+  music_stop_all(); music_tempo(11);
+  music_play(0, 0, tlead_buf, 6); music_play(1, 2, tbass_buf, 7);
+}
+func title_track() {
+  text_pal = 7;
+  wtext(4, 8, "                ");
+  var names = "DUSTY HILLS MUD VALLEY  SKY RAMPS   ";
+  for (var i = 0; i < 11; i++) { wchar(4 + i, 8, peek8(names + track * 12 + i)); }
+  wchar(2, 8, 60); wchar(17, 8, 62);
+  wtext(4, 10, "                ");
+  if (track >= unlocked) { wtext(4, 10, "WIN THE LAST TRACK"); }
+  else if (best[track] > 0) { wtext(4, 10, "BEST"); wtime(9, 10, best[track]); }
+  else { wtext(4, 10, "NO TIME YET"); }
+}
+func title_frame() {
+  timer++;
+  if (btnp(BTN_RIGHT) && track < NTRACK - 1) { track++; sfx_play(SFX_SELECT); title_track(); }
+  if (btnp(BTN_LEFT) && track > 0) { track--; sfx_play(SFX_SELECT); title_track(); }
+  text_pal = 7;
+  if (blink(timer, 30)) { wtext(4, 13, "PRESS  START"); } else { wtext(4, 13, "            "); }
+  if (btnp(BTN_START | BTN_A) && track < unlocked) { srand(0, frames()); sfx_play(SFX_POWER); start_gen(); return; }
+  // the truck bobs on the ground at the bottom of the title
+  spr_begin(0);
+  var bob = (sin(timer * 5) / 90);
+  spr(72, 104 + bob, truck_tile((sin(timer * 5) / 200)), 0x80 | 1);
+  spr(umod(timer, 200) - 20, 40, T + art_cloud, 0x80 | SPR_BEHIND);          // behind the title text, never over it
+  spr(umod(timer + 100, 200) - 20, 66, T + art_cloud, 0x80 | SPR_BEHIND);
+  spr_end();
+}
+func start_gen() {
+  state = S_GEN; gen_col = 0; fill_col = 0;
+  len = t_len[track]; finish_x = (len - 6) * 8;
+  theme(track);
+  text_pal = 6; wclear(6); wtext(6, 8, "LOADING...");
+  clear_bg();
+  hide_all_sprites(); spr_end();
+}
+func gen_frame() {                      // work is spread over frames: the heights first, then the first screenful of columns
+  if (gen_col < len) { gen_step(); return; }
+  if (fill_col < 32) { for (var i = 0; i < 4; i++) { stream_column(fill_col); fill_col++; } return; }
+  start_ready();
+}
+func start_ready() {
+  state = S_READY; timer = 0;
+  tx = 40; txf = 0; ty = ground(40); tyf = 0; tspd = 0; tvy = 0; onground = 1; pitch = 0; heat = 0; hot = 0; crash_t = 0; shake = 0;
+  rx = 24; rxf = 0; rspd = 0; ry = ground(24); rdone = 0; place = 1;
+  for (var i = 0; i < 12; i++) { rock_gone[i] = 0; }
+  for (var i = 0; i < 4; i++) { dust_t[i] = 0; }
+  t_total = 0; penalty = 0; newbest = 0; cam = 0;
+  stream_lo = 0;
+  scroll(0, 0);
+  hud_static();
+  window_pos(0, 128);
+  music_stop_all();
+  tx = 40; cam = 0;
+}
+func ready_frame() {
+  timer++;
+  scroll_camera();
+  if (timer == 60 || timer == 120 || timer == 180) { sfx_play(SFX_SELECT); }
+  if (timer == 240) { sfx_play(SFX_POWER); start_race(); return; }
+  if (timer < 60) { msg(76, 40, "3"); } else if (timer < 120) { msg(76, 40, "2"); } else if (timer < 180) { msg(76, 40, "1"); } else { msg(72, 40, "GO!"); }
+  draw_scene();
+}
+func start_race() {
+  state = S_RACE; timer = 0;
+  music_tempo(7);
+  music_play(0, 0, lead_buf, 7); music_play(1, 2, bass_buf, 8);
+}
+
+func do_crash() {
+  state = S_CRASH; crash_t = 70; tspd = 0; tvy = -300; onground = 0;
+  sfx_play(SFX_EXPLODE); shake = 14; penalty += 120;
+  music_mute(1);
+}
+func rival_update() {
+  var base = t_rival[track];
+  var d = rx - tx;
+  if (d > 140) { base -= 130; }                    // rubber band: well ahead, ease off ...
+  if (d < -110) { base += 140; }                   // ... well behind, push, so it stays a race
+  var s = slope(rx);
+  var goal = base - s * 6;
+  if (in_mud_col(rx >> 3)) { goal = goal / 2; }
+  if (rspd < goal) { rspd += 6; } else if (rspd > goal) { rspd -= 8; }
+  if (rspd < 120) { rspd = 120; }
+  if (rx < finish_x + 40) {
+    rxf += rspd; rx += rxf >> 8; rxf = rxf & 255;
+  }
+  var g = ground(rx);
+  if (ry < g) { ry += 3; if (ry > g) { ry = g; } } else { ry = g; }
+  if (!rdone && rx >= finish_x) { rdone = 1; }
+}
+func race_update() {
+  t_total++;
+  var gas = btn(BTN_A);
+  var want_turbo = btn(BTN_B) && gas && !hot;
+  if (want_turbo && !turbo_on) { sfx_play(SFX_SHOOT); }
+  turbo_on = want_turbo;
+  var mud = onground && in_mud_col(tx >> 3);
+  var maxs = 700;
+  if (want_turbo) { maxs = 940; }
+  if (mud) { maxs = 360; }
+  if (gas) { if (tspd < maxs) { tspd += 18; if (want_turbo) { tspd += 24; } if (tspd > maxs) { tspd = maxs; } } } else { tspd -= 8; }
+  if (onground) { tspd += slope(tx) * 4; }          // downhill speeds you up, uphill slows you
+  if (tspd > maxs + 200) { tspd = maxs + 200; }     // a long downhill can carry you past the limit, but not forever
+  if (tspd > maxs) { tspd -= 12; }
+  if (tspd < 0) { tspd = 0; }
+  if (want_turbo) { heat += 3; } else if (heat > 0) { heat -= 2; }
+  if (heat >= 230) { heat = 230; if (!hot) { hot = 1; sfx_play(SFX_BACK); } }
+  if (hot && heat < 90) { hot = 0; }
+  // along the ground
+  txf += tspd; tx += txf >> 8; txf = txf & 255;
+  // up and down: gravity always pulls; the ground catches us when we are within 2 pixels of it
+  var gy = ground(tx);
+  var last_gy = ty;
+  tvy += GRAV;
+  tyf += tvy; ty += tyf >> 8; tyf = tyf & 255;
+  if (ty >= gy - 2) {
+    if (!onground) { land(gy); if (state == S_CRASH) { return; } }
+    ty = gy; tyf = 0; onground = 1;
+    tvy = ((gy - last_gy) * 256 * 3) / 5;          // a crest launches you, but only with most of the speed of the ground
+    if (tvy > 1200) { tvy = 1200; }
+    if (tvy < -1200) { tvy = -1200; }
+    var gp = ground_pitch(tx);
+    if (pitch < gp) { pitch++; } else if (pitch > gp) { pitch--; }
+  } else {
+    if (onground) { onground = 0; air_t = 0; if (tvy < -200) { sfx_play(SFX_JUMP); } }
+    air_t++;
+    if (air_t > 10 && (air_t % 10) == 0 && pitch < 3) { pitch++; }   // in a long jump the nose drops slowly by itself: it needs a correction
+    if ((air_t % 8) == 0) {
+      if (btn(BTN_LEFT) && pitch > -3) { pitch--; }             // LEFT lifts the nose
+      if (btn(BTN_RIGHT) && pitch < 3) { pitch++; }             // RIGHT dips it
+    }
+  }
+  // rocks
+  if (onground) {
+    for (var i = 0; i < 12; i++) {
+      var rc = t_rocks[track * 12 + i];
+      if (!rock_gone[i] && abs(tx - (rc * 8 + 4)) < 9) {
+        rock_gone[i] = 1; tspd = tspd / 3; shake = 6; sfx_play(SFX_HIT); puff(tx, ty); puff(tx + 6, ty);
+      }
+    }
+  }
+  // dust behind the wheels
+  if (onground && tspd > 300 && (t_total & 3) == 0) { puff(tx - 8, ty); }
+  // the engine: the harder it goes the higher it sounds
+  var vol = 3 + (tspd >> 8);
+  if (!onground) { vol = 2; }
+  sfx_tone(3, 50 + (tspd >> 3), vol, 0, 2);
+  // the finish line
+  if (tx >= finish_x) { finish_race(); }
+}
+func land(gy) {
+  var d = abs(pitch - ground_pitch(tx));
+  if (air_t < 12) { d = 0; }                    // a hop over a crest is always a clean landing
+  if (d <= 1) { sfx_play(SFX_LAND); puff(tx - 4, gy); puff(tx + 4, gy); }
+  else if (d == 2) { tspd = (tspd * 3) / 4; shake = 8; sfx_play(SFX_HIT); puff(tx, gy); }
+  else { ty = gy; tyf = 0; do_crash(); }
+}
+func finish_race() {
+  state = S_DONE; timer = 0;
+  tspd = 0;
+  var t = t_total + penalty;
+  t_total = t;
+  newbest = 0;
+  place = 1;
+  if (rdone) { place = 2; }
+  if (place == 1) {
+    if (track + 1 >= unlocked && track + 1 < NTRACK) { unlocked = track + 2; }
+    if (best[track] == 0 || t < best[track]) { best[track] = t; newbest = 1; }
+    save_best();
+    sfx_play(SFX_WIN);
+  } else { sfx_play(SFX_DEATH); }
+  music_stop_all();
+  tone_off(3);
+  hud_update();
+}
+func crash_frame() {
+  crash_t--;
+  tvy += GRAV; tyf += tvy; ty += tyf >> 8; tyf = tyf & 255;
+  var gy = ground(tx);
+  if (ty > gy) { ty = gy; tvy = 0; tyf = 0; }
+  pitch = (crash_t / 6) % 5 - 2;
+  rival_update();
+  if (crash_t <= 0) {
+    // back on the wheels a little way behind, still in the race
+    tx = tx - 40; if (tx < 40) { tx = 40; }
+    txf = 0; ty = ground(tx); tvy = 0; onground = 1; pitch = 0; tspd = 0; heat = 0; hot = 0;
+    state = S_RACE; music_mute(0);
+  }
+}
+func done_frame() {
+  timer++;
+  rival_update();
+  if (timer > 30 && btnp(BTN_START | BTN_A)) { sfx_play(SFX_SELECT); start_title(); return; }
+}
+
+// ---------- the frame ----------
+func init() {
+  load_font(0);
+  load_tiles(art, T, art_COUNT);
+  master_volume(11);
+  load_save();
+  ui_pals(); theme(0);
+  music_build(lead_buf, lead_pats, 8, lead_order, 24);
+  music_build(bass_buf, bass_pats, 8, bass_order, 24);
+  music_build(tlead_buf, tlead_pats, 8, tlead_order, 16);
+  music_build(tbass_buf, tbass_pats, 8, tlead_order, 16);
+  hide_all_sprites();
+  track = 0;
+  start_title();
+}
+func frame() {
+  music_update(); sfx_update();
+  if (state == S_TITLE) { title_frame(); return; }
+  if (state == S_GEN) { gen_frame(); return; }
+  if (state == S_READY) { ready_frame(); return; }
+  if (state == S_PAUSE) {
+    if (btnp(BTN_START)) { state = S_RACE; music_mute(0); sfx_play(SFX_PAUSE); }
+    msg(60, 60, "PAUSED");
+    draw_scene();
+    return;
+  }
+  if (state == S_RACE) {
+    if (btnp(BTN_START)) { state = S_PAUSE; music_mute(1); tone_off(3); sfx_play(SFX_PAUSE); return; }
+    race_update();
+    rival_update();
+    if (state == S_RACE) { place = 1; if (rx > tx + 6) { place = 2; } }
+  } else if (state == S_CRASH) { crash_frame(); }
+  else if (state == S_DONE) { done_frame(); }
+  if (state == S_TITLE) { return; }
+  scroll_camera();
+  if (state != S_DONE) { hud_update(); }
+  for (var i = 0; i < 4; i++) { if (dust_t[i] > 0) { dust_t[i]--; } }
+  if (state == S_RACE && t_total < 40) { msg(72, 44, "GO!"); }
+  if (state == S_DONE) {
+    if (place == 1) { msg(36, 28, "YOU WIN!"); if (newbest) { msg(32, 44, "NEW BEST!"); } }
+    else { msg(28, 28, "2ND PLACE"); }
+    wtime(2, 0, t_total);
+  }
+  draw_scene();
+}

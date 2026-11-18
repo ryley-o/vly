@@ -1,0 +1,143 @@
+// {{name}}: Pong with a title screen, an AI opponent, sound, and a saved best rally.
+//   UP/DOWN move your paddle (left). START begins. Hit the ball back as many times as you can.
+// Shows: game states, sprites with collision, sound effects, save data, randomness seeded by the player.
+
+import "std/tunes";
+
+tileset art = "../assets/court.tiles";
+
+const T = 100;                     // first art tile in tile RAM
+const PADDLE_H = 16;
+const LEFT_X = 8;
+const RIGHT_X = 144;
+const TITLE = 0;
+const PLAYING = 1;
+const OVER = 2;
+
+var state;
+var py;                            // player paddle y
+var ay;                            // AI paddle y
+var bx; var by;                    // ball position
+var vx; var vy;                    // ball velocity (pixels per frame)
+var rally;                         // consecutive returns this game
+var best;                          // best rally, kept in the save
+var misses;                        // balls missed (game over at 3)
+var beep;                          // frames left on the current sound
+
+func draw_hud() {
+  text(1, 0, "RALLY");
+  print_u(7, 0, rally);
+  text(12, 0, "BEST");
+  print_u(17, 0, best);
+}
+
+func serve() {
+  bx = 76;
+  by = 64;
+  vx = 2 - (rand(2) * 4);           // -2 or 2
+  vy = rand(3) - 1;                 // -1, 0 or 1
+  if (vy == 0) { vy = 1; }
+}
+
+func start_game() {
+  rally = 0;
+  misses = 0;
+  py = 64;
+  ay = 64;
+  serve();
+  state = PLAYING;
+  clear_bg();
+  for (var r = 2; r < 18; r++) { if ((r & 1) == 0) { set_cell(10, r, T + art_dash); } }
+  draw_hud();
+}
+
+func sound(hz) {
+  sfx_tone(1, hz, 12, 2, 6);     // effects on channel 1; the music has channels 0 and 2
+  beep = 6;
+}
+
+func init() {
+  load_font(0);
+  load_tiles(art, T, art_COUNT);
+  bg_pal(0, rgb(14, 15, 12), rgb(9, 12, 7), rgb(4, 8, 4), rgb(1, 3, 1));
+  obj_pal(0, 0, rgb(15, 15, 12), rgb(8, 12, 5), rgb(1, 4, 2));
+  hide_all_sprites();
+  master_volume(8);
+  tune_play(TUNE_ACTION);
+  if (save_loaded() && save_valid()) { best = save_get(0); }
+  state = TITLE;
+  lcd(LCD_BG | LCD_OBJ);
+}
+
+func title_screen() {
+  text(5, 6, "P O N G");
+  text(3, 9, "PRESS START");
+  text(3, 12, "BEST RALLY");
+  print_u(14, 12, best);
+  if (btnp(BTN_START)) {
+    srand(frames(), 0x1D2B);        // the player's timing seeds the random serve
+    start_game();
+  }
+}
+
+func play() {
+  // player
+  py = clamp(py + (btn(BTN_DOWN) - btn(BTN_UP)) * 2, 0, SCREEN_H - PADDLE_H);
+  // AI follows the ball, a little slower than the ball moves
+  if (by > ay + 8) { ay = ay + 1; }
+  if (by < ay + 4) { ay = ay - 1; }
+  ay = clamp(ay, 0, SCREEN_H - PADDLE_H);
+  // ball
+  bx += vx;
+  by += vy;
+  if (by < 0) { by = 0; vy = 0 - vy; sound(440); }
+  if (by > SCREEN_H - 8) { by = SCREEN_H - 8; vy = 0 - vy; sound(440); }
+  // paddles
+  if (vx < 0 && overlap(bx, by, 8, 8, LEFT_X, py, 8, PADDLE_H)) {
+    vx = 0 - vx;
+    vy = clamp(vy + (by + 4 - (py + 8)) / 6, -3, 3);
+    bx = LEFT_X + 8;
+    rally++;
+    if (rally > best) { best = rally; }
+    sound(880);
+    draw_hud();
+  }
+  if (vx > 0 && overlap(bx, by, 8, 8, RIGHT_X, ay, 8, PADDLE_H)) {
+    vx = 0 - vx;
+    vy = clamp(vy + (by + 4 - (ay + 8)) / 6, -3, 3);
+    bx = RIGHT_X - 8;
+    sound(660);
+  }
+  // misses
+  if (bx < 0) {
+    misses++;
+    sound(220);
+    if (misses >= 3) { state = OVER; save_set(0, best); save_seal(); save_commit(); } else { serve(); }
+  }
+  if (bx > SCREEN_W) { serve(); }     // the AI missed: just serve again
+}
+
+func game_over() {
+  text(5, 7, "GAME OVER");
+  text(4, 9, "RALLY");
+  print_u(10, 9, rally);
+  text(3, 12, "START: AGAIN");
+  if (btnp(BTN_START)) { start_game(); }
+}
+
+func frame() {
+  music_update(); sfx_update();
+  if (state == TITLE) { title_screen(); }
+  else if (state == PLAYING) { play(); }
+  else { game_over(); }
+
+  // sprites: 0 = player paddle, 1 = AI paddle, 2 = ball
+  if (state == PLAYING) {
+    sprite(0, LEFT_X, py, T + art_paddle, SPR_8X16);
+    sprite(1, RIGHT_X, ay, T + art_paddle, SPR_8X16 | SPR_FLIPX);
+    sprite(2, bx, by, T + art_ball, 0);
+  } else {
+    hide_sprite(0); hide_sprite(1); hide_sprite(2);
+  }
+  if (beep > 0) { beep--; if (beep == 0) { tone_off(1); } }
+}

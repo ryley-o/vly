@@ -1,0 +1,740 @@
+// MOM'S CAT GARDEN: a calm gardening game for one very special mom.
+// D-pad walk, A use (plant / water / pick / pet / fill / rest), B change seed,
+// START help, SELECT cat book. No timers, no enemies, nothing can go wrong.
+import "std/music";
+import "std/sprites";
+import "std/anim";
+import "std/fade";
+import "std/tunes";
+
+const T = 100;
+const FIRST_SOLID = 4;
+const S_TITLE = 0;
+const S_PLAY = 1;
+const S_PAUSE = 2;
+const S_BOOK = 3;
+const S_TRANS = 4;
+const S_PARTY = 5;
+const WATER_MAX = 6;
+const HM = 5;       // hearts that make a cat your friend
+const NAME_TO = 3;   // plant bloom tile order: daisy tulip violet sunflower lilac zinnia mum aster pumpkin
+
+tileset art = "../assets/art.tiles";
+tilemap gm1 = "../assets/g1.map";
+tilemap gm2 = "../assets/g2.map";
+tilemap gm3 = "../assets/g3.map";
+func map_of(n) { if (n == 1) { return gm2; } if (n == 2) { return gm3; } return gm1; }
+func bed_list(n) { if (n == 1) { return gm2_B_list; } if (n == 2) { return gm3_B_list; } return gm1_B_list; }
+
+table plant_names = { "DAISY", "TULIP", "VIOLET", "SUNFLWR", "LILAC", "ZINNIA", "MUM", "ASTER", "PUMPKIN" };
+table cat_names = { "MOCHI", "PIP", "BUTTER", "SOOT", "CLOVER", "MAPLE" };
+btable cat_fav = { 0, 1, 2, 1, 2, 0 };          // which of the garden's three seeds each cat loves
+table garden_names = { "THE COTTAGE GARDEN", "THE POND GARDEN", "THE AUTUMN ORCHARD" };
+
+// palettes: per garden grass, path, water, ambient colour
+table PAL_GRASS = { rgb(7,12,5), rgb(15,11,12), rgb(4,9,4), rgb(7,4,2),
+                    rgb(5,12,4), rgb(8,14,6), rgb(3,9,3), rgb(7,4,2),
+                    rgb(9,10,4), rgb(15,9,2), rgb(6,7,3), rgb(6,3,1) };
+table PAL_PATH = { rgb(14,12,9), rgb(15,14,11), rgb(9,6,3), rgb(6,4,2),
+                   rgb(14,13,9), rgb(15,14,11), rgb(9,6,3), rgb(6,4,2),
+                   rgb(13,11,7), rgb(14,12,9), rgb(9,6,3), rgb(5,3,1) };
+table PAL_WATER = { rgb(5,9,15), rgb(9,12,15), rgb(3,6,13), rgb(15,15,15),
+                    rgb(4,9,14), rgb(9,13,15), rgb(2,6,12), rgb(15,15,15),
+                    rgb(5,8,12), rgb(8,11,14), rgb(3,6,10), rgb(14,14,15) };
+table AMB = { rgb(15,10,12), rgb(15,15,8), rgb(15,10,3) };
+// per plant: petal colour, highlight colour
+table PAL_PLANT = { rgb(15,13,2), rgb(15,15,15),   rgb(14,3,4), rgb(15,10,10),   rgb(9,5,13), rgb(15,14,4),
+                    rgb(15,12,1), rgb(6,3,1),      rgb(10,6,14), rgb(14,11,15),  rgb(15,8,1), rgb(15,14,3),
+                    rgb(13,5,2), rgb(15,12,4),     rgb(8,5,14), rgb(14,12,15),   rgb(15,8,2), rgb(9,3,1) };
+// per cat: fur, shade, eyes
+table PAL_CAT = { rgb(15,10,4), rgb(12,6,2), rgb(3,2,1),
+                  rgb(10,10,12), rgb(7,7,9), rgb(2,2,1),
+                  rgb(15,14,10), rgb(13,10,6), rgb(4,3,1),
+                  rgb(5,5,6), rgb(2,2,3), rgb(15,14,2),
+                  rgb(15,15,15), rgb(11,11,13), rgb(3,5,12),
+                  rgb(10,6,3), rgb(6,3,2), rgb(15,13,3) };
+
+// music: pentatonic lullabies built from patterns (16 bars each, about 21 seconds before repeating)
+btable L1 = { N_E4,0,N_G4,0,N_C5,0,N_G4,0,  N_A4,0,N_G4,0,N_E4,0,N_D4,0,  N_E4,0,N_G4,N_E4,N_D4,0,N_C4,0,
+              N_D4,0,N_E4,0,N_G4,0,N_A4,N_G4,  N_C5,0,N_A4,0,N_G4,0,N_E4,0,  N_G4,0,N_A4,0,N_C5,N_D5,N_E5,0,
+              N_C4,0,N_E4,0,N_G4,0,0,0 };
+btable L1O = { 0,1,0,2, 3,4,3,5, 0,1,0,2, 4,3,2,6 };
+btable B1 = { N_C3,0,0,0,N_G3,0,0,0,  N_A2,0,0,0,N_E3,0,0,0,  N_F2,0,0,0,N_C3,0,0,0,  N_G2,0,0,0,N_D3,0,0,0 };
+btable B1O = { 0,1,0,3, 2,3,2,3, 0,1,0,3, 2,3,0,0 };
+btable L2 = { N_D5,0,N_B4,0,N_G4,0,N_B4,0,  N_A4,0,N_B4,0,N_D5,0,N_B4,N_A4,  N_G4,0,N_A4,0,N_B4,0,0,0,
+              N_E5,0,N_D5,0,N_B4,0,N_A4,0,  N_B4,N_A4,N_G4,0,N_A4,0,N_G4,0,  N_D5,N_E5,N_D5,N_B4,N_A4,0,N_G4,0 };
+btable L2O = { 0,1,0,2, 3,1,3,2, 0,1,0,2, 4,3,5,2 };
+btable B2 = { N_G2,0,0,0,N_D3,0,0,0,  N_E2,0,0,0,N_B2,0,0,0,  N_C3,0,0,0,N_G3,0,0,0,  N_D3,0,0,0,N_A3,0,0,0 };
+btable B2O = { 0,1,0,3, 2,3,2,0, 0,1,0,3, 2,3,2,0 };
+btable L3 = { N_E5,0,N_D5,0,N_C5,0,N_A4,0,  N_C5,0,N_D5,0,N_E5,0,0,0,  N_G4,0,N_A4,0,N_C5,0,N_A4,0,
+              N_D5,0,N_E5,0,N_G5,0,N_E5,N_D5,  N_C5,N_D5,N_C5,0,N_A4,0,0,0,  N_A4,0,N_C5,0,N_E5,0,N_A5,0 };
+btable L3O = { 0,1,0,2, 3,4,3,2, 0,1,0,2, 4,3,5,5 };
+btable B3 = { N_A2,0,0,0,N_E3,0,0,0,  N_F2,0,0,0,N_C3,0,0,0,  N_G2,0,0,0,N_D3,0,0,0,  N_E2,0,0,0,N_B2,0,0,0 };
+btable B3O = { 0,0,1,0, 2,0,1,2, 0,0,1,0, 3,2,1,0 };
+byte lead_buf[257];
+byte bass_buf[257];
+btable lullaby = { N_E5,2,N_C5,2,N_G4,2,N_E4,4,N_G4,2,N_C4,8, MUS_END };
+btable bday = { N_G4,1,N_G4,1,N_A4,2,N_G4,2,N_C5,2,N_B4,4,  N_G4,1,N_G4,1,N_A4,2,N_G4,2,N_D5,2,N_C5,4,
+                N_G4,1,N_G4,1,N_G5,2,N_E5,2,N_C5,2,N_B4,2,N_A4,2,  N_F5,1,N_F5,1,N_E5,2,N_C5,2,N_D5,2,N_C5,4,  0,12, MUS_LOOP };
+btable bday_bass = { N_C3,12,N_G2,12,N_C3,12,N_F2,12,N_C3,12, MUS_LOOP };
+
+// ---- state ----
+var state; var phase; var pend; var pend_t; var tgt_g; var tgt_x; var new_flag;
+var g; var day = 1; var water = 6; var tool = 1; var cleared; var won;
+byte bed[36]; byte hearts[6]; byte inv[9]; byte sol[320];
+var tx = 5; var ty = 8; var ox; var oy; var mvx; var mvy; var face;
+byte cat_here[6]; byte cat_x[6]; byte cat_y[6]; byte cat_pet[6]; var cat_t[6];
+var fx_t; var fx_x; var fx_y; var fx_n;
+var msg_t; var last_hint = -1; var abuf;
+var has_save; var sel; var confirm; var tick; var last_b = -1;
+var amb_x[4]; var amb_y[4]; var cf_x[12]; var cf_y[12];
+var snd_id; var snd_t; var rain_flag; var party_t;
+
+// ---- small helpers ----
+func dxof(d) { if (d == 2) { return -1; } if (d == 3) { return 1; } return 0; }
+func dyof(d) { if (d == 0) { return 1; } if (d == 1) { return -1; } return 0; }
+func slen(s) { var n = 0; while (peek8(s + n) != 0) { n++; } return n; }
+func tbl(t, i) { return peek(t + i * 2); }
+func fav_of(c) { return peek8(cat_fav + c); }
+func water_anim() { copy(TILES + (T + art_water) * 16, art + (art_water + ((tick >> 5) & 1)) * 16, 16); }
+
+// ---- sound effects (channel 1 tonal, channel 3 noise; music uses 0 and 2) ----
+func snd(id) { snd_id = id; snd_t = 0; }
+func snd_end() { tone_off(1); tone_off(3); snd_id = 0; }
+func snd_update() {
+  if (snd_id == 0) { return; }
+  var t = snd_t; snd_t++;
+  if (snd_id == 1) {          // plant: two soft plops
+    if (t == 0) { tone(1, 262, 10, 2); } if (t == 4) { tone(1, 196, 10, 2); } if (t == 10) { snd_end(); }
+  } else if (snd_id == 2) {   // water splash
+    if (t == 0) { tone(3, 1800, 7, 0); } if (t == 8) { tone(3, 1200, 6, 0); } if (t == 16) { tone(3, 800, 5, 0); } if (t == 26) { snd_end(); }
+  } else if (snd_id == 3) {   // pick a flower: rising three notes
+    if (t == 0) { tone(1, 523, 10, 1); } if (t == 3) { tone(1, 659, 10, 1); } if (t == 6) { tone(1, 784, 10, 1); } if (t == 14) { snd_end(); }
+  } else if (snd_id == 4) {   // meow then purr
+    if (t < 10) { tone(1, 480 + t * 14, 8, 2); }
+    else if (t < 20) { tone(1, 620 - (t - 10) * 14, 8, 2); }
+    else if (t < 56) { tone(1, 80 + (t & 2) * 15, 5, 0); }
+    else { snd_end(); }
+  } else if (snd_id == 5) {   // fill the can: glug glug
+    if (t < 26) { tone(1, 180 + t * 7 + ((t / 5) & 1) * 40, 8, 2); } else { snd_end(); }
+  } else if (snd_id == 7) {   // new friend: sparkle arpeggio
+    if (t == 0) { tone(1, 523, 11, 1); } if (t == 6) { tone(1, 659, 11, 1); } if (t == 12) { tone(1, 784, 11, 1); } if (t == 18) { tone(1, 1047, 11, 1); } if (t == 40) { snd_end(); }
+  } else if (snd_id == 8) {   // gate opens: rumble then chime
+    if (t < 24) { tone(3, 400, 6, 0); }
+    if (t == 24) { tone_off(3); tone(1, 392, 11, 1); } if (t == 30) { tone(1, 523, 11, 1); } if (t == 36) { tone(1, 659, 11, 1); } if (t == 60) { snd_end(); }
+  } else if (snd_id == 9) {   // menu blip
+    if (t == 0) { tone(1, 880, 6, 2); } if (t == 4) { snd_end(); }
+  } else if (snd_id == 10) {  // gentle no
+    if (t == 0) { tone(1, 150, 8, 3); } if (t == 7) { snd_end(); }
+  } else if (snd_id == 11) {  // soft footstep
+    if (t == 0) { tone(3, 2600, 2, 0); } if (t == 2) { snd_end(); }
+  } else if (snd_id == 12) {  // pause / book
+    if (t == 0) { tone(1, 440, 8, 1); } if (t == 4) { tone(1, 330, 8, 1); } if (t == 9) { snd_end(); }
+  } else { snd_end(); }
+}
+
+// ---- world data ----
+func nb() { if (g == 1) { return gm2_B_COUNT; } if (g == 2) { return gm3_B_COUNT; } return gm1_B_COUNT; }
+func bed_x(k) { return peek(bed_list(g) + k * 4); }
+func bed_y(k) { return peek(bed_list(g) + k * 4 + 2); }
+func bed_at(x, y) {
+  var n = nb();
+  for (var k = 0; k < n; k++) { if (bed_x(k) == x && bed_y(k) == y) { return k; } }
+  return -1;
+}
+func set_bed(k, type, stage, wet) { bed[g * 12 + k] = (type << 4) | (stage << 1) | wet; }
+func draw_bed(k) {
+  var v = bed[g * 12 + k];
+  var type = v >> 4;
+  var tile = T + art_soil;
+  var pal = 1;
+  if (type > 0) {
+    var stage = (v >> 1) & 3;
+    pal = 3 + type;
+    if (stage == 0) { tile = T + art_seed; }
+    else if (stage == 1) { tile = T + art_sprout; }
+    else if (stage == 2) { tile = T + art_bud; }
+    else { tile = T + art_bloom_daisy + g * 3 + type - 1; }
+  }
+  set_cell(bed_x(k), bed_y(k), tile | (pal << 12));
+}
+func solid_at(x, y) {
+  if (x < 0 || x > 19 || y < 1 || y > 14) { return 1; }
+  return sol[y * 20 + x];
+}
+func cat_at(x, y) {
+  for (var k = 0; k < 2; k++) {
+    var c = g * 2 + k;
+    if (cat_here[c] && cat_x[c] == x && cat_y[c] == y) { return c; }
+  }
+  return -1;
+}
+func bloom_count(type) {
+  var n = 0; var m = nb();
+  for (var k = 0; k < m; k++) {
+    var v = bed[g * 12 + k];
+    if ((v >> 4) == type && ((v >> 1) & 3) == 3) { n++; }
+  }
+  return n;
+}
+func free_cell(x, y) {
+  if (solid_at(x, y)) { return 0; }
+  if (x == tx && y == ty) { return 0; }
+  if (cat_at(x, y) >= 0) { return 0; }
+  return 1;
+}
+func place_cats() {
+  for (var k = 0; k < 2; k++) {
+    var c = g * 2 + k;
+    cat_here[c] = 0;
+    if (hearts[c] >= HM || bloom_count(fav_of(c) + 1) > 0 || (day == 1 && c == 0)) {
+      var tries = 0; var x = 6; var y = 9;
+      while (tries < 50) {
+        x = rand_range(2, 17); y = rand_range(3, 13);
+        if (free_cell(x, y)) { break; }
+        tries++;
+      }
+      cat_here[c] = 1; cat_x[c] = x; cat_y[c] = y; cat_t[c] = rand_range(60, 200);
+    }
+  }
+}
+
+// ---- palettes ----
+func bgp(p, t, n) { var a = t + n * 8; bg_pal(p, peek(a), peek(a + 2), peek(a + 4), peek(a + 6)); }
+func set_palettes(n) {
+  bgp(0, PAL_GRASS, n);
+  bgp(1, PAL_PATH, n);
+  bgp(2, PAL_WATER, n);
+  bg_pal(3, peek(PAL_GRASS + n * 8), rgb(5,3,1), rgb(11,7,3), rgb(14,11,6));
+  for (var k = 0; k < 3; k++) {
+    var a = PAL_PLANT + (n * 3 + k) * 4;
+    bg_pal(4 + k, rgb(9,6,3), rgb(4,12,3), peek(a), peek(a + 2));
+  }
+  bg_pal(7, rgb(4,3,2), rgb(15,5,6), rgb(15,13,6), rgb(15,14,11));
+  obj_pal(0, 0, rgb(15,11,8), rgb(15,13,5), rgb(5,9,10));
+  obj_pal(1, 0, peek(AMB + n * 2), rgb(15,4,5), rgb(6,10,15));
+  for (var c = 0; c < 6; c++) {
+    var b = PAL_CAT + c * 6;
+    obj_pal(2 + c, 0, peek(b), peek(b + 2), peek(b + 4));
+  }
+  fade_save();
+  fade_set(0);
+  fade_to(0, 4);
+}
+
+// ---- HUD (window layer: map rows 0 and 1 show at the bottom of the screen) ----
+func hud_fill(row) { for (var c = 0; c < 20; c++) { set_wcell(c, row, 7 << 12); } }
+func hud_draw() {
+  hud_fill(0);
+  wtext(0, 0, "SEED");
+  wtext(5, 0, tbl(plant_names, g * 3 + tool - 1));
+  wtext(13, 0, "WATER");
+  wprint_u(19, 0, water);
+}
+func say(a) { hud_fill(1); wtext(0, 1, a); msg_t = 170; }
+func say2(a, b) { hud_fill(1); wtext(0, 1, a); wtext(slen(a) + 1, 1, b); msg_t = 170; }
+func show_hearts(c) {
+  for (var i = 0; i < HM; i++) {
+    if (i < hearts[c]) { set_wcell(15 + i, 1, (T + art_hud_heart) | (7 << 12)); }
+  }
+}
+func facing_x() { return tx + dxof(face); }
+func facing_y() { return ty + dyof(face); }
+func hint_code() {
+  var x = facing_x(); var y = facing_y();
+  var c = cat_at(x, y);
+  if (c >= 0) { return 200 + c; }
+  var k = bed_at(x, y);
+  if (k >= 0) {
+    var v = bed[g * 12 + k];
+    if ((v >> 4) == 0) { return 10 + tool; }
+    if (((v >> 1) & 3) == 3) { return 30 + (v >> 4); }
+    if (v & 1) { return 21; }
+    return 20;
+  }
+  if (x >= 0 && x < 20 && y >= 0 && y < 16) {
+    var cell = get_cell(x, y) & 0x1FF;
+    if (cell == T + art_barrel) { return 40; }
+    if (cell == T + art_bench) { return 41; }
+  }
+  for (var j = 0; j < 2; j++) {
+    var cc = g * 2 + j;
+    if (hearts[cc] < HM && cat_here[cc] == 0) { return 50 + cc; }
+  }
+  return 0;
+}
+func show_hint(code) {
+  hud_fill(1);
+  if (code >= 200) { wtext(0, 1, "A PET"); wtext(6, 1, tbl(cat_names, code - 200)); }
+  else if (code >= 50) { var cc = code - 50; wtext(0, 1, tbl(cat_names, cc)); wtext(slen(tbl(cat_names, cc)) + 1, 1, "WANTS"); wtext(slen(tbl(cat_names, cc)) + 7, 1, tbl(plant_names, g * 3 + fav_of(cc))); }
+  else if (code >= 40) { if (code == 40) { wtext(0, 1, "A FILL THE CAN"); } else { wtext(0, 1, "A REST TILL MORNING"); } }
+  else if (code >= 30) { wtext(0, 1, "A PICK"); wtext(7, 1, tbl(plant_names, g * 3 + code - 31)); }
+  else if (code == 21) { wtext(0, 1, "WATERED. GROWING"); }
+  else if (code == 20) { wtext(0, 1, "A WATER IT"); }
+  else if (code >= 11) { wtext(0, 1, "A PLANT"); wtext(8, 1, tbl(plant_names, g * 3 + code - 11)); }
+  else { wtext(0, 1, "B SEED  SELECT BOOK"); }
+}
+
+// ---- save ----
+func save_game() {
+  for (var i = 0; i < 36; i++) { save_set8(i, bed[i]); }
+  for (var i = 0; i < 6; i++) { save_set8(36 + i, hearts[i]); }
+  for (var i = 0; i < 9; i++) { save_set8(42 + i, inv[i]); }
+  save_set(52, day); save_set8(54, cleared); save_set8(55, won); save_set8(56, g); save_set8(57, 71);
+  save_seal(); save_commit();
+}
+func load_game() {
+  for (var i = 0; i < 36; i++) { bed[i] = save_get8(i); }
+  for (var i = 0; i < 6; i++) { hearts[i] = save_get8(36 + i); }
+  for (var i = 0; i < 9; i++) { inv[i] = save_get8(42 + i); }
+  day = save_get(52); cleared = save_get8(54); won = save_get8(55); g = save_get8(56);
+  water = WATER_MAX; tool = 1;
+}
+func new_game() {
+  for (var i = 0; i < 36; i++) { bed[i] = 0; }
+  for (var i = 0; i < 6; i++) { hearts[i] = 0; }
+  for (var i = 0; i < 9; i++) { inv[i] = 0; }
+  day = 1; cleared = 0; won = 0; g = 0; water = WATER_MAX; tool = 1;
+  bed[0] = 20; bed[1] = 36;     // two buds to water on the first day, so the first bloom comes quickly
+  save_clear();
+}
+
+// ---- gardens ----
+func open_gates() {
+  if (g < 2 && ((cleared >> g) & 1)) {
+    for (var y = 7; y <= 8; y++) { set_cell(19, y, (T + art_path) | (1 << 12)); sol[y * 20 + 19] = 0; }
+  }
+  if (g > 0 && ((cleared >> (g - 1)) & 1)) {
+    for (var y = 7; y <= 8; y++) { set_cell(0, y, (T + art_path) | (1 << 12)); sol[y * 20] = 0; }
+  }
+}
+func init_ambient() {
+  for (var i = 0; i < 4; i++) { amb_x[i] = 20 + i * 40 + rand(20); amb_y[i] = rand(120) * 16; }
+}
+func load_garden(n) {            // part A (spread over three frames to stay cheap)
+  g = n;
+  set_palettes(n);
+  var src = map_of(n);
+  load_map(src, 20, 16, 0, 0);
+  for (var y = 0; y < 8; y++) {
+    for (var x = 0; x < 20; x++) {
+      sol[y * 20 + x] = ((map_cell(src, 20, x, y) & 0x1FF) - T) >= FIRST_SOLID;
+    }
+  }
+}
+func load_garden_b() {
+  var src = map_of(g);
+  for (var y = 8; y < 16; y++) {
+    for (var x = 0; x < 20; x++) {
+      sol[y * 20 + x] = ((map_cell(src, 20, x, y) & 0x1FF) - T) >= FIRST_SOLID;
+    }
+  }
+  open_gates();
+  var m = nb();
+  for (var k = 0; k < m; k++) { draw_bed(k); }
+}
+func load_garden_c() {
+  scroll(0, 0);
+  lcd(LCD_BG | LCD_WIN | LCD_OBJ);
+  window_pos(0, 128);
+  place_cats();
+  init_ambient();
+  hud_fill(0); hud_fill(1);
+  hud_draw();
+  last_hint = -1; msg_t = 0;
+}
+
+// ---- music ----
+func garden_music(n) {
+  music_stop_all();
+  music_tempo(10);
+  var lp = L1; var lo = L1O; var bp = B1; var bo = B1O;
+  if (n == 1) { lp = L2; lo = L2O; bp = B2; bo = B2O; }
+  if (n == 2) { lp = L3; lo = L3O; bp = B3; bo = B3O; }
+  var l = music_build(lead_buf, lp, 8, lo, 16);
+  music_play(0, 0, l, 6);
+}
+func garden_bass(n) {
+  var bp = B1; var bo = B1O;
+  if (n == 1) { bp = B2; bo = B2O; }
+  if (n == 2) { bp = B3; bo = B3O; }
+  var b = music_build(bass_buf, bp, 8, bo, 16);
+  music_play(1, 2, b, 7);
+}
+
+// ---- the night ----
+func night() {
+  rain_flag = (rand(4) == 0);
+  for (var i = 0; i < 36; i++) {
+    var v = bed[i];
+    var type = v >> 4; var stage = (v >> 1) & 3; var wet = v & 1;
+    if (type > 0 && stage < 3 && (wet || rain_flag)) { stage++; }
+    bed[i] = (type << 4) | (stage << 1);
+  }
+  day++;
+  for (var c = 0; c < 6; c++) { cat_pet[c] = 0; }
+  water = WATER_MAX;
+}
+
+// ---- transitions ----
+func trans_go(kind, g2, x2) {
+  pend = kind; tgt_g = g2; tgt_x = x2; phase = 0; pend_t = 0; state = S_TRANS;
+  fade_to(0, 4);
+}
+func party_setup() {
+  set_palettes(0);
+  clear_bg();
+  fill_cells(0, 0, 20, 18, T + art_grass);
+  for (var i = 0; i < 24; i++) { set_cell(rand(20), rand(18), T + art_grass2); }
+  fill_cells(0, 9, 20, 2, (T + art_path) | (1 << 12));
+}
+func party_setup_b() {
+  for (var x = 0; x < 20; x++) { set_cell(x, 13, (T + art_bloom_daisy + (x % 3)) | ((4 + (x % 3)) << 12)); }
+  fill_cells(0, 1, 20, 3, 7 << 12);
+  text(0, 2, "HAPPY BIRTHDAY, MOM!");
+  text(1, 3, "FROM ALL YOUR CATS");
+  fill_cells(0, 15, 20, 3, 7 << 12);
+  text(1, 16, "START: GARDEN ON");
+  lcd(LCD_BG | LCD_OBJ);
+  for (var i = 0; i < 12; i++) { cf_x[i] = rand(150); cf_y[i] = rand(130); }
+  party_t = 0;
+}
+func trans_update() {
+  if (fade_busy()) { return; }
+  if (phase == 0) { phase = 1; return; }
+  if (phase == 1) {
+    if (pend == 2) { night(); load_garden(g); }
+    else if (pend == 4) { party_setup(); }
+    else {
+      if (pend == 5) { if (new_flag) { new_game(); } else { load_game(); } srand(frames(), tick); }
+      else { tx = tgt_x; mvx = 0; mvy = 0; ox = 0; oy = 0; }
+      load_garden(tgt_g);
+    }
+    pend_t = 0; phase = 2; return;
+  }
+  if (phase == 2) {
+    pend_t++;
+    if (pend_t == 1 && pend == 4) { party_setup_b(); }
+    if (pend_t == 1 && pend != 4) { load_garden_b(); }
+    if (pend_t == 2 && pend != 4) { load_garden_c(); }
+    if (pend == 2) {
+      if (pend_t == 2) { music_stop_all(); music_tempo(10); music_play(0, 0, lullaby, 7); }
+      if (pend_t == 8) { save_game(); }
+      if (pend_t > 120) { phase = 3; }
+    } else if (pend_t > 6) { phase = 3; }
+    return;
+  }
+  if (phase == 3) {
+    if (pend == 4) { music_stop_all(); music_tempo(8); music_play(0, 0, bday, 7); }
+    else { garden_music(g); }
+    phase = 4; return;
+  }
+  if (phase == 4) {
+    if (pend == 4) { music_play(1, 2, bday_bass, 7); } else { garden_bass(g); }
+    fade_to(4, 4); phase = 5; return;
+  }
+  if (phase == 5) {
+    if (pend == 4) { state = S_PARTY; }
+    else {
+      state = S_PLAY;
+      if (pend == 2) {
+        if (rain_flag) { say("IT RAINED TONIGHT!"); }
+        else { hud_fill(1); wtext(0, 1, "GOOD MORNING. DAY"); wprint_u(18, 1, day); msg_t = 170; }
+      } else if (pend == 5) { say2("WELCOME TO", tbl(garden_names, g) + 4); }
+      else { say(tbl(garden_names, g)); }
+    }
+  }
+}
+
+// ---- cats ----
+func spawn_hearts(x, y, n) { fx_x = x; fx_y = y; fx_n = n; fx_t = 34; }
+func check_clear() {
+  var a = g * 2;
+  if (hearts[a] >= HM && hearts[a + 1] >= HM && !((cleared >> g) & 1)) {
+    cleared = cleared | (1 << g);
+    if (g < 2) { open_gates(); say("THE GATE CREAKS OPEN"); snd(8); }
+  }
+  var all = 1;
+  for (var c = 0; c < 6; c++) { if (hearts[c] < HM) { all = 0; } }
+  if (all && !won) { won = 1; save_game(); trans_go(4, g, tx); }
+}
+func pet_cat(c) {
+  var nm = tbl(cat_names, c);
+  var fav = g * 3 + fav_of(c);
+  if (hearts[c] >= HM) { say2(nm, "PURRS"); snd(4); spawn_hearts(cat_x[c], cat_y[c], 1); return; }
+  if (inv[fav] > 0) {
+    inv[fav] = inv[fav] - 1;
+    hearts[c] = min(HM, hearts[c] + 2);
+    cat_pet[c] = 1;
+    say2(nm, "LOVES IT!");
+    spawn_hearts(cat_x[c], cat_y[c], 2);
+  } else if (cat_pet[c] == 0) {
+    hearts[c] = hearts[c] + 1;
+    cat_pet[c] = 1;
+    say2(nm, "LIKES YOU");
+    spawn_hearts(cat_x[c], cat_y[c], 1);
+  } else {
+    say("ENOUGH PETS TODAY");
+    snd(4);
+    return;
+  }
+  snd(4);
+  if (hearts[c] >= HM) { say2(nm, "IS A FRIEND!"); snd(7); save_game(); check_clear(); }
+  else { show_hearts(c); }
+}
+func cats_update() {
+  for (var k = 0; k < 2; k++) {
+    var c = g * 2 + k;
+    if (cat_here[c]) {
+      cat_t[c] = cat_t[c] - 1;
+      if (cat_t[c] <= 0) {
+        cat_t[c] = rand_range(120, 300);
+        if (rand(3) != 0) {
+          var d = rand(4);
+          var nx = cat_x[c] + dxof(d); var ny = cat_y[c] + dyof(d);
+          if (nx >= 1 && nx <= 18 && ny >= 2 && ny <= 14 && free_cell(nx, ny)) { cat_x[c] = nx; cat_y[c] = ny; }
+        }
+      }
+    }
+  }
+}
+
+// ---- actions ----
+func do_action() {
+  var x = facing_x(); var y = facing_y();
+  var c = cat_at(x, y);
+  if (c >= 0) { pet_cat(c); return; }
+  var k = bed_at(x, y);
+  if (k >= 0) {
+    var v = bed[g * 12 + k];
+    var type = v >> 4; var stage = (v >> 1) & 3; var wet = v & 1;
+    var pi = g * 3 + type - 1;
+    if (type == 0) { set_bed(k, tool, 0, 0); draw_bed(k); snd(1); say2("PLANTED", tbl(plant_names, g * 3 + tool - 1)); return; }
+    if (stage == 3) {
+      if (inv[pi] < 9) { inv[pi] = inv[pi] + 1; }
+      set_bed(k, 0, 0, 0); draw_bed(k); snd(3); say2("PICKED", tbl(plant_names, pi)); return;
+    }
+    if (wet) { snd(10); say("ALREADY WATERED"); return; }
+    if (water <= 0) { snd(10); say("EMPTY. TRY THE BARREL"); return; }
+    water--; set_bed(k, type, stage, 1); snd(2); hud_draw(); say("WATERED"); return;
+  }
+  if (x >= 0 && x < 20 && y >= 0 && y < 16) {
+    var cell = get_cell(x, y) & 0x1FF;
+    if (cell == T + art_barrel) { water = WATER_MAX; snd(5); hud_draw(); say("FILLED THE CAN"); return; }
+    if (cell == T + art_bench) { snd(12); trans_go(2, g, tx); return; }
+  }
+}
+func arrived() {
+  if (tx >= 19 && g < 2) { trans_go(1, g + 1, 1); }
+  else if (tx <= 0 && g > 0) { trans_go(1, g - 1, 18); }
+}
+
+// ---- panels (pause and cat book) ----
+func panel_open(kind) {
+  state = kind; snd(12);
+  for (var r = 0; r < 18; r++) { hud_fill(r); }
+  window_pos(0, 0);
+  if (kind == S_PAUSE) {
+    music_mute(1);
+    wtext(7, 1, "PAUSED");
+    wtext(1, 3, "D-PAD  WALK");
+    wtext(1, 4, "A      PLANT WATER");
+    wtext(8, 5, "PICK PET");
+    wtext(8, 6, "FILL CAN");
+    wtext(1, 7, "B      CHOOSE SEED");
+    wtext(1, 8, "SELECT CAT BOOK");
+    wtext(1, 10, "SIT ON A BENCH TO");
+    wtext(1, 11, "REST UNTIL MORNING.");
+    wtext(1, 12, "PLANTS GROW WHILE");
+    wtext(1, 13, "YOU SLEEP. CATS");
+    wtext(1, 14, "VISIT FOR THEIR");
+    wtext(1, 15, "FAVOURITE FLOWERS.");
+    wtext(1, 17, "START: CONTINUE");
+  } else {
+    wtext(5, 0, "THE CAT BOOK");
+    for (var c = 0; c < 6; c++) {
+      var row = 2 + c * 2;
+      wtext(1, row, tbl(cat_names, c));
+      for (var i = 0; i < HM; i++) {
+        if (i < hearts[c]) { set_wcell(7 + i, row, (T + art_hud_heart) | (7 << 12)); } else { wtext(7 + i, row, "-"); }
+      }
+      wtext(13, row, tbl(plant_names, (c / 2) * 3 + fav_of(c)));
+    }
+    wtext(1, 14, "DAY");
+    wprint_u(5, 14, day);
+    wtext(9, 14, "BASKET");
+    for (var k = 0; k < 3; k++) { wtext(1, 15 + k, tbl(plant_names, g * 3 + k)); wprint_u(10, 15 + k, inv[g * 3 + k]); }
+  }
+}
+func panel_close() {
+  window_pos(0, 128);
+  hud_fill(0); hud_fill(1);
+  hud_draw();
+  music_mute(0);
+  last_hint = -1; msg_t = 0;
+  state = S_PLAY; snd(12);
+}
+
+// ---- title ----
+func title_draw() {
+  set_palettes(0);
+  clear_bg();
+  fill_cells(0, 0, 20, 18, T + art_grass);
+  for (var i = 0; i < 30; i++) { set_cell(rand(20), rand(18), T + art_grass2); }
+  fill_cells(1, 2, 18, 5, 7 << 12);
+  text(2, 3, "MOM'S CAT GARDEN");
+  text(3, 5, "A BIRTHDAY GIFT");
+  for (var x = 0; x < 20; x++) { set_cell(x, 11, (T + art_bloom_daisy + (x % 3)) | ((4 + (x % 3)) << 12)); }
+  fill_cells(0, 14, 20, 4, 7 << 12);
+  text(1, 15, "D-PAD WALK  A USE");
+  text(1, 16, "B SEED  START: HELP");
+  fill_cells(3, 8, 14, 3, 7 << 12);
+  lcd(LCD_BG | LCD_OBJ);
+}
+func title_menu() {
+  if (has_save) {
+    text(5, 8, sel == 0 ? ">" : " "); text(6, 8, "CONTINUE");
+    text(5, 9, sel == 1 ? ">" : " "); text(6, 9, "NEW GARDEN");
+    if (confirm) { text(4, 10, "A AGAIN TO ERASE"); } else { text(4, 10, "                "); }
+  }
+}
+func title_update() {
+  tick++;
+  if (has_save) {
+    if (btnp(BTN_UP | BTN_DOWN)) { sel = 1 - sel; confirm = 0; snd(9); title_menu(); }
+    if (btnp(BTN_START | BTN_A)) {
+      if (sel == 0) { new_flag = 0; trans_go(5, 0, 0); }
+      else if (confirm == 0) { confirm = 1; snd(10); title_menu(); }
+      else { new_flag = 1; trans_go(5, 0, 0); }
+    }
+  } else {
+    var b = blink(tick, 30);
+    if (b != last_b) { last_b = b; if (b) { text(5, 9, "PRESS START"); } else { text(5, 9, "           "); } }
+    if (btnp(BTN_START | BTN_A)) { new_flag = 1; trans_go(5, 0, 0); }
+  }
+}
+
+// ---- sprites ----
+func draw_cat(c, x, y) {
+  var tile = T + art_cat_a;
+  if (hearts[c] >= HM && cat_t[c] > 150) { tile = T + art_cat_loaf; }
+  else if (anim_frame(tick + c * 17, 2, 28) == 1) { tile = T + art_cat_b; }
+  spr(x, y, tile, 2 + c);
+}
+func draw_player(x, y) {
+  var w = 0;
+  if (ox != 0 || oy != 0) { w = ((ox + oy) >> 2) & 1; }
+  var tile = T + art_hero_d0 + w * 2; var attr = SPR_8X16;
+  if (face == 1) { tile = T + art_hero_u0 + w * 2; }
+  if (face == 2) { tile = T + art_hero_s0 + w * 2; attr = SPR_8X16 | SPR_FLIPX; }
+  if (face == 3) { tile = T + art_hero_s0 + w * 2; }
+  spr(x, y, tile, attr);
+}
+func draw_world_sprites() {
+  if (fx_t > 0) {
+    for (var i = 0; i < fx_n; i++) { spr(fx_x * 8 + i * 7 - (fx_n - 1) * 3, fx_y * 8 - 6 - (34 - fx_t) / 2, T + art_heart, 1); }
+    fx_t--;
+  }
+  draw_player(tx * 8 + ox, ty * 8 - 8 + oy);
+  for (var k = 0; k < 2; k++) {
+    var c = g * 2 + k;
+    if (cat_here[c]) { draw_cat(c, cat_x[c] * 8, cat_y[c] * 8); }
+  }
+  var m = nb();
+  for (var k = 0; k < m; k++) {
+    var v = bed[g * 12 + k];
+    if ((v >> 4) > 0 && ((v >> 1) & 3) < 3 && (v & 1)) { spr(bed_x(k) * 8 + 3, bed_y(k) * 8 - 4, T + art_drop, 1); }
+  }
+  for (var i = 0; i < 4; i++) {
+    if (g == 1) {
+      var bx = 22 + i * 38 + sin(tick * 2 + i * 70) / 12;
+      var by = 30 + i * 22 + cos(tick * 3 + i * 50) / 14;
+      spr(bx, by, T + art_fly_a + anim_frame(tick + i * 5, 2, 8), 1);
+    } else {
+      amb_y[i] = amb_y[i] + 4 + (i & 1) * 2;
+      if (amb_y[i] > 118 * 16) { amb_y[i] = 0; amb_x[i] = 10 + rand(140); }
+      spr(amb_x[i] + (sin((amb_y[i] >> 2) + i * 64) >> 5), amb_y[i] >> 4, T + art_mote, 1);
+    }
+  }
+}
+
+// ---- main ----
+func init() {
+  load_font(0);
+  load_tiles(art, T, art_COUNT);
+  text_pal = 7;
+  hide_all_sprites();
+  master_volume(10);
+  has_save = 0;
+  if (save_loaded() && save_valid() && save_get8(57) == 71) { has_save = 1; }
+  title_draw();
+  title_menu();
+  tune_play(TUNE_TITLE);
+  state = S_TITLE;
+  fade_to(4, 6);
+}
+
+func frame() {
+  music_update(); snd_update(); fade_update();
+  tick++;
+  if (tick < 0) { tick = 0; }
+  if (tick % 32 == 0) { water_anim(); }
+  spr_begin(0);
+  if (state == S_TITLE) {
+    title_update();
+    spr(24, 104, T + art_cat_a + ((tick >> 5) & 1), 2);
+    spr(120, 104, T + art_cat_loaf, 5);
+    spr(76, 96, T + art_hero_d0, SPR_8X16);
+  } else if (state == S_PLAY) {
+    if (btnp(BTN_START)) { panel_open(S_PAUSE); }
+    else if (btnp(BTN_SELECT)) { panel_open(S_BOOK); }
+    else {
+      if (btnp(BTN_A)) { abuf = 8; }
+      if (ox != 0 || oy != 0) {
+        ox += mvx; oy += mvy;
+        if (ox == 0 && oy == 0) { arrived(); }
+      } else {
+        if (btnp(BTN_B)) { tool++; if (tool > 3) { tool = 1; } snd(9); hud_draw(); last_hint = -1; }
+        if (abuf > 0) { abuf = 0; do_action(); }
+        var d = held();
+        var dir = -1;
+        if (d & BTN_UP) { dir = 1; } else if (d & BTN_DOWN) { dir = 0; } else if (d & BTN_LEFT) { dir = 2; } else if (d & BTN_RIGHT) { dir = 3; }
+        if (dir >= 0 && state == S_PLAY) {
+          face = dir;
+          var nx = tx + dxof(dir); var ny = ty + dyof(dir);
+          if (!solid_at(nx, ny) && cat_at(nx, ny) < 0) {
+            tx = nx; ty = ny; mvx = dxof(dir); mvy = dyof(dir); ox = -mvx * 8; oy = -mvy * 8;
+            if (snd_id == 0) { snd(11); }
+          }
+        }
+      }
+      if (abuf > 0) { abuf--; }
+      cats_update();
+      if (msg_t > 0) { msg_t--; if (msg_t == 0) { last_hint = -1; } }
+      if (msg_t == 0 && state == S_PLAY) {
+        var hc = hint_code();
+        if (hc != last_hint) { last_hint = hc; show_hint(hc); }
+      }
+    }
+    if (state == S_PLAY || state == S_TRANS) { draw_world_sprites(); }
+  } else if (state == S_PAUSE) {
+    if (btnp(BTN_START)) { panel_close(); }
+  } else if (state == S_BOOK) {
+    if (btnp(BTN_SELECT | BTN_B | BTN_START)) { panel_close(); }
+  } else if (state == S_TRANS) {
+    trans_update();
+    if (pend != 4 && pend != 5 && pend != 0) { draw_world_sprites(); }
+  } else if (state == S_PARTY) {
+    party_t++;
+    for (var c = 0; c < 6; c++) { draw_cat(c, 14 + c * 25, 84); }
+    spr(72, 70, T + art_cake, SPR_16X16 | 1);
+    spr(76, 96, T + art_hero_d0, SPR_8X16);
+    for (var i = 0; i < 12; i++) {
+      cf_y[i] = cf_y[i] + 1 + (i & 1);
+      if (cf_y[i] > 128) { cf_y[i] = 0; cf_x[i] = rand(150); }
+      spr(cf_x[i] + (sin(cf_y[i] * 3 + i * 40) >> 6), cf_y[i], T + art_mote, 2 + (i % 6));
+    }
+    if (party_t > 240 && btnp(BTN_START)) { trans_go(1, g, tx); }
+  }
+  spr_end();
+}

@@ -1,0 +1,59 @@
+{
+  "name": "{{name}}",
+  "entry": "src/main.vly",
+  "out": "build/{{name}}.vlc",
+  "tests": [
+    {
+      "name": "title screen",
+      "frames": 20,
+      "expect": {
+        "words": {
+          "state": 0
+        },
+        "frameHash": "e8e8bbdb3da76127e077a77efb3b6664527f4dd6495794c3b34cee0a147d81df"
+      }
+    },
+    {
+      "name": "START generates both monsters (spread over four frames) and opens the battle menu",
+      "frames": 20,
+      "input": "START@5",
+      "expect": {
+        "words": {
+          "state": 1,
+          "gen_phase": 3
+        },
+        "maxCycles": 100000,
+        "frameHash": "dcc2630b5938443ba0999cb84e7cd3c2516f65c4874701ae3756d2cd58da3088"
+      }
+    },
+    {
+      "name": "different START timings give different monsters",
+      "frames": 20,
+      "input": "START@9",
+      "expect": {
+        "words": {
+          "state": 1
+        },
+        "frameHash": "f45fbd2b5993fb878c205255ab9242a8ae029527967861b116ac81180343b158"
+      }
+    },
+    {
+      "name": "a long session (restarting every game, mashing A) never overruns the cycle budget or faults",
+      "frames": 4000,
+      "input": "START@5-4000/97, A@40-4000/4",
+      "expect": {
+        "maxCycles": 100000,
+        "frameHash": "b710e70486df0c4b3f039a9e0b9a970eec69e20f57ce0e42d660a5c558790dac"
+      }
+    },
+    {
+      "name": "mashing A and B through menus and many fights",
+      "frames": 6000,
+      "input": "START@5-6000/97, A@40-6000/5, B@41-6000/50",
+      "expect": {
+        "maxCycles": 100000,
+        "frameHash": "e8e8bbdb3da76127e077a77efb3b6664527f4dd6495794c3b34cee0a147d81df"
+      }
+    }
+  ]
+}

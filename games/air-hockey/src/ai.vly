@@ -1,0 +1,159 @@
+// ai.vly: the computer opponent. It sees the puck `ai_delay` frames late, drives its mallet with the same acceleration as the
+// player (only its top speed differs), and on a slow puck it winds up behind it and strikes toward the other goal.
+// Four levels differ in reaction time, speed, whether it predicts bounces, aiming error, bank shots and counter-punches.
+//   level:        0 ROOKIE  1 PRO  2 CHAMP  3 LEGEND
+table ai_delay   = { 28, 14, 7, 4 };            // frames of reaction delay
+table ai_spk     = { 6, 8, 11, 13 };            // defending speed in 48ths of a 1/256 px/frame step: 336, 432, 576, 672 (1.3 to 2.6 px per frame)
+table ai_strike  = { 7, 11, 14, 15 };           // speed of a strike or punch: up to 768 (3 px per frame, the same as the player's)
+table ai_pred    = { 0, 1, 1, 1 };              // predicts wall bounces
+table ai_err     = { 24, 11, 5, 2 };             // px of error in where it thinks the puck will arrive
+table ai_aim     = { 36, 20, 9, 3 };            // px of error when aiming at the goal
+table ai_corner  = { 0, 1, 1, 1 };              // aims at the far corner instead of the middle
+table ai_bank    = { 0, 0, 1, 1 };              // uses bank shots when the player is guarding the goal
+table ai_counter = { 0, 0, 1, 1 };              // punches forward into a shot that is coming at it
+table ai_defx    = { 142, 138, 134, 131 };      // where it stands to defend
+table ai_wait    = { 100, 50, 24, 8 };           // frames it waits before taking a serve
+
+table ai_rot = { 256, 0,  196, 165,  196, -165,  44, 252,  44, -252,  -128, 222,  -128, -222 };   // cos, sin (8.8) of 0, +-40, +-80, +-120 degrees
+var hist_x[32]; var hist_y[32]; var hist_i;     // puck positions in half pixels, one per frame
+var ai_noise; var ai_noise_t;                   // current prediction error
+var ai_aim_n;                                   // current aiming error
+var ai_wait_t;                                  // serve delay counter
+var ai_ch;                                      // frames left in the current strike (it keeps charging once it starts)
+var ai_stuck;                                   // frames spent attacking without touching the puck
+var ai_mode;                                    // for tests and the screen: 0 home, 1 defend, 2 wind-up, 3 strike, 4 punch
+var level;                                      // 0..3
+
+func hist_push() {
+  hist_i = (hist_i + 1) & 31;
+  hist_x[hist_i] = pux >> 5;
+  hist_y[hist_i] = puy >> 5;
+}
+func hist_fill() {
+  for (var k = 0; k < 32; k++) { hist_x[k] = pux >> 5; hist_y[k] = puy >> 5; }
+}
+
+// Drive mallet i toward the pixel (tx, ty) with top speed spk (see ai_spk); it slows down in the last 12 px.
+func ai_drive(i, tx, ty, spk) {
+  var ex = clamp((tx * 64 - mx[i]) >> 4, -48, 48);
+  var ey = clamp((ty * 64 - my[i]) >> 4, -48, 48);
+  var tvx = ex * spk;
+  var tvy = ey * spk;
+  if (abs(tvx) > spk * 30 && abs(tvy) > spk * 30) { tvx = fmul(tvx, 205); tvy = fmul(tvy, 205); }
+  mallet_drive(i, tvx, tvy);
+}
+
+// Where the puck will be when it reaches x = dx (px), in half pixels; folds the wall bounces. ox, oy, ovx, ovy are half pixels (and per 3 frames).
+func ai_predict_y(ox, oy, ovx, ovy, dxp) {
+  var dxh = dxp * 2 - ox;
+  var y = oy + (ovy * dxh) / ovx;
+  var rel = abs(y - 40);
+  rel = umod(rel, 448);
+  if (rel > 224) { rel = 448 - rel; }
+  return (rel + 40) >> 1;
+}
+
+// i = the mallet it drives (1 = right side; 0 = left side, mirrored, used by the attract mode on the title screen).
+func ai_think(i) {
+  var lv = level;
+  var fl = (i == 0);
+  var d = ai_delay[lv];
+  var k = (hist_i - d) & 31;
+  var k3 = (hist_i - d - 3) & 31;
+  var ox = hist_x[k];
+  var oy = hist_y[k];
+  var ovx = ox - hist_x[k3];
+  var ovy = oy - hist_y[k3];
+  var mxp = mx[i] >> 6;
+  var myp = my[i] >> 6;
+  var oppy = my[1 - i] >> 6;
+  if (fl) { ox = 320 - ox; ovx = 0 - ovx; mxp = 160 - mxp; }
+  var pxp = ox >> 1;
+  var pyp = oy >> 1;
+  var spk = ai_spk[lv];
+  var dx = ai_defx[lv];
+  var tx = dx;
+  var ty = 76;
+  var sp3 = abs(ovx) + abs(ovy);
+  if (ai_noise_t > 0) { ai_noise_t--; } else { ai_noise_t = 20 + rand(20); ai_noise = rand_range(0 - ai_err[lv], ai_err[lv]); ai_aim_n = rand_range(0 - ai_aim[lv], ai_aim[lv]); }
+  if (ai_wait_t > 0) { ai_wait_t--; }
+  var attack = 0;
+  if (pxp > 76 && sp3 < 15 && ai_wait_t == 0) { attack = 1; }
+  if (attack) {
+    ai_stuck++;
+    if (ai_pred[lv]) { pxp += (ovx * (d + 12)) / 6; pyp += (ovy * (d + 12)) / 6; pxp = clamp(pxp, 14, 146); pyp = clamp(pyp, 22, 130); }
+    // choose the aim point: the middle of the other goal, or its mirror image in a side wall for a bank shot
+    var ax = 8;
+    var ay = 76 + ai_aim_n;
+    if (ai_corner[lv]) { if (oppy > 76) { ay = 58 + ai_aim_n; } else { ay = 94 + ai_aim_n; } }     // aim at the corner the player is not guarding
+    if (ai_bank[lv] && abs(oppy - 76) < 24) {
+      if (oppy > 76) { ay = 0 - 36 + ai_aim_n / 2; } else { ay = 188 + ai_aim_n / 2; }
+    }
+    var a = (ax - pxp) >> 1;
+    var b = (ay - pyp) >> 1;
+    var h = isqrt(a * a + b * b);
+    if (h == 0) { h = 1; }
+    var ux = a * 256 / h;
+    var uy = b * 256 / h;
+    // can the mallet get behind the puck on that line? If the wind-up point is off the table (puck on a wall), turn the strike by up to 120 degrees until it can
+    var ux0 = ux; var uy0 = uy;
+    for (var q = 0; q < 7; q++) {
+      var qc = ai_rot[q * 2]; var qs = ai_rot[q * 2 + 1];
+      ux = fmul(ux0, qc) - fmul(uy0, qs);
+      uy = fmul(ux0, qs) + fmul(uy0, qc);
+      var wx = pxp - fmul(19, ux);
+      var wy = pyp - fmul(19, uy);
+      if (abs(clamp(wx, 87, 145) - wx) <= 3 && abs(clamp(wy, 24, 128) - wy) <= 3) { break; }
+    }
+    var rx = mxp - pxp;
+    var ry = myp - pyp;
+    var along = fmul(rx, ux) + fmul(ry, uy);
+    var perp = fmul(ry, ux) - fmul(rx, uy);
+    var side = 1;
+    if (perp < 0) { side = -1; }
+    var cspk = spk;
+    if (ai_stuck > 220) {
+      tx = dx; ty = 76; ai_mode = 0;                   // fallback: give up this approach, go home, and start over
+      if (ai_stuck > 270) { ai_stuck = 0; }
+    } else if (ai_ch > 0 && along < 8) {
+      ai_ch--;
+      tx = pxp + fmul(16, ux); ty = pyp + fmul(16, uy); ai_mode = 3;
+      cspk = ai_strike[lv];
+    } else if (along < -12 && abs(perp) < 9) {
+      ai_ch = 24;
+      tx = pxp + fmul(16, ux); ty = pyp + fmul(16, uy); ai_mode = 3;
+      cspk = ai_strike[lv];
+    } else if (along < -12) {
+      tx = pxp - fmul(19, ux); ty = pyp - fmul(19, uy); ai_mode = 2;
+    } else if (abs(perp) < 14 && along > -4) {
+      tx = pxp - fmul(side * 24, uy); ty = pyp + fmul(side * 24, ux); ai_mode = 2;
+    } else {
+      tx = pxp - fmul(16, ux) - fmul(side * 20, uy); ty = pyp - fmul(16, uy) + fmul(side * 20, ux); ai_mode = 2;
+    }
+    tx = clamp(tx, 87, 145);
+    ty = clamp(ty, 24, 128);
+    if (fl) { tx = 160 - tx; }
+    ai_drive(i, tx, ty, cspk);
+    return;
+  }
+  ai_stuck = 0; ai_ch = 0;
+  if (ovx > 2) {
+    // a shot is coming: stand where it will arrive
+    var yp = pyp;
+    if (ai_pred[lv]) { yp = ai_predict_y(ox, oy, ovx, ovy, dx); }
+    yp = clamp(yp + ai_noise, 24, 128);
+    tx = dx; ty = yp; ai_mode = 1;
+    if (ai_counter[lv] && pxp > dx - 34 && abs(pyp - myp) < 13 && abs(yp - myp) < 10) {
+      tx = pxp - 20; ty = pyp; ai_mode = 4;      // punch it back as it arrives
+      spk = ai_strike[lv];
+    }
+  } else {
+    tx = dx; ty = 76 + (pyp - 76) / 3; ai_mode = 0;
+  }
+  tx = clamp(tx, 87, 145);
+  if (fl) { tx = 160 - tx; }
+  ai_drive(i, tx, ty, spk);
+}
+
+// A mallet hit the puck: the attack worked (or at least tried); look for the next chance.
+func ai_touched() { ai_stuck = 0; ai_ch = 0; }

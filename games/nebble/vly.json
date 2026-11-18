@@ -1,0 +1,672 @@
+{
+  "name": "pal",
+  "entry": "src/main.vly",
+  "out": "build/pal.vlc",
+  "tests": [
+    {
+      "name": "title with no save: PRESS START, egg, no faults",
+      "frames": 60,
+      "expect": {
+        "words": {
+          "state": 0,
+          "have_save": 0
+        },
+        "frameHash": "0470e0584cdeba2acab59b35bb1d1b82a005b9bac7f3ed4ddaf9255de3be2bb0",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "START on the title opens the name screen",
+      "frames": 100,
+      "input": "START@20",
+      "expect": {
+        "words": {
+          "state": 1
+        },
+        "frameHash": "3edfd9ef841b0cfa043e39a9a5081de06f581f10339cd29ebdf0e4d7234a2090",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "the name screen cycles names with RIGHT",
+      "frames": 110,
+      "input": "START@20, RIGHT@80",
+      "expect": {
+        "words": {
+          "state": 1,
+          "pname": 3
+        },
+        "frameHash": "85e86a9ac4d4daea51d3131b1dd1be3fb364c9f40e483570697528eb64c9b670",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "A names the pet and the egg appears",
+      "frames": 220,
+      "input": "START@20, A@80",
+      "expect": {
+        "words": {
+          "state": 2,
+          "stage": 0,
+          "hp": 2
+        },
+        "saves": 1,
+        "frameHash": "f090c312a39d6a8e68e369da0bc425efe084a8d059da3cee4db3b3f535456121",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "rubbing the egg hatches it in about 8 seconds",
+      "frames": 800,
+      "input": "START@20, A@80, A@150-500/7",
+      "expect": {
+        "words": {
+          "state": 3,
+          "stage": 1,
+          "age": 9
+        },
+        "frameHash": "eacf10b39e1a64c51bd399f9bacf9a89a2bb7d02ebd8985b1ca742524f4fa8c7",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "an egg nobody touches still hatches by itself after 40 seconds (no dead end)",
+      "frames": 3000,
+      "input": "START@20, A@80",
+      "expect": {
+        "words": {
+          "state": 3,
+          "stage": 1
+        },
+        "frameHash": "2197d665d97b399fdc8ff561a8e0f3e89dd8b9bce66419ff17ba7e74f6c5b28c",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "CONTINUE enters the room and counts the boot",
+      "save": "tests/saves/baby_new.sav",
+      "frames": 160,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 3,
+          "stage": 1,
+          "boots": 2,
+          "age": 11
+        },
+        "frameHash": "48190ec6cc8a4e25e6dfef0d12d7c1f7d5461e616b4c6f807fd195cb052d94d4",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "power off is a nap: needs drop a little, energy rises, the day moves on",
+      "save": "tests/saves/full.sav",
+      "frames": 130,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "hun": 81,
+          "fun": 85,
+          "nrg": 99,
+          "cln": 87,
+          "clk": 61,
+          "boots": 2
+        },
+        "frameHash": "5b51465ee8029e201393b60899ffd37ed593ae97d36da55d4519b363db9cafac",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "the nap never pushes a need below 30, and never touches one already lower",
+      "save": "tests/saves/mid.sav",
+      "frames": 130,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "hun": 30,
+          "fun": 30,
+          "nrg": 99,
+          "cln": 30
+        },
+        "frameHash": "e282c87e66d3d021270af264c4807f2a4f183afe7b313d33e5ea600a701a32be",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a pet at zero on everything is still alive after the nap, and can be fed",
+      "save": "tests/saves/zero.sav",
+      "frames": 130,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 3,
+          "hun": 0,
+          "fun": 0,
+          "nrg": 12,
+          "cln": 0,
+          "mess": 1
+        },
+        "frameHash": "2afd43c19c89dcc0dfcf521af94d676c0b7014196c4cedf3809305e37e0cf36e",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "feeding a meal fills the tummy",
+      "save": "tests/saves/hungry.sav",
+      "frames": 420,
+      "input": "START@30, A@150, A@175",
+      "expect": {
+        "words": {
+          "hun": 42,
+          "n_meal": 8,
+          "fun": 59,
+          "act": 0
+        },
+        "saves": 1,
+        "frameHash": "35f43ed16de3328510a3b62f0dbea997359ae7e006a4fe308be15b76f9cba8bb",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a snack is less filling but fun",
+      "save": "tests/saves/hungry.sav",
+      "frames": 420,
+      "input": "START@30, A@150, RIGHT@165, A@180",
+      "expect": {
+        "words": {
+          "hun": 20,
+          "fun": 73,
+          "n_snack": 1,
+          "n_meal": 7
+        },
+        "frameHash": "e1466177ad369c66b02e63c53d255abca5b67d8496563a14cf22f96907a30b8c",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a second meal straight after a big one is refused (a pet that is full)",
+      "save": "tests/saves/full.sav",
+      "frames": 700,
+      "input": "START@30, A@150, A@175, A@360, A@385",
+      "expect": {
+        "words": {
+          "hun": 97,
+          "n_meal": 8,
+          "act": 0
+        },
+        "frameHash": "d4a1961d2fdf044e2394f049da57f53ca3f79a713772a8748b2b959b8bd76600",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a bath cleans, clears messes and counts",
+      "save": "tests/saves/zero.sav",
+      "frames": 420,
+      "input": "START@30, RIGHT@130, RIGHT@145, RIGHT@160, A@180",
+      "expect": {
+        "words": {
+          "cln": 44,
+          "mess": 0,
+          "n_wash": 6
+        },
+        "frameHash": "61593c45c7e2d4ffdcaa5697be2bce7525e21d31e769fe5d13536a6f33200529",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "lights out: sleep restores energy and the clock runs faster",
+      "save": "tests/saves/dusk.sav",
+      "frames": 1500,
+      "input": "START@30, RIGHT@130, RIGHT@145, A@160",
+      "expect": {
+        "words": {
+          "sleeping": 0,
+          "nrg": 94,
+          "clk": 272,
+          "n_rest": 4,
+          "day": 3
+        },
+        "frameHash": "e1591392503d7893871a64776bdf03cd9082121f715e66116cad37c4a496bc2b",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a rested pet by day says not sleepy",
+      "save": "tests/saves/full.sav",
+      "frames": 300,
+      "input": "START@30, RIGHT@130, RIGHT@145, A@165",
+      "expect": {
+        "words": {
+          "sleeping": 0,
+          "nrg": 99
+        },
+        "frameHash": "e501538a91a66bd9689922ffa36a92cfc1b86c30071de215f155b7a42dc19cd9",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "petting gives a little fun, three times, then only purrs",
+      "save": "tests/saves/baby_new.sav",
+      "frames": 520,
+      "input": "START@30, B@150, B@220, B@290, B@360, B@430",
+      "expect": {
+        "words": {
+          "fun": 55
+        },
+        "frameHash": "fb10d565a0f05f766e7dd390d17c031213803a19a0e8492d754da93c1f2c81c7",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "PLAY then CATCH starts the first mini-game",
+      "save": "tests/saves/baby_new.sav",
+      "frames": 360,
+      "input": "START@30, RIGHT@130, A@150, A@170",
+      "expect": {
+        "words": {
+          "state": 4,
+          "mg_id": 0
+        },
+        "frameHash": "1f048839a70e3aa8dea5c802b2f19a3778fe5f74d071c3c4288beae5f57bcd44",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a hungry-to-the-bone pet refuses to play",
+      "save": "tests/saves/zero.sav",
+      "frames": 360,
+      "input": "START@30, RIGHT@130, A@150, A@170",
+      "expect": {
+        "words": {
+          "state": 3
+        },
+        "frameHash": "f16ad2eab2c519e601e9760b2956699b725a6395494100d2194d73aafeb565b5",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "ABOUT ME shows the pet pages and B comes back",
+      "save": "tests/saves/adult.sav",
+      "frames": 420,
+      "input": "START@30, RIGHT@130, RIGHT@145, RIGHT@160, RIGHT@175, A@190, RIGHT@240, RIGHT@260, B@300",
+      "expect": {
+        "words": {
+          "state": 3,
+          "info_page": 2
+        },
+        "frameHash": "e2942e2ce34593f23fec18b49eea9344a8e65c7c675331dc25b9a29a09b1111e",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "START pauses: time stands still",
+      "save": "tests/saves/baby_new.sav",
+      "frames": 700,
+      "input": "START@30, START@200, START@600",
+      "expect": {
+        "words": {
+          "state": 3,
+          "age": 14,
+          "clk": 64
+        },
+        "frameHash": "fe81974b01dc70911e647018715932930981ad4f0b270d4c9e4175b68693d89f",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "pause then SAVE + TITLE goes back to the title and saves",
+      "save": "tests/saves/baby_new.sav",
+      "frames": 400,
+      "input": "START@30, START@200, DOWN@230, DOWN@245, A@260",
+      "expect": {
+        "words": {
+          "state": 0
+        },
+        "saves": 1,
+        "frameHash": "d7acb7220cb531bcfbabcef8a261a7eda3c19ca928cfd3bbf45347bb2ecc0dd0",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a baby grows into a child at 3 minutes",
+      "save": "tests/saves/baby_evo.sav",
+      "frames": 700,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "stage": 2,
+          "age": 180,
+          "state": 8
+        },
+        "frameHash": "076f56e8afb1e164fda01ece2a7ca2c06e6a6680481c47f13e1ea8673d89cc5e",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "balanced care grows a STARRY adult",
+      "save": "tests/saves/child_star.sav",
+      "frames": 700,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 0
+        },
+        "frameHash": "d732715885901302a2a34efef38f4f5e1a6e0b6fab809179cd1b41e507f0a73f",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "lots of snacks grow a PUDGY adult",
+      "save": "tests/saves/child_pudge.sav",
+      "frames": 700,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 2
+        },
+        "frameHash": "b60cc077d3d41f79c979e7effe186bdc2f5dccc7364fc350fd0cdf2fb7eab894",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "lots of winning games grow a DASHY adult",
+      "save": "tests/saves/child_dash.sav",
+      "frames": 700,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 1
+        },
+        "frameHash": "e2eddebd48b19709c92b20443320d3b85570650cc46ab59c9619362065045bf4",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "naps and baths grow a LUNA adult",
+      "save": "tests/saves/child_luna.sav",
+      "frames": 700,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 3
+        },
+        "frameHash": "2505d9b6c2f804673b738186435960370f55a8c516d45ed25e9c17dcf2e2c523",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "neglect grows a SCAMP, never a dead pet",
+      "save": "tests/saves/child_scamp.sav",
+      "frames": 700,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 4,
+          "hun": 55
+        },
+        "frameHash": "ebf8cb3c0eebfc88a5419a72a022599790bd8f0c5acb991d4b859d43d721af76",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "evening arrives on its own (the clock crosses 180)",
+      "save": "tests/saves/evening.sav",
+      "frames": 2900,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "clk": 187,
+          "last_ph": 1
+        },
+        "frameHash": "ffec6893181a2432cd825f0a3c0e16384b7bf41c5e199b89e81d3965535ecad9",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "the same wait without pausing ages the pet by 7 more seconds",
+      "save": "tests/saves/baby_new.sav",
+      "frames": 700,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 3,
+          "age": 20,
+          "clk": 70
+        },
+        "frameHash": "bce0c38d5163a7e46a8d6c2e084de07f32188762a702dd8259a4599beb8a5dab",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "adult CONTINUE shows the room with the day and night look",
+      "save": "tests/saves/adult.sav",
+      "frames": 200,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 3,
+          "stage": 3,
+          "form": 3
+        },
+        "frameHash": "9fb0b10d84af50eae930a317259a30a5c3971ac54366bb3579c9377f0da9c9aa",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "CATCH, careful player: 2 stars, fun +24, energy -10",
+      "save": "tests/saves/bored.sav",
+      "frames": 1100,
+      "inputFile": "tests/runs/catch_careful.input",
+      "expect": {
+        "words": {
+          "state": 7,
+          "mg_id": 0,
+          "mg_score": 18,
+          "mg_stars": 2,
+          "fun": 44,
+          "nrg": 89,
+          "hun": 65,
+          "n_play": 7,
+          "n_win": 3,
+          "best[0]": 18
+        },
+        "saves": 1,
+        "frameHash": "89847b5c901396da0eb4b81a92f33fffa7c63bf73b812895347474f7c22b3217",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "CATCH, sloppy player: 0 stars, still a little fun and nothing is lost",
+      "save": "tests/saves/bored.sav",
+      "frames": 1100,
+      "inputFile": "tests/runs/catch_sloppy.input",
+      "expect": {
+        "words": {
+          "state": 7,
+          "mg_score": 9,
+          "mg_stars": 0,
+          "fun": 26,
+          "n_play": 7,
+          "n_win": 2
+        },
+        "frameHash": "442fe6fdbe37bbcde8acd5cbaa8fe1d4e713b254a4e7c3da025e19be73777ff9",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "COPY ME, perfect memory: all 6 rounds, 3 stars",
+      "save": "tests/saves/bored.sav",
+      "frames": 2270,
+      "inputFile": "tests/runs/copy_perfect.input",
+      "expect": {
+        "words": {
+          "state": 7,
+          "mg_id": 1,
+          "mg_score": 6,
+          "mg_stars": 3,
+          "fun": 54,
+          "best[1]": 6
+        },
+        "frameHash": "8abf11c4f54c190d52c30100467003fe64c3459bdbc7e49ad11a236d4dcdca1f",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "COPY ME, many slips: out of lives early, 0 stars",
+      "save": "tests/saves/bored.sav",
+      "frames": 1260,
+      "inputFile": "tests/runs/copy_sloppy.input",
+      "expect": {
+        "words": {
+          "state": 7,
+          "mg_score": 1,
+          "mg_stars": 0,
+          "mg_lives": 0,
+          "fun": 26
+        },
+        "frameHash": "26b3a90531d50d6e731fa253a621265e4a549de2d4a21e976fbfbc31b3078f9a",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "HOP, well timed: all 14 obstacles, 3 stars",
+      "save": "tests/saves/bored.sav",
+      "frames": 1220,
+      "inputFile": "tests/runs/hop_perfect.input",
+      "expect": {
+        "words": {
+          "state": 3,
+          "mg_id": 2,
+          "mg_score": 14,
+          "mg_stars": 3,
+          "mg_lives": 3,
+          "fun": 54,
+          "best[2]": 14
+        },
+        "frameHash": "a8fd2e78a831e046e548454d1f0863dd7c3f29bc8e5db3cfe1b1d3536a292462",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "HOP, never jumping: three hits end it, 0 stars",
+      "save": "tests/saves/bored.sav",
+      "frames": 595,
+      "inputFile": "tests/runs/hop_idle.input",
+      "expect": {
+        "words": {
+          "state": 3,
+          "mg_score": 0,
+          "mg_stars": 0,
+          "mg_lives": 0,
+          "fun": 26
+        },
+        "frameHash": "a8fd2e78a831e046e548454d1f0863dd7c3f29bc8e5db3cfe1b1d3536a292462",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "HOP, 12 frames late every time: fails (the window is about +-8 frames)",
+      "save": "tests/saves/bored.sav",
+      "frames": 595,
+      "inputFile": "tests/runs/hop_late12.input",
+      "expect": {
+        "words": {
+          "state": 3,
+          "mg_score": 0,
+          "mg_stars": 0,
+          "mg_lives": 0
+        },
+        "frameHash": "a8fd2e78a831e046e548454d1f0863dd7c3f29bc8e5db3cfe1b1d3536a292462",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "LIFE: an attentive player (bot) raises a STARRY adult in 14 minutes",
+      "frames": 50400,
+      "inputFile": "tests/runs/life_attentive.input",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 0,
+          "age": 821,
+          "n_neg": 0,
+          "hun": 55,
+          "fun": 80,
+          "nrg": 96,
+          "cln": 69
+        },
+        "frameHash": "a9b24a2d572c93f215e27c66c586a96db33467cfd1becd4ee93a63c4d2bd9d30",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "LIFE: a snack-giving player raises a PUDGY adult",
+      "frames": 50400,
+      "inputFile": "tests/runs/life_snacker.input",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 2,
+          "n_snack": 23,
+          "n_meal": 0
+        },
+        "frameHash": "36fcf646f63c6e0ce55316b6df91e5b7e4c67fd45a95780db27e54ef84b20c8e",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "LIFE: a play-loving player raises a DASHY adult",
+      "frames": 50400,
+      "inputFile": "tests/runs/life_player.input",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 1,
+          "n_play": 15,
+          "n_win": 15
+        },
+        "frameHash": "493be4e7507aff7d97b31e4523b168591eb41fef160cd70b159f770ef27a8f98",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "LIFE: a sleepy, tidy player raises a LUNA adult",
+      "frames": 50400,
+      "inputFile": "tests/runs/life_sleeper.input",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 3,
+          "n_rest": 7,
+          "n_wash": 13
+        },
+        "frameHash": "d302b4c2528ddd50d24b3b7eb0ab72de3b4f9fac2e729c1e3e9eee4810a36034",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "LIFE: a player who only hatches the egg and walks away gets a SCAMP, pet alive and well",
+      "frames": 50400,
+      "inputFile": "tests/runs/life_neglect.input",
+      "expect": {
+        "words": {
+          "stage": 3,
+          "form": 4,
+          "n_neg": 544,
+          "hun": 0,
+          "fun": 0,
+          "nrg": 0,
+          "cln": 0,
+          "state": 3
+        },
+        "frameHash": "2c64286e4cd61dd5d414ea929b27e1ba28cbe62cc8b53dbc365f29bd0785e387",
+        "maxCycles": 80000
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "name": "vly",
+  "version": "0.5.0",
+  "description": "VLY-1: a tiny deterministic handheld game console, its toolchain, and its on-chain cartridge format",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "vly": "cli/vly.js"
+  },
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./core": "./src/core/index.js",
+    "./asm": "./src/asm/index.js",
+    "./lang": "./src/lang/index.js",
+    "./wasm": "./src/wasm/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "cli",
+    "src",
+    "spec",
+    "docs",
+    "templates",
+    "examples",
+    "conformance",
+    "c",
+    "hardware",
+    "SPEC.md",
+    "AGENTS.md",
+    "llms.txt",
+    "LICENSE",
+    ".claude/skills",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "gen": "node scripts/gen.js && node scripts/gen-stdlib-docs.js",
+    "conformance": "node scripts/gen-conformance.js",
+    "difftest": "node scripts/difftest.js",
+    "build:c": "make -C c",
+    "docs:stdlib": "node scripts/gen-stdlib-docs.js",
+    "fuzz": "node scripts/fuzz.js",
+    "build:wasm": "sh scripts/build-wasm.sh",
+    "docs": "node scripts/gen-stdlib-docs.js"
+  }
+}

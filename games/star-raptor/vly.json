@@ -1,0 +1,181 @@
+{
+  "name": "star-raptor",
+  "entry": "src/main.vly",
+  "out": "build/star-raptor.vlc",
+  "tests": [
+    {
+      "name": "title screen",
+      "frames": 30,
+      "expect": {
+        "words": {
+          "state": 0
+        },
+        "frameHash": "60f432c8f1586f73b79af51155e2fa2dee6129ec529c7b8dd6a52513a7f74202",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "title shows the saved best score and stages cleared",
+      "frames": 30,
+      "expect": {
+        "words": {
+          "state": 0,
+          "hi": 25960,
+          "cleared": 3
+        },
+        "frameHash": "c40f63fc14cb3535f60fe4209c85b1201c4d2806cb805ec1279d9ee80f30d75a",
+        "maxCycles": 80000
+      },
+      "save": "tests/after-win.sav"
+    },
+    {
+      "name": "START shows the stage 1 card (3 lives, 3 bombs)",
+      "frames": 110,
+      "expect": {
+        "words": {
+          "state": 1,
+          "stage": 0,
+          "lives": 3,
+          "bombs": 3
+        },
+        "frameHash": "7fc584176a0c31cd0935047685f77cc75fbddb93023778ade29259959de878c4",
+        "maxCycles": 80000
+      },
+      "input": "START@20"
+    },
+    {
+      "name": "stage 1 starts (shot 1: scrolling space, HUD)",
+      "frames": 300,
+      "expect": {
+        "words": {
+          "state": 2,
+          "stage": 0,
+          "lives": 3
+        },
+        "frameHash": "444404781d06bd1e38b63a89d70eabd765cc80e4a76971c88b22239e1dcb1713",
+        "maxCycles": 80000
+      },
+      "input": "START@20,START@120"
+    },
+    {
+      "name": "holding A fires and scores on rocks",
+      "frames": 700,
+      "expect": {
+        "words": {
+          "state": 2
+        },
+        "frameHash": "764ea384fb5ed539e26a63c8e433300294114ec9a4b62a1b735cf054be2c817a",
+        "maxCycles": 80000
+      },
+      "input": "START@20,START@120,A@130-700,LEFT@300-330,RIGHT@400-450"
+    },
+    {
+      "name": "START pauses",
+      "frames": 320,
+      "expect": {
+        "words": {
+          "state": 3
+        },
+        "frameHash": "c3508f9cc34f4079b190355b432b16886c4ee28ddb095465e6fc3ccbf8ddce7b",
+        "maxCycles": 80000
+      },
+      "input": "START@20,START@120,A@130-300,START@300"
+    },
+    {
+      "name": "START again resumes",
+      "frames": 340,
+      "expect": {
+        "words": {
+          "state": 2
+        },
+        "frameHash": "66124b7bf85350dac6da391d90c428014d46808ccc60c34486b3f795a7eb77eb",
+        "maxCycles": 80000
+      },
+      "input": "START@20,START@120,A@130-300,START@300,START@320"
+    },
+    {
+      "name": "B drops a bomb (3 -> 2)",
+      "frames": 330,
+      "expect": {
+        "words": {
+          "state": 2,
+          "bombs": 2
+        },
+        "frameHash": "f9c71ddf018b054dead92bf0f96c4864399df6333249e01f46669cf20257bf1e",
+        "maxCycles": 80000
+      },
+      "input": "START@20,START@120,A@130-330,B@320"
+    },
+    {
+      "name": "SELECT on the title picks stage 3 once it is unlocked",
+      "frames": 60,
+      "expect": {
+        "words": {
+          "state": 0,
+          "start_sel": 2
+        },
+        "frameHash": "ad2487c85560bb14fbe8346ff156f84b2221c0a2e26059ac611e455c4be04c0b",
+        "maxCycles": 80000
+      },
+      "input": "SELECT@20,SELECT@40",
+      "save": "tests/after-win.sav"
+    },
+    {
+      "name": "a bot plays stage 1 to 3 from the title and wins (full run, about 4.4 minutes)",
+      "frames": 15870,
+      "expect": {
+        "words": {
+          "state": 7,
+          "stage": 2,
+          "loopn": 0,
+          "cleared": 3
+        },
+        "frameHash": "f9f33ad5f0fd200dc6b6b787d7a29c3ac5a1b29a32f349037a27b17d51e0f61e",
+        "maxCycles": 80000,
+        "saves": 4
+      },
+      "inputFile": "tests/full.input"
+    },
+    {
+      "name": "bot clears stage 2 and reaches the stage 3 card",
+      "frames": 5350,
+      "expect": {
+        "words": {
+          "state": 1,
+          "stage": 2
+        },
+        "frameHash": "a8fd2e78a831e046e548454d1f0863dd7c3f29bc8e5db3cfe1b1d3536a292462",
+        "maxCycles": 80000
+      },
+      "inputFile": "tests/stage2.input",
+      "save": "tests/after-win.sav"
+    },
+    {
+      "name": "bot clears stage 3 and the ending screen shows",
+      "frames": 5800,
+      "expect": {
+        "words": {
+          "state": 7
+        },
+        "frameHash": "b1ca21be75cc87b57f94b38dccd7e8988b7a2da786782369ee7bfe3a7ab83028",
+        "maxCycles": 80000
+      },
+      "inputFile": "tests/stage3.input",
+      "save": "tests/after-win.sav"
+    },
+    {
+      "name": "doing nothing on stage 3 ends in GAME OVER",
+      "frames": 6000,
+      "expect": {
+        "words": {
+          "state": 5,
+          "lives": 0
+        },
+        "frameHash": "3b6278ab019dc90a24ac552cee3a1e9259c2625a49193d7948a5ae64887eda9b",
+        "maxCycles": 80000
+      },
+      "input": "SELECT@20,SELECT@40,START@70,START@160",
+      "save": "tests/after-win.sav"
+    }
+  ]
+}

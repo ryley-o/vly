@@ -1,0 +1,179 @@
+{
+  "name": "ninja-chef",
+  "entry": "src/main.vly",
+  "out": "build/ninja-chef.vlc",
+  "tests": [
+    {
+      "name": "title screen: name, PRESS START, controls, hero on grass",
+      "frames": 30,
+      "expect": {
+        "words": {
+          "state": 0,
+          "sel": 1
+        },
+        "frameHash": "fa53f3433d52516fa3595a26c5f9e0ff77be7d31d2a0e7facd26acde6d6b1f2b",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "START fades to the stage 1 card",
+      "frames": 100,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 1,
+          "level": 0
+        },
+        "frameHash": "a44c344ae04cef70477556336a2bdd98c17bb81fd47ca0dc269f94d11e44a853",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "play begins: 3 hearts, 3 lives, hero on the ground, camera at 0",
+      "frames": 200,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 2,
+          "hearts": 3,
+          "lives": 3,
+          "px": 24,
+          "py": 88,
+          "cam": 0,
+          "grounded": 1
+        },
+        "frameHash": "ff88a766e2d9ff8f6fc8c7046aa917a45434db0d3445e6b54b81ba5402bc88bc",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a held jump rises 30 px (about 3.75 tiles)",
+      "frames": 254,
+      "input": "START@30,A@240-270",
+      "expect": {
+        "words": {
+          "py": 58,
+          "grounded": 0
+        },
+        "frameHash": "4af1ca13e639fe5eefece52720c0825cf70cd5622eff28ae1535e97928143a1a",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a tapped jump is a short hop (variable height)",
+      "frames": 245,
+      "input": "START@30,A@240",
+      "expect": {
+        "words": {
+          "py": 79
+        },
+        "frameHash": "b131bc45633c84bc0c9f59ee4000cb5db40846e97ea8ebde7fc156131c981abf",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "START pauses and the hero stops walking",
+      "frames": 300,
+      "input": "START@30,RIGHT@200-600,START@260",
+      "expect": {
+        "words": {
+          "state": 3,
+          "px": 107
+        },
+        "frameHash": "6e3635c46b473ab5878f270dcfae5d073c217927abfa783610a8e1c669bacf59",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "paused for 5 more seconds: nothing moves",
+      "frames": 600,
+      "input": "START@30,RIGHT@200-600,START@260",
+      "expect": {
+        "words": {
+          "state": 3,
+          "px": 107
+        },
+        "frameHash": "6e3635c46b473ab5878f270dcfae5d073c217927abfa783610a8e1c669bacf59",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "holding every button at once for a minute causes no faults",
+      "frames": 3800,
+      "input": "START@30,UP+DOWN+LEFT+RIGHT+A+B@200-3800",
+      "expect": {
+        "frameHash": "ff88a766e2d9ff8f6fc8c7046aa917a45434db0d3445e6b54b81ba5402bc88bc",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "idle for five minutes: no faults, no overrun",
+      "frames": 18000,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 2
+        },
+        "frameHash": "f920b5f0837cd5aea0429e3a29974b1653a576bb2becca492c03137ca6de11ce",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "the recorded bot clears stage 1, boss and all, and reaches the cooking screen",
+      "frames": 1700,
+      "expect": {
+        "words": {
+          "state": 6,
+          "level": 0
+        },
+        "frameHash": "43678f1405f763140ef37aca6c92c9f8124860657a242319b58cbacc1b02d075",
+        "maxCycles": 80000
+      },
+      "inputFile": "tests/win.input"
+    },
+    {
+      "name": "the same run ends in game over after losing every life at the stage 3 boss",
+      "frames": 8640,
+      "expect": {
+        "words": {
+          "state": 5,
+          "lives": -1
+        },
+        "frameHash": "9501fbea1eac3e8252e05fc12e88cbe15b5fbfcf97eb34ae260a1d1e7d49bac8",
+        "maxCycles": 80000
+      },
+      "inputFile": "tests/win.input"
+    },
+    {
+      "name": "the full recorded run (3 stages, 3 bosses, a game over and a retry) reaches the ending and saves 5 times",
+      "frames": 18200,
+      "expect": {
+        "words": {
+          "state": 7,
+          "level": 2,
+          "unlocked": 3
+        },
+        "frameHash": "7856204a707b1e9cdafc8947d5e5af19a6d760ecede72e25719ae744e616bc6b",
+        "maxCycles": 80000,
+        "saves": 5
+      },
+      "inputFile": "tests/win.input"
+    },
+    {
+      "name": "a finished save lets the title pick stage 3 with LEFT/RIGHT",
+      "frames": 100,
+      "input": "RIGHT@10,RIGHT@20,START@30",
+      "expect": {
+        "words": {
+          "level": 2,
+          "unlocked": 3,
+          "sel": 3,
+          "state": 1
+        },
+        "frameHash": "eece2b2d5ee38f45743c194fa89d8c7f1fd7537cac1401fc7f7f0cb56f40a22b",
+        "maxCycles": 80000
+      },
+      "save": "tests/after-win.sav"
+    }
+  ]
+}

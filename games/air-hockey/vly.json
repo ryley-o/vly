@@ -1,0 +1,191 @@
+{
+  "name": "hockey",
+  "entry": "src/main.vly",
+  "out": "build/hockey.vlc",
+  "tests": [
+    {
+      "name": "title: two computers play an attract game behind the logo",
+      "frames": 60,
+      "expect": {
+        "words": {
+          "state": 0
+        },
+        "frameHash": "dbba0f0750c5e2fba8b0648102175347e90006bede66402368b0e23a5bedd90e",
+        "maxCycles": 60000
+      }
+    },
+    {
+      "name": "START on the title opens the rival menu",
+      "frames": 80,
+      "input": "START@20",
+      "expect": {
+        "words": {
+          "state": 1
+        },
+        "frameHash": "0014d7947e0d31e1282ff4d157f17019a5fb8ffdfdfd1863a13e0a061f3b70a5"
+      }
+    },
+    {
+      "name": "menu: DOWN moves the cursor, a locked level refuses A",
+      "frames": 140,
+      "input": "START@20,DOWN@40,DOWN@50,DOWN@60,A@80",
+      "expect": {
+        "words": {
+          "state": 1,
+          "sel": 3
+        }
+      }
+    },
+    {
+      "name": "menu: choosing PRO starts a versus card for level 1",
+      "frames": 130,
+      "input": "START@20,DOWN@40,A@50",
+      "expect": {
+        "words": {
+          "state": 2,
+          "level": 1,
+          "score[0]": 0,
+          "score[1]": 0
+        },
+        "frameHash": "66b6f5a772a45c7a46a0526bca582f18f1bb2b9ba6203b2ed3864d46f869f983"
+      }
+    },
+    {
+      "name": "countdown 3-2-1 on the table, then play",
+      "frames": 160,
+      "input": "START@20,A@40,A@70",
+      "expect": {
+        "words": {
+          "state": 3,
+          "level": 0
+        },
+        "frameHash": "0db469e925513b81f0104015814f7889d517f204f150ba71392511d2825f4bbb"
+      }
+    },
+    {
+      "name": "after GO the game is live",
+      "frames": 260,
+      "input": "START@20,A@40,A@70",
+      "expect": {
+        "words": {
+          "state": 4
+        }
+      }
+    },
+    {
+      "name": "START pauses play and freezes the puck",
+      "frames": 300,
+      "input": "START@20,A@40,A@70,START@230",
+      "expect": {
+        "words": {
+          "state": 6
+        },
+        "frameHash": "3482631a2b8e5637dde4aac45588d29f16a02436bd19d30fcfa0c2384395c623"
+      }
+    },
+    {
+      "name": "START resumes after a short count-in",
+      "frames": 400,
+      "input": "START@20,A@40,A@70,START@230,START@260",
+      "expect": {
+        "words": {
+          "state": 4
+        }
+      }
+    },
+    {
+      "name": "SELECT on the pause screen quits to the menu",
+      "frames": 340,
+      "input": "START@20,A@40,A@70,START@230,SELECT@260",
+      "expect": {
+        "words": {
+          "state": 1
+        }
+      }
+    },
+    {
+      "name": "a bot (14 frames late, average) beats ROOKIE 7-3 and the record is saved",
+      "frames": 8500,
+      "inputFile": "tests/win_rookie.input",
+      "expect": {
+        "words": {
+          "state": 7,
+          "score[0]": 7,
+          "score[1]": 3,
+          "rec_w[0]": 1,
+          "rec_l[0]": 0
+        },
+        "saves": 1,
+        "saveWords": {
+          "2": 1
+        },
+        "frameHash": "2e825db8384c6a66c4d408de49b24d93a53c4f262d8b592afba6a5d781ecd64d",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "a bot (8 frames late, expert) beats CHAMP 7-4: LEGEND unlocks",
+      "frames": 12300,
+      "inputFile": "tests/win_champ.input",
+      "expect": {
+        "words": {
+          "state": 7,
+          "score[0]": 7,
+          "score[1]": 4,
+          "rec_w[2]": 1
+        },
+        "saves": 1,
+        "saveWords": {
+          "6": 1
+        },
+        "frameHash": "240a41df67618d222436358af6b0fdc51ff9ec11bc124afe01183a19f071ae5a",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "an idle player loses 0-7 to PRO (shot clock ends stalled points) and the loss is saved",
+      "frames": 9000,
+      "input": "START@20,DOWN@40,A@50,A@90",
+      "expect": {
+        "words": {
+          "state": 7,
+          "score[0]": 0,
+          "score[1]": 7,
+          "rec_l[1]": 1
+        },
+        "saves": 1,
+        "saveWords": {
+          "12": 1
+        },
+        "frameHash": "ceefa9a5bdc1800223389842228b8996c14bd8bb38e3833e4ac9d2ff98220be6"
+      }
+    },
+    {
+      "name": "with that save, LEGEND is open and the menu shows the record",
+      "frames": 150,
+      "input": "START@20,DOWN@40,DOWN@50,DOWN@60,A@80",
+      "save": "tests/win_champ.sav",
+      "expect": {
+        "words": {
+          "state": 2,
+          "level": 3,
+          "rec_w[2]": 1
+        },
+        "frameHash": "dad864ac65046fd0148ef0fbf230c141ab9bbb995d4f8df1cfb354e298a1c554"
+      }
+    },
+    {
+      "name": "a saved record is shown on the menu",
+      "frames": 80,
+      "input": "START@20",
+      "save": "tests/win_rookie.sav",
+      "expect": {
+        "words": {
+          "state": 1,
+          "rec_w[0]": 1
+        },
+        "frameHash": "42b29f2c38ea041d68b6d89f3725406c3e95318dcce82c2e68bbdcbf98bdb653"
+      }
+    }
+  ]
+}

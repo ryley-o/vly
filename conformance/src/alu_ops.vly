@@ -1,0 +1,35 @@
+// Conformance: one ALU operation per frame. Frame n picks (operation, a, b) from tables, builds a tiny routine
+// in RAM (opcode, registers, immediate, RET), loads r0=a and r1=b, calls it, and the frame ends. The machine
+// state hash after every frame therefore covers the result and all four flags of that operation.
+//   kinds: 0 = op rd,rs   1 = op rd,imm (b is the immediate)   2 = op rd (unary)   3 = op rd,n (shift count b & 15)
+btable ops = {
+  0x10,0, 0x11,0, 0x12,0, 0x13,0, 0x14,0, 0x15,0, 0x16,0, 0x17,0, 0x18,0, 0x19,0, 0x1A,0, 0x1B,0, 0x28,0, 0x2A,0,
+  0x1C,2, 0x1D,2,
+  0x20,1, 0x21,1, 0x22,1, 0x23,1, 0x27,1, 0x29,1,
+  0x24,3, 0x25,3, 0x26,3,
+};
+table vals = { 0, 1, 2, 7, 15, 16, 0x7FFF, 0x8000, 0x8001, 0xFFFF, 0x1234, 0xFFFE };
+const NVALS = 12;
+const NOPS = 24;
+const STUB = 0xB500;
+
+func frame() {
+  var f = frames();
+  var total = NOPS * NVALS * NVALS;
+  if (f >= total) { return; }
+  var opi = udiv(f, NVALS * NVALS);
+  var rem = umod(f, NVALS * NVALS);
+  var a = vals[udiv(rem, NVALS)];
+  var b = vals[umod(rem, NVALS)];
+  var op = ops[opi * 2];
+  var kind = ops[opi * 2 + 1];
+  poke8(STUB, op);
+  if (kind == 0) { poke8(STUB + 1, 0x01); poke(STUB + 2, 0x003D); }
+  else if (kind == 1) { poke8(STUB + 1, 0x00); poke(STUB + 2, b); poke(STUB + 4, 0x003D); }
+  else if (kind == 2) { poke8(STUB + 1, 0x00); poke(STUB + 2, 0x003D); }
+  else { poke8(STUB + 1, b & 15); poke(STUB + 2, 0x003D); }
+  poke(0xB520, a);
+  poke(0xB522, b);
+  // r0 = a, r1 = b, then call the stub; flags and r0 are left for the state hash.
+  asm("LDI r2, 0xB520\nLD r0, [r2]\nLDI r2, 0xB522\nLD r1, [r2]\nLDI r2, 0xB500\nCALLR r2");
+}

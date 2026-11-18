@@ -1,0 +1,19 @@
+{
+  "name": "{{name}}",
+  "entry": "src/main.vly",
+  "out": "build/{{name}}.vlc",
+  "tests": [
+    {
+      "name": "hero walks right and the score counts presses of A",
+      "frames": 40,
+      "input": "RIGHT@0-29, A@5, A@10, A@15",
+      "expect": {
+        "words": {
+          "x": 102,
+          "score": 3
+        },
+        "frameHash": "25f79be16ab98d80c14d30668087ede0e7f15b407ff5593cb6d1b1827c2848c3"
+      }
+    }
+  ]
+}

@@ -1,0 +1,153 @@
+{
+  "name": "cat-garden",
+  "entry": "src/main.vly",
+  "out": "build/cat-garden.vlc",
+  "tests": [
+    {
+      "name": "title screen: name, PRESS START, no faults",
+      "frames": 60,
+      "expect": {
+        "words": {
+          "state": 0
+        },
+        "frameHash": "647f35d1450e9b51d30a18a3a86664959c16dc2bb1899d977e34177887e21545",
+        "maxCycles": 60000
+      }
+    },
+    {
+      "name": "START with no save begins a new garden: day 1, full can, two buds planted",
+      "frames": 220,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 1,
+          "g": 0,
+          "day": 1,
+          "water": 6,
+          "bed[0]": 9236
+        },
+        "frameHash": "36962b4ba1d1c8351451363cff65f64f4384482d3b66941162d4e7f7e4c00d40",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "fences stop the gardener (walks left for 5 seconds, ends at x=1)",
+      "frames": 520,
+      "input": "START@30, LEFT@150-500",
+      "expect": {
+        "words": {
+          "tx": 1,
+          "ty": 8
+        }
+      }
+    },
+    {
+      "name": "day one: water both buds, rest on the bench, wake on day 2 with two blooms and cats visiting",
+      "frames": 760,
+      "input": "START@30,UP@150,UP@159,UP@168,LEFT@177,UP@186,A@195,RIGHT@209,UP@218,A@227,DOWN@241,DOWN@250,DOWN@259,RIGHT@268,RIGHT@277,RIGHT@286,RIGHT@295,RIGHT@304,RIGHT@313,DOWN@322,DOWN@331,A@340",
+      "expect": {
+        "words": {
+          "state": 1,
+          "day": 2,
+          "bed[0]": 9750,
+          "cat_here[0]": 257
+        },
+        "saves": 1,
+        "frameHash": "c87f839a27c09a50566b4ba8ad5fff74303b7e59a51949fa2188be48fde36144",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "START pauses (help panel) and START resumes",
+      "frames": 300,
+      "input": "START@30, START@200, START@260",
+      "expect": {
+        "words": {
+          "state": 1
+        }
+      }
+    },
+    {
+      "name": "START pauses: state 2 while paused",
+      "frames": 230,
+      "input": "START@30, START@200",
+      "expect": {
+        "words": {
+          "state": 2
+        },
+        "frameHash": "91c7e3cf23c5ee88b744a2ce7930598984a6834a95e8bbaf589dada4e02941f4"
+      }
+    },
+    {
+      "name": "SELECT opens the cat book",
+      "frames": 230,
+      "input": "START@30, SELECT@200",
+      "expect": {
+        "words": {
+          "state": 3
+        },
+        "frameHash": "53a69364478633e2f36c5dbcb362788dc81bc31b771d50599460b71217e8b1a6"
+      }
+    },
+    {
+      "name": "a bot plays the whole game: three gardens, six cats, five hearts each, gates open, birthday party (tests/full.input)",
+      "frames": 7044,
+      "inputFile": "tests/full.input",
+      "expect": {
+        "words": {
+          "state": 5,
+          "won": 1,
+          "cleared": 7,
+          "g": 2,
+          "day": 10,
+          "hearts[0]": 1285,
+          "hearts[2]": 1285,
+          "hearts[4]": 1285
+        },
+        "frameHash": "d69707762c581a7e441398302afdbbe90b724693596ee364a14c3f379a438412",
+        "maxCycles": 80000
+      }
+    },
+    {
+      "name": "the finished game is saved: the title offers CONTINUE and resumes with every cat a friend",
+      "save": "tests/won.sav",
+      "frames": 220,
+      "input": "START@30",
+      "expect": {
+        "words": {
+          "state": 1,
+          "won": 1,
+          "cleared": 7,
+          "hearts[4]": 1285
+        },
+        "frameHash": "b49eb18c95bbac3cd52484e3a99bdd3798f615d4367b6293d1235eb3a96aa3b9"
+      }
+    },
+    {
+      "name": "NEW GARDEN needs a second press so a saved garden is not erased by accident",
+      "save": "tests/won.sav",
+      "frames": 260,
+      "input": "DOWN@30, START@50, START@120",
+      "expect": {
+        "words": {
+          "state": 1,
+          "day": 1,
+          "won": 0
+        },
+        "frameHash": "318444f6d443ac7643fcd7a4293a62bb06a111161615addd52132fbcae1fbf43"
+      }
+    },
+    {
+      "name": "NEW GARDEN pressed once only asks",
+      "save": "tests/won.sav",
+      "frames": 120,
+      "input": "DOWN@30, START@50",
+      "expect": {
+        "words": {
+          "state": 0,
+          "confirm": 1
+        }
+      }
+    }
+  ]
+}

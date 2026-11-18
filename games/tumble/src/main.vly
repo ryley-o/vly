@@ -1,0 +1,289 @@
+// TUMBLE: a falling-block puzzle.
+//
+//   LEFT / RIGHT  slide (hold to keep sliding)      DOWN  drop faster      UP  drop at once
+//   A / B         turn right / left                 START pause            SELECT music on or off
+//
+// Fill a row to clear it; clear four at once for the big score. It speeds up every ten rows. Your best score is saved.
+//
+// Shows: pieces turned by arithmetic instead of tables of shapes, a seven-piece "bag" so the luck is fair, a ghost that
+// shows where the piece will land, sprites for what moves and background cells for what has settled, std/music.
+
+import "std/music";
+
+tileset art = "../assets/art.tiles";
+
+const T = 100;                      // art tiles in tile RAM (the font is 0..94)
+const W = 10; const H = 18;         // the well, in cells
+const FX = 1;                       // the well's left edge on screen (cells)
+const S_TITLE = 0; const S_PLAY = 1; const S_CLEAR = 2; const S_OVER = 3; const S_PAUSE = 4;
+
+// Each piece is four cells in a small box: I, O, T, S, Z, J, L. `box` is the side of the box it turns in (0: never turns).
+btable shapes = { 0,1, 1,1, 2,1, 3,1,   1,0, 2,0, 1,1, 2,1,   1,0, 0,1, 1,1, 2,1,   1,0, 2,0, 0,1, 1,1,
+                  0,0, 1,0, 1,1, 2,1,   0,0, 0,1, 1,1, 2,1,   2,0, 0,1, 1,1, 2,1 };
+btable box = { 4, 0, 3, 3, 3, 3, 3 };
+btable speeds = { 48, 43, 38, 33, 28, 23, 18, 13, 8, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 2 };   // frames per row, by level
+table line_score = { 0, 4, 10, 30, 120 };                                                    // in tens
+
+byte grid[180];                     // settled blocks: 0 empty, else piece + 1
+byte bag[7];
+var state; var piece; var rot; var px; var py; var next; var bag_n;
+var cx[4]; var cy[4];               // the current piece's cells, already turned
+var fall; var rest; var das; var das_dir;
+var score; var lines; var level; var best;        // scores are kept in tens
+var timer; var full[4]; var nfull;
+var muted; var beep;
+
+// ---------- pieces ----------
+func load_cells(p, r) {
+  var n = box[p];
+  for (var i = 0; i < 4; i++) {
+    var x = shapes[p * 8 + i * 2];
+    var y = shapes[p * 8 + i * 2 + 1];
+    for (var k = 0; k < r && n > 0; k++) { var t = x; x = n - 1 - y; y = t; }    // a quarter turn to the right
+    cx[i] = x; cy[i] = y;
+  }
+}
+func fits(x, y) {
+  for (var i = 0; i < 4; i++) {
+    var gx = x + cx[i];
+    var gy = y + cy[i];
+    if (gx < 0 || gx >= W || gy >= H) { return 0; }
+    if (gy >= 0 && grid[gy * W + gx]) { return 0; }
+  }
+  return 1;
+}
+func draw_bag() {
+  for (var i = 0; i < 7; i++) { bag[i] = i; }
+  for (var i = 6; i > 0; i--) { var j = rand(i + 1); var t = bag[i]; bag[i] = bag[j]; bag[j] = t; }
+  bag_n = 0;
+}
+func take() {
+  if (bag_n >= 7) { draw_bag(); }
+  bag_n++;
+  return bag[bag_n - 1];
+}
+
+// ---------- drawing ----------
+func cell(x, y, v) {
+  if (v) { set_cell(FX + x, y, (T + art_blk) | (v << 12)); } else { set_cell(FX + x, y, T + art_well); }
+}
+func draw_well() {
+  for (var y = 0; y < H; y++) {
+    set_cell(FX - 1, y, T + art_wall);
+    set_cell(FX + W, y, T + art_wall);
+    for (var x = 0; x < W; x++) { cell(x, y, grid[y * W + x]); }
+  }
+}
+func draw_next() {
+  for (var y = 0; y < 2; y++) { for (var x = 0; x < 4; x++) { set_cell(14 + x, 3 + y, 0); } }
+  for (var i = 0; i < 4; i++) {
+    set_cell(14 + shapes[next * 8 + i * 2], 3 + shapes[next * 8 + i * 2 + 1], (T + art_blk) | ((next + 1) << 12));
+  }
+}
+func draw_score() {
+  print_u(13, 8, score);
+  if (score > 0) { text(13 + (score > 9999 ? 5 : score > 999 ? 4 : score > 99 ? 3 : score > 9 ? 2 : 1), 8, "0"); }
+  print_u(13, 11, lines);
+  print_u(13, 14, level + 1);
+}
+func draw_panel() {
+  text(13, 1, "NEXT");
+  text(13, 7, "SCORE");
+  text(13, 10, "LINES");
+  text(13, 13, "LEVEL");
+  text(13, 16, "BEST");
+  print_u(13, 17, best);
+  if (best > 0) { text(13 + (best > 9999 ? 5 : best > 999 ? 4 : best > 99 ? 3 : best > 9 ? 2 : 1), 17, "0"); }
+  draw_score();
+}
+func draw_piece() {
+  // where it would land
+  var gy = py;
+  while (fits(px, gy + 1)) { gy++; }
+  for (var i = 0; i < 4; i++) {
+    var sx = (FX + px + cx[i]) * 8;
+    sprite(i, sx, (py + cy[i]) * 8, T + art_blk, piece);
+    if (gy != py) { sprite(4 + i, sx, (gy + cy[i]) * 8, T + art_ghost, piece); } else { hide_sprite(4 + i); }
+  }
+}
+func hide_piece() { for (var i = 0; i < 8; i++) { hide_sprite(i); } }
+
+// ---------- sound ----------
+func blip(hz, frames) { tone(1, hz, 9, 2); beep = frames; }
+btable song_lead = {
+  N_E5, 2, N_B4, 1, N_C5, 1, N_D5, 2, N_C5, 1, N_B4, 1, N_A4, 2, N_A4, 1, N_C5, 1, N_E5, 2, N_D5, 1, N_C5, 1,
+  N_B4, 3, N_C5, 1, N_D5, 2, N_E5, 2, N_C5, 2, N_A4, 2, N_A4, 4,
+  N_D5, 3, N_F5, 1, N_A5, 2, N_G5, 1, N_F5, 1, N_E5, 3, N_C5, 1, N_E5, 2, N_D5, 1, N_C5, 1,
+  N_B4, 2, N_B4, 1, N_C5, 1, N_D5, 2, N_E5, 2, N_C5, 2, N_A4, 2, N_A4, 2, 0, 2,
+  MUS_LOOP
+};
+btable song_bass = {
+  N_A2, 2, N_E3, 2, N_A2, 2, N_E3, 2, N_A2, 2, N_E3, 2, N_A2, 2, N_E3, 2,
+  N_GS2, 2, N_E3, 2, N_GS2, 2, N_E3, 2, N_A2, 2, N_E3, 2, N_A2, 2, N_E3, 2,
+  N_D3, 2, N_A3, 2, N_D3, 2, N_A3, 2, N_C3, 2, N_G3, 2, N_C3, 2, N_G3, 2,
+  N_GS2, 2, N_E3, 2, N_GS2, 2, N_E3, 2, N_A2, 2, N_E3, 2, N_A2, 2, N_E3, 2,
+  MUS_LOOP
+};
+func start_music() {
+  music_tempo(7);
+  music_play(0, 0, song_lead, 7);
+  music_duty(0, 1);
+  music_play(1, 2, song_bass, 9);
+  music_mute(muted);
+}
+
+// ---------- the game ----------
+func spawn() {
+  piece = next;
+  next = take();
+  rot = 0; px = 3; py = 0 - 1; fall = 0; rest = 0;
+  load_cells(piece, 0);
+  draw_next();
+  if (!fits(px, py)) {
+    state = S_OVER;
+    hide_piece();
+    music_stop_all();
+    blip(110, 30);
+    if (score > best) { best = score; save_set(0, best); save_seal(); save_commit(); }
+    fill_cells(FX, 6, W, 6, 0);
+    text(FX, 7, " GAME OVER");
+    text(FX, 9, "  START:");
+    text(FX, 10, "  AGAIN");
+    draw_panel();
+  }
+}
+func new_game() {
+  fill(grid, 0, 180);
+  score = 0; lines = 0; level = 0;
+  srand(frames(), 0x7AB1);
+  draw_bag();
+  next = take();
+  clear_bg();
+  draw_well();
+  draw_panel();
+  state = S_PLAY;
+  spawn();
+  start_music();
+}
+func lock() {
+  for (var i = 0; i < 4; i++) {
+    var gy = py + cy[i];
+    if (gy >= 0) { grid[gy * W + px + cx[i]] = piece + 1; cell(px + cx[i], gy, piece + 1); }
+  }
+  hide_piece();
+  blip(196, 3);
+  // which rows are full?
+  nfull = 0;
+  for (var y = 0; y < H; y++) {
+    var n = 0;
+    for (var x = 0; x < W; x++) { if (grid[y * W + x]) { n++; } }
+    if (n == W) { full[nfull] = y; nfull++; }
+  }
+  if (nfull == 0) { spawn(); return; }
+  for (var k = 0; k < nfull; k++) { for (var x = 0; x < W; x++) { set_cell(FX + x, full[k], T + art_flash); } }
+  state = S_CLEAR;
+  timer = 16;
+  blip(nfull == 4 ? 1046 : 660, 12);
+}
+func collapse() {
+  for (var k = 0; k < nfull; k++) {
+    // rows are listed top to bottom, so each one can be closed up in turn
+    for (var y = full[k]; y > 0; y--) { copy(grid + y * W, grid + (y - 1) * W, W); }
+    fill(grid, 0, W);
+  }
+  score = score + line_score[nfull] * (level + 1);
+  lines = lines + nfull;
+  level = min(19, lines / 10);
+  draw_well();
+  draw_score();
+  state = S_PLAY;
+  spawn();
+}
+func turn(dir) {
+  if (box[piece] == 0) { return; }
+  var r = (rot + dir) & 3;
+  load_cells(piece, r);
+  // try in place, then nudged one cell either way (two for the long piece)
+  var k = 0 - 1;
+  if (fits(px, py)) { k = 0; }
+  else if (fits(px - 1, py)) { k = 0 - 1; px = px - 1; k = 0; }
+  else if (fits(px + 1, py)) { px = px + 1; k = 0; }
+  else if (piece == 0 && fits(px - 2, py)) { px = px - 2; k = 0; }
+  else if (piece == 0 && fits(px + 2, py)) { px = px + 2; k = 0; }
+  if (k == 0) { rot = r; blip(523, 2); } else { load_cells(piece, rot); }
+}
+func slide(dir) {
+  if (fits(px + dir, py)) { px = px + dir; blip(392, 1); }
+}
+func play() {
+  if (btnp(BTN_START)) { state = S_PAUSE; hide_piece(); music_mute(1); text(FX + 2, 8, "PAUSED"); return; }
+  if (btnp(BTN_A)) { turn(1); }
+  if (btnp(BTN_B)) { turn(3); }
+  // sliding: at once on a press, then again and again while held
+  var dir = btn(BTN_RIGHT) - btn(BTN_LEFT);
+  if (dir != 0 && dir != das_dir) { slide(dir); das = 12; }
+  else if (dir != 0) { das--; if (das <= 0) { slide(dir); das = 3; } }
+  das_dir = dir;
+  if (btnp(BTN_UP)) {
+    while (fits(px, py + 1)) { py++; }
+    lock();
+    return;
+  }
+  // falling
+  fall++;
+  var speed = speeds[level];
+  if (btn(BTN_DOWN)) { speed = 2; }
+  if (fall >= speed) {
+    fall = 0;
+    if (fits(px, py + 1)) { py++; rest = 0; }
+  }
+  if (!fits(px, py + 1)) {
+    rest++;
+    if (rest > 24 || btn(BTN_DOWN)) { lock(); return; }
+  }
+  draw_piece();
+}
+func title() {
+  text(6, 4, "TUMBLE");
+  text(3, 8, "PRESS  START");
+  text(5, 12, "BEST");
+  print_u(10, 12, best);
+  if (best > 0) { text(10 + (best > 9999 ? 5 : best > 999 ? 4 : best > 99 ? 3 : best > 9 ? 2 : 1), 12, "0"); }
+  // a falling shower of blocks down the sides
+  var t = frames();
+  if ((t & 7) == 0) {
+    var col = (t >> 3) % 6;
+    var x = col < 3 ? col : 14 + col;
+    for (var y = 17; y > 0; y--) { set_cell(x, y, get_cell(x, y - 1)); }
+    set_cell(x, 0, rand(3) == 0 ? (T + art_blk) | ((1 + rand(7)) << 12) : 0);
+  }
+  if (btnp(BTN_START) || btnp(BTN_A)) { new_game(); }
+}
+func frame() {
+  if (btnp(BTN_SELECT)) { muted = !muted; music_mute(muted); }
+  if (state == S_TITLE) { title(); }
+  else if (state == S_PLAY) { play(); }
+  else if (state == S_CLEAR) { timer--; if (timer == 0) { collapse(); } }
+  else if (state == S_PAUSE) { if (btnp(BTN_START)) { state = S_PLAY; music_mute(muted); draw_well(); } }
+  else { if (btnp(BTN_START)) { new_game(); } }
+  if (beep > 0) { beep--; if (beep == 0) { tone_off(1); } }
+  music_update();
+}
+func init() {
+  load_font(0);
+  load_tiles(art, T, art_COUNT);
+  bg_pal(0, rgb(1, 1, 3), rgb(3, 4, 7), rgb(7, 8, 11), rgb(15, 15, 15));
+  // I cyan, O yellow, T purple, S green, Z red, J blue, L orange: the same colors for settled blocks and for sprites
+  bg_pal(1, 0, rgb(12, 15, 15), rgb(2, 12, 14), rgb(0, 6, 8));     obj_pal(0, 0, rgb(12, 15, 15), rgb(2, 12, 14), rgb(0, 6, 8));
+  bg_pal(2, 0, rgb(15, 15, 10), rgb(15, 12, 1), rgb(9, 6, 0));     obj_pal(1, 0, rgb(15, 15, 10), rgb(15, 12, 1), rgb(9, 6, 0));
+  bg_pal(3, 0, rgb(14, 11, 15), rgb(10, 4, 14), rgb(5, 1, 8));     obj_pal(2, 0, rgb(14, 11, 15), rgb(10, 4, 14), rgb(5, 1, 8));
+  bg_pal(4, 0, rgb(11, 15, 10), rgb(3, 12, 3), rgb(1, 6, 1));      obj_pal(3, 0, rgb(11, 15, 10), rgb(3, 12, 3), rgb(1, 6, 1));
+  bg_pal(5, 0, rgb(15, 11, 10), rgb(14, 3, 2), rgb(7, 1, 1));      obj_pal(4, 0, rgb(15, 11, 10), rgb(14, 3, 2), rgb(7, 1, 1));
+  bg_pal(6, 0, rgb(10, 12, 15), rgb(2, 5, 14), rgb(1, 2, 8));      obj_pal(5, 0, rgb(10, 12, 15), rgb(2, 5, 14), rgb(1, 2, 8));
+  bg_pal(7, 0, rgb(15, 13, 9), rgb(15, 8, 1), rgb(9, 4, 0));       obj_pal(6, 0, rgb(15, 13, 9), rgb(15, 8, 1), rgb(9, 4, 0));
+  hide_all_sprites();
+  master_volume(9);
+  if (save_loaded() && save_valid()) { best = save_get(0); }
+  state = S_TITLE;
+  lcd(LCD_BG | LCD_OBJ);
+}

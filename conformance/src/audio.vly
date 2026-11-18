@@ -1,0 +1,19 @@
+// Conformance: audio registers. Plays a pattern over all four channels (pulse duty sweep, triangle, noise) and
+// changes it over time. State hashes cover the registers; the C and JavaScript synthesizers are compared
+// separately (test/audio-c.test.js).
+var step;
+
+func frame() {
+  var t = frames();
+  if (umod(t, 20) == 0) {
+    var k = udiv(t, 20);
+    tone(0, 220 + umod(k, 8) * 55, 12, umod(k, 4));
+    tone(1, 330 + umod(k, 5) * 40, 9, umod(k + 1, 4));
+    tone(2, 110 + umod(k, 6) * 30, 12, 0);
+    tone(3, 800 + umod(k, 7) * 900, 8, 0);
+    master_volume(10 + umod(k, 6));
+    step = k;
+  }
+  if (t == 150) { tone_off(1); tone_off(3); }
+  if (t == 170) { tone(1, 523, 15, 1); }
+}

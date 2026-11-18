@@ -1,0 +1,29 @@
+// Music for THIES' WORLD. Each song is (note, steps) pairs for std/music; a step is 8 frames.
+import "std/music";
+
+btable song_lead = {
+  N_E4, 2, N_G4, 2, N_C5, 4, N_B4, 2, N_G4, 2, N_E4, 4,
+  N_F4, 2, N_A4, 2, N_C5, 4, N_A4, 2, N_F4, 2, N_D4, 4,
+  N_E4, 2, N_G4, 2, N_C5, 2, N_E5, 2, N_D5, 4, N_B4, 4,
+  N_C5, 4, N_G4, 4, N_E4, 4, 0, 4,
+  N_A4, 2, N_C5, 2, N_E5, 4, N_D5, 2, N_C5, 2, N_A4, 4,
+  N_G4, 2, N_B4, 2, N_D5, 4, N_C5, 2, N_B4, 2, N_G4, 4,
+  N_F4, 2, N_A4, 2, N_G4, 2, N_F4, 2, N_E4, 4, N_D4, 4,
+  N_C4, 8, 0, 8,
+  MUS_LOOP
+};
+btable song_bass = {
+  N_C3, 4, N_E3, 4, N_G3, 4, N_E3, 4,
+  N_F3, 4, N_A3, 4, N_D3, 4, N_A3, 4,
+  N_C3, 4, N_E3, 4, N_G3, 4, N_G3, 4,
+  N_C3, 4, N_G3, 4, N_C3, 4, N_G2, 4,
+  N_A2, 4, N_E3, 4, N_A3, 4, N_E3, 4,
+  N_G2, 4, N_D3, 4, N_G3, 4, N_D3, 4,
+  N_F3, 4, N_F3, 4, N_G3, 4, N_G3, 4,
+  N_C3, 8, N_G2, 4, N_G2, 4,
+  MUS_LOOP
+};
+// A short "you found something" fanfare.
+btable song_fanfare = { N_C5, 1, N_E5, 1, N_G5, 1, N_C6, 3, MUS_END };
+// The "all blocks found" celebration.
+btable song_win = { N_C5, 1, N_C5, 1, N_C5, 1, N_E5, 2, N_G5, 1, N_E5, 1, N_G5, 2, N_C6, 6, MUS_END };
