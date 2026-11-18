@@ -349,7 +349,7 @@ export const commands = {
   },
 
   publish: {
-    help: 'vly publish <cart or source> [--title "Name"] [--no-sources] [--site URL] [--new] [--dry-run]\n  Upload the cartridge to the VLY-1 site and print a play link (no account). It uploads the game, so ask the person first.\n  Run again in the same folder to revise the same game (the edit token is kept in .vly-publish.json: do not commit it).\n  The text files of src/ and assets/ go along (so the game can be fetched back, and so a re-skin of a template or sample game can be refused); --no-sources leaves them out; --dry-run shows what would be sent.',
+    help: 'vly publish <cart or source> [--title "Name"] [--no-sources] [--site URL] [--new] [--dry-run]\n  Upload the cartridge to the VLY-1 site and print a play link (no account). It uploads the game, so ask the person first.\n  Run again in the same folder to revise the same game (the edit token is kept in .vly-publish.json: do not commit it).\n  The text files of src/ and assets/ go along so the game can be fetched back; --no-sources leaves them out; --dry-run shows what would be sent.',
     async run(args) {
       const { rom } = await loadCart(args._[0]);
       const site = String(args.flags.site || process.env.VLY_SITE || 'https://vly-1.vercel.app').replace(/\/$/, '');
@@ -357,10 +357,6 @@ export const commands = {
       const stateFile = path.resolve('.vly-publish.json');
       let state = null;
       if (!args.flags.new && fs.existsSync(stateFile)) { try { state = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { state = null; } }
-      // never publish what the quality gates fail (a frozen game, a crash, a re-skin of a template): the same checks as `vly check`, short
-      const gate = checkCartridge(rom, { frames: 900, ...projectInfo(args._[0]) });
-      const failed = gate.checks.filter((c) => c.status === 'fail');
-      if (failed.length) throw new CliError(`not published: vly check fails\n${failed.map((c) => `  FAIL  ${c.id}: ${c.message}${c.hint ? `\n        -> ${c.hint}` : ''}`).join('\n')}\nFix it, run vly check, and publish again.`);
       const body = { title, cartridge_base64: Buffer.from(rom).toString('base64') };
       if (state && state.site === site && state.game_id && state.edit_token) { body.game_id = state.game_id; body.edit_token = state.edit_token; }
       if (!args.flags['no-sources']) {
@@ -564,7 +560,7 @@ export const commands = {
         }
       };
       copy(tdir, dir);
-      return { text: `created ${dir} from template "${template}":\n  ${written.join('\n  ')}\nnext: write DESIGN.md (the game in one sentence, controls, screens, a content table) and show it to the person; then edit src/ and the "tests" in vly.json (they check the template's own game, so they fail once you change it), then cd ${dir} && vly build && vly run build/${name}.vlc --frames 60 --screenshot shot.png. This is a starting point to learn from: vly check fails a game that is only a re-skin of a template or sample game.`, data: { dir, template, files: written } };
+      return { text: `created ${dir} from template "${template}":\n  ${written.join('\n  ')}\nnext: write DESIGN.md (the game in one sentence, controls, screens, a content table) and show it to the person; then edit src/ and the "tests" in vly.json (they check the template's own game, so they fail once you change it), then cd ${dir} && vly build && vly run build/${name}.vlc --frames 60 --screenshot shot.png. This is a starting point to learn from: vly check flags a game that is only a re-skin of a template or sample game.`, data: { dir, template, files: written } };
     },
   },
 

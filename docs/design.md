@@ -7,7 +7,7 @@ to keep playing.
 ## 0. The quality bar
 
 **Your game must be your own.** The templates and the sample games in `games/` are *references*: read them to learn a technique (how a tilemap is scanned, how a boss is staged, how a save is sealed). Never ship one with a new skin, new title, new art or renamed words:
-its rules, levels, code structure and art must be your own, designed for this person. `vly check` compares your sources with every template and sample game and **fails a re-skin**. Start from an empty project (`vly new mygame`), not from a game. A game that only changes the title, the colours, the sprites or the story around someone else's levels is a re-skin, however nicely it runs. If you catch yourself reusing a template's level data or its main loop, stop and design your own.
+its rules, levels, code structure and art must be your own, designed for this person. `vly check` compares your sources with every template and sample game and **flags a re-skin**. Start from an empty project (`vly new mygame`), not from a game. A game that only changes the title, the colours, the sprites or the story around someone else's levels is a re-skin, however nicely it runs. If you catch yourself reusing a template's level data or its main loop, stop and design your own.
 
 **Aim for the depth and polish of a good NES-era game, not a tech demo.** A person who is given this game should still be
 playing it an hour later, and should be able to tell where the care went. Concretely, a finished game has:

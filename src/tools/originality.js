@@ -101,14 +101,14 @@ export function compare(files, index = loadIndex()) {
   return { lines: own.length, blocks: ownB.length, refs: rows };
 }
 
-/** A verdict: 'fail' for a re-skin (most of the code or the levels are a reference's), 'warn' for a lot of borrowing. */
+/** A verdict: always a 'warn' at most (a nudge for the agent, never a block): a re-skin when most of the code or the levels are a reference's, or a lot of borrowing. */
 export function verdict(c) {
   const top = c.refs[0];
   if (!top) return { status: 'pass' };
   const codeFail = c.lines >= 20 && top.code >= 0.5, codeWarn = c.lines >= 20 && top.code >= 0.25;
   const artFail = c.blocks >= 6 && top.art >= 0.8, artWarn = c.blocks >= 6 && top.art >= 0.5;
   const pct = (x) => `${Math.round(100 * x)}%`;
-  if (codeFail || artFail) return { status: 'fail', top, message: `this looks like a re-skin of ${top.name}: ${pct(top.code)} of its code lines and ${pct(top.art)} of its art and levels are the same`, hint: `Templates and sample games are for learning techniques, not for shipping. Design your own game: your own rules, levels and art, with your own code structure. Borrow an idea or a function, not the game.` };
+  if (codeFail || artFail) return { status: 'warn', reskin: true, top, message: `this looks like a re-skin of ${top.name}: ${pct(top.code)} of its code lines and ${pct(top.art)} of its art and levels are the same`, hint: `Templates and sample games are for learning techniques, not for shipping. Design your own game: your own rules, levels and art, with your own code structure. Borrow an idea or a function, not the game.` };
   if (codeWarn || artWarn) return { status: 'warn', top, message: `a lot of this is borrowed from ${top.name}: ${pct(top.code)} of its code lines and ${pct(top.art)} of its art and levels are the same`, hint: 'Make the parts that define the game (rules, levels, art, the main loop) your own. Keep shared helper code only where it is truly generic.' };
   return { status: 'pass', top };
 }

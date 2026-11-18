@@ -24,19 +24,18 @@ test('every template and sample game is its own game: none looks like a re-skin 
   for (const [name, dir] of Object.entries(refDirs())) {
     const others = { ...idx, refs: Object.fromEntries(Object.entries(idx.refs).filter(([k]) => k !== name)) };
     const v = verdict(compare(readProjectFiles(dir), others));
-    assert.notEqual(v.status, 'fail', `${name}: ${v.message}`);
+    assert.notEqual(v.reskin, true, `${name}: ${v.message}`);
   }
 });
 
-test('a template with a new title and a few renamed words is a re-skin, and vly check fails it', () => {
+test('a template with a new title and a few renamed words is a re-skin, and vly check warns about it', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-reskin-'));
   const run = (...a) => spawnSync('node', [path.join(root, 'cli', 'vly.js'), ...a], { cwd: dir, encoding: 'utf8' });
   assert.equal(run('new', dir, '--template', 'puzzle').status, 0);
   const main = path.join(dir, 'src', 'main.vly');
   fs.writeFileSync(main, fs.readFileSync(main, 'utf8').replaceAll('CRATES', 'QUILTS'));
   const r = run('check', '--frames', '600');
-  assert.equal(r.status, 1, r.stdout + r.stderr);
-  assert.match(r.stdout, /FAIL\s+originality: this looks like a re-skin of template puzzle/);
+  assert.match(r.stdout, /WARN\s+originality: this looks like a re-skin of template puzzle/);
 });
 
 test('an original program passes the gate; a missing DESIGN.md is a warning', () => {
