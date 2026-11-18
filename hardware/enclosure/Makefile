@@ -1,5 +1,5 @@
 # Render the printable parts (needs OpenSCAD 2021.01 or newer) into build/*.stl and the preview pictures.
-PARTS = front back door cartridge dpad button pill
+PARTS = front back door cartridge dpad button pill slider
 all: $(PARTS:%=build/%.stl)
 build/%.stl: vly1-handheld.scad
 	@mkdir -p build

@@ -21,6 +21,9 @@ spk_d = 28.0;  spk_t = 4.2;                    // 28 mm round speaker
 pcb_w = 134;   pcb_h = 70;   pcb_t = 1.6;      // main board, landscape
 sw = 6.0;      sw_t = 5.0;                     // tact switch footprint and height (6x6x5)
 cart_w = 30.0; cart_t = 4.0; cart_len = 36.0;  // the cartridge (see cartridge() below)
+pw_x = -48;                                    // power slider: on the top edge, left of the cartridge, like the original Game Boy
+pw_l = 9.0;   pw_w = 3.6;  pw_t = 3.6;         // the bought SPDT slide switch body (Adafruit 805 class; measure yours)
+pw_travel = 4.0;                               // how far its lever moves between OFF and ON
 
 // ---- the shell ----
 body_w = 150;  body_h = 82;                    // outside size; the thickness (body_t) is worked out below from the battery holder
@@ -75,14 +78,36 @@ module back() {
       post_xy() cylinder(d = screw_post, h = bt);
       intersection() { translate([0, 0, 0]) outline(bt, -wall / 2); cart_guide(); }
       battery_cradle();
+      power_cradle();
     }
     post_xy() translate([0, 0, -0.1]) cylinder(d = screw_d + 0.4, h = bt + 0.2);                          // screws come in from the back
     post_xy() translate([0, 0, -0.1]) cylinder(d1 = 5.4, d2 = screw_d + 0.4, h = 2.5);                    // countersink
     for (i = [-3 : 3]) translate([41 + i * 3.4, -22, -0.1]) cube([1.6, 14, wall + 0.2]);                  // speaker grille
-    translate([body_w / 2 - wall / 2, 14, wall + 3]) cube([wall * 3, 9, 4], center = true);              // power slide switch
+    translate([pw_x, body_h / 2 - wall - 0.5, wall + pw_t / 2 + 2]) cube([pw_travel + 7, wall * 3, 5], center = true);   // the power slider slot in the top edge
     translate([-(cart_w + 2 * tol) / 2, body_h / 2 - wall - 1, cz]) cube([cart_w + 2 * tol, wall * 3, ct]);   // the cartridge slot in the top edge
     translate([bat_cx, bat_cy, -0.1]) cube([open_l, open_w, wall * 3], center = true);                        // the battery opening
     door_bosses() translate([0, 0, wall]) cylinder(d = screw_d - 0.4, h = 9);                                // pilot holes for the door screws
+  }
+}
+
+// a block under the top edge with a pocket for the bought slide switch; its lever points at the slot and the slider cap sits on it
+module power_cradle() {
+  translate([pw_x, body_h / 2 - wall - 3.6, wall - 0.01]) difference() {
+    translate([0, 0, 4.5]) cube([pw_l + 6, 6, 9], center = true);
+    translate([0, -0.6, 6.5]) cube([pw_l + 0.4, pw_w + 0.4, 9], center = true);   // the switch body (open at the top: it drops in from above)
+    translate([0, 2.5, 6.5]) cube([pw_travel + 4, 4, 9], center = true);          // room for the lever to travel
+  }
+}
+
+// the slider cap: a ridged thumb piece that rides on the switch lever and pokes out through the top edge. OFF is left, ON is right (print ON/OFF on the shell).
+module power_slider() {
+  difference() {
+    union() {
+      translate([-3.4, -0.5, 0]) cube([6.8, 3.0, 4.0]);                                    // inside the shell, around the lever
+      translate([-3.0, 2.5, 0.4]) cube([6.0, wall + 1.2, 3.2]);                            // through the slot
+      for (i = [-2 : 2]) translate([i * 1.1 - 0.35, 2.5 + wall + 1.2, 0.4]) cube([0.7, 0.9, 3.2]);  // grip ridges
+    }
+    translate([-1.1, -0.6, 0.8]) cube([2.2, 2.2, 2.4]);                                   // the lever fits in here
   }
 }
 
@@ -143,6 +168,7 @@ if (part == "front") front();
 else if (part == "back") back();
 else if (part == "cartridge") cartridge();
 else if (part == "door") battery_door();
+else if (part == "slider") power_slider();
 else if (part == "dpad") dpad();
 else if (part == "button") round_button();
 else if (part == "pill") pill_button();

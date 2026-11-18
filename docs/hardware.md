@@ -109,7 +109,7 @@ An RP2040 handheld in the shape of the classic portrait handhelds, with the same
         |  [<][>]        (A)    |
         |   [v]                 |
         |        (SEL) (START)  |
-        |   ::::::::    speaker |     power slide switch on the side, battery door on the back
+        |   ::::::::    speaker |     power slider on the top edge left of the cartridge (like the Game Boy), battery door on the back
         +-----------------------+
 ```
 
