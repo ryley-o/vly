@@ -357,6 +357,10 @@ export const commands = {
       const stateFile = path.resolve('.vly-publish.json');
       let state = null;
       if (!args.flags.new && fs.existsSync(stateFile)) { try { state = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { state = null; } }
+      // never publish what the quality gates fail (a frozen game, a crash, a re-skin of a template): the same checks as `vly check`, short
+      const gate = checkCartridge(rom, { frames: 900, ...projectInfo(args._[0]) });
+      const failed = gate.checks.filter((c) => c.status === 'fail');
+      if (failed.length) throw new CliError(`not published: vly check fails\n${failed.map((c) => `  FAIL  ${c.id}: ${c.message}${c.hint ? `\n        -> ${c.hint}` : ''}`).join('\n')}\nFix it, run vly check, and publish again.`);
       const body = { title, cartridge_base64: Buffer.from(rom).toString('base64') };
       if (state && state.site === site && state.game_id && state.edit_token) { body.game_id = state.game_id; body.edit_token = state.edit_token; }
       if (!args.flags['no-sources']) {

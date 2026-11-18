@@ -16,7 +16,7 @@ const run = (cwd, ...args) => new Promise((resolve) => {
   p.on('close', (status) => resolve({ status, out }));
 });
 
-test('vly publish: sends the cartridge, saves the token, revises the same game next time, and reports an unreachable site', async () => {
+test('vly publish: refuses a frozen game, sends the cartridge, saves the token, revises the same game next time, and reports an unreachable site', async () => {
   const seen = [];
   const server = http.createServer((req, res) => {
     let b = ''; req.on('data', (d) => { b += d; });
@@ -31,9 +31,14 @@ test('vly publish: sends the cartridge, saves the token, revises the same game n
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const site = `http://127.0.0.1:${server.address().port}`;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-pub-'));
-  const b = await buildText({ text: 'func init() { load_font(0); lcd(LCD_BG); text(1, 1, "HI"); }\nfunc frame() {}', filename: 'main.vly', baseDir: '/nonexistent' });
+  const b = await buildText({ text: 'var n;\nfunc init() { load_font(0); lcd(LCD_BG); text(1, 1, "HI"); }\nfunc frame() { n++; print_u(1, 3, n); }', filename: 'main.vly', baseDir: '/nonexistent' });
   fs.writeFileSync(path.join(dir, 'game.vlc'), b.bytes);
   fs.mkdirSync(path.join(dir, 'src')); fs.writeFileSync(path.join(dir, 'src', 'main.vly'), 'func frame() {}');
+
+  const frozen = await buildText({ text: 'func init() { load_font(0); lcd(LCD_BG); text(1, 1, "STUCK"); }\nfunc frame() {}', filename: 'main.vly', baseDir: '/nonexistent' });
+  fs.writeFileSync(path.join(dir, 'stuck.vlc'), frozen.bytes);
+  const stuck = await run(dir, 'publish', 'stuck.vlc', '--site', site);
+  assert.equal(stuck.status, 1); assert.match(stuck.out, /not published: vly check fails[\s\S]*FAIL\s+alive/); assert.equal(seen.length, 0, 'a failing game is not uploaded');
 
   const dry = await run(dir, 'publish', 'game.vlc', '--site', site, '--dry-run');
   assert.equal(dry.status, 0, dry.out); assert.match(dry.out, /would upload GAME/); assert.equal(seen.length, 0, 'a dry run sends nothing');
