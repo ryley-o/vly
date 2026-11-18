@@ -10,6 +10,9 @@ The full playbook is `vly docs design` (or https://vly-1.vercel.app/design.md); 
 
 ## The bar
 
+**Your game must be your own.** The templates and the sample games in `games/` are *references*: read them to learn a technique (how a tilemap is scanned, how a boss is staged, how a save is sealed). Never ship one with a new skin, new title, new art or renamed words:
+its rules, levels, code structure and art must be your own, designed for this person. `vly check` compares your sources with every template and sample game and **fails a re-skin**. Start from an empty project (`vly new mygame`), not from a game.
+
 Aim for a good NES-era game, not a demo. Always: title screen with the name and PRESS START, pause (START), game over and
 retry, a stated goal, controls that feel good and are shown on screen, a sound for every event, a difficulty curve.
 Full game: 3+ stages or phases with their own look and music, 3+ enemy behaviours, a boss or finale, 2+ power-ups, saved

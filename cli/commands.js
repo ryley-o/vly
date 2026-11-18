@@ -560,7 +560,7 @@ export const commands = {
         }
       };
       copy(tdir, dir);
-      return { text: `created ${dir} from template "${template}":\n  ${written.join('\n  ')}\nnext: edit src/ and the "tests" in vly.json (they check the template's own game, so they fail once you change it), then cd ${dir} && vly build && vly run build/${name}.vlc --frames 60 --screenshot shot.png`, data: { dir, template, files: written } };
+      return { text: `created ${dir} from template "${template}":\n  ${written.join('\n  ')}\nnext: write DESIGN.md (the game in one sentence, controls, screens, a content table) and show it to the person; then edit src/ and the "tests" in vly.json (they check the template's own game, so they fail once you change it), then cd ${dir} && vly build && vly run build/${name}.vlc --frames 60 --screenshot shot.png. This is a starting point to learn from: vly check fails a game that is only a re-skin of a template or sample game.`, data: { dir, template, files: written } };
     },
   },
 
