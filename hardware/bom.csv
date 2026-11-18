@@ -4,7 +4,7 @@ console,Boot flash 2 MB QSPI (W25Q16 class),1,0.50,0.35,estimate,"firmware and m
 console,12 MHz crystal and load capacitors,1,0.40,0.20,estimate,
 console,"3.5in 480x320 TFT module, 2x pixels = 320x288 picture",1,9.00,6.00,unverified,"the biggest line and the least certain; get three quotes. 2.4in 320x240 modules were seen at $9-11 retail"
 console,6x6 tact switches and a rubber d-pad,8,1.00,0.40,estimate,
-console,PAM8302A class-D amplifier and 28 mm speaker,1,1.60,1.00,estimate,
+console,PAM8302A class-D amplifier and 28 to 40 mm speaker,1,1.60,1.00,estimate,
 console,2 x AA cell holder with contacts,1,0.80,0.45,estimate,"cells (not included in the box) drop in through a door in the back; no lithium, so no battery shipping rules; the console does not charge NiMH"
 console,3.3 V boost converter for the cells,1,1.00,0.60,estimate,"2 AA cells give 1.8-3.2 V; the boost holds 3.3 V until the cells are flat"
 console,Power slide switch (top edge slider like the original Game Boy; SPDT with a printed thumb cap),1,0.30,0.15,estimate,"there is no USB port: firmware is programmed at the factory through test pads"

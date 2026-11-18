@@ -5,25 +5,29 @@
 //   openscad -o front.stl -D 'part="front"' vly1-handheld.scad     (or run  make -C hardware enclosure  for all parts)
 //
 // Prototype stack (docs/hardware-plan.md): 3.5" 480x320 module, a Pico 2 class board or the custom PCB, two AA cells in a
-// holder reached through a door in the back, 28 mm speaker, eight 6x6x5 tact switches, a cartridge slot
+// holder reached through a door in the back, 40 mm speaker, eight 6.0 x 3.5 x 4.3 tact switches (real dimensions: hardware/parts-dimensions.md), a cartridge slot
 // on the top edge. About 30 mm thick, because of the AA cells (a LiPo version would be 21 mm).
 
 $fn = 48;
 
 // ---- what you bought ----
-lcd_w = 98.0;  lcd_h = 56.0;  lcd_t = 3.6;     // 3.5" module, outer glass+PCB footprint, thickness with FPC
-view_w = 74.0; view_h = 49.5;                  // visible window of the panel (a little under the active area, so the edge hides)
+lcd_w = 84.07; lcd_h = 54.34; lcd_t = 3.3;     // the 3.5" panel glass, from the panel drawing (Adafruit35inTFT.pdf): outline 84.07 x 54.34 +-0.2, 3.3 +-0.2 thick. The breakout PCB behind it is 96.5 x 56 mm (66 mm across its corner ears), 2 mm thick
+view_w = 74.2; view_h = 49.4;                  // visible window: between the active area (73.44 x 48.96) and the touch panel's viewing area (75.09 x 49.96), from the panel drawing
 view_dx = 0;   view_dy = 0;                    // shift the window if the panel's active area is off centre
-bat_l = 58;    bat_w = 34;   bat_t = 16.0;     // two AA cells side by side in a holder: length, width, height (unverified: measure the holder you buy)
+bat_l = 68.2;  bat_w = 34.4; bat_t = 18.8;     // the 2 x AA holder, Adafruit 4193: 68.2 x 34.4 x 18.8 mm (the page does not say which is which; length > width > height assumed)
 open_l = 54;   open_w = 31.5;                  // the opening in the back that the cells drop through (cells are 50.5 long, 14.5 across)
-bat_cx = -20;  bat_cy = -21;                   // where the cells sit (centre), clear of the cartridge guide above
-spk_d = 28.0;  spk_t = 4.2;                    // 28 mm round speaker
+bat_cx = -20;  bat_cy = -19.5;                  // where the cells sit (centre), clear of the cartridge guide above
+spk_x = 44;    spk_y = -17;                    // where the speaker sits (centre), bottom right
+spk_d = 40.0;  spk_t = 5.0;                    // Adafruit 1891 thin speaker: 40 mm outside diameter (datasheet); the thickness is not given: 5.0 is a guess, measure it
 pcb_w = 134;   pcb_h = 70;   pcb_t = 1.6;      // main board, landscape
-sw = 6.0;      sw_t = 5.0;                     // tact switch footprint and height (6x6x5)
+sw = 6.0;      sw_w = 3.5;  sw_t = 4.3;        // tact switch (Adafruit 1489, datasheet C1779-001): 6.0 x 3.5 body, 4.3 tall to the top of the button, 0.25 travel
 cart_w = 30.0; cart_t = 4.0; cart_len = 36.0;  // the cartridge (see cartridge() below)
 pw_x = -48;                                    // power slider: on the top edge, left of the cartridge, like the original Game Boy
-pw_l = 9.0;   pw_w = 3.6;  pw_t = 3.6;         // the bought SPDT slide switch body (Adafruit 805 class; measure yours)
-pw_travel = 4.0;                               // how far its lever moves between OFF and ON
+// Haoyu SS-12E17 slide switch (Adafruit 805), from its datasheet drawing: body 11.6 long (along the slide) x 6.0 deep x 4.1 wide, lever 4.6 long x 2.1 thick, travel 2.5, pins on a 2.5 mm pitch.
+// The lever length above the body is not given in the drawing (X): 2.5 is a guess, measure it.
+pw_l = 11.6;  pw_w = 6.0;  pw_t = 4.1;         // body: along the slide, depth toward the lever, width
+pw_lever = 2.5; pw_lever_l = 4.6; pw_lever_t = 2.1;   // lever length above the body (guess), its size along the slide and across
+pw_travel = 2.5;                               // lever travel between OFF and ON
 
 // ---- the shell ----
 body_w = 150;  body_h = 82;                    // outside size; the thickness (body_t) is worked out below from the battery holder
@@ -79,35 +83,40 @@ module back() {
       intersection() { translate([0, 0, 0]) outline(bt, -wall / 2); cart_guide(); }
       battery_cradle();
       power_cradle();
+      translate([spk_x, spk_y, wall - 0.01]) difference() { cylinder(d = spk_d + 3, h = spk_t + 1); translate([0, 0, -0.1]) cylinder(d = spk_d + 0.6, h = spk_t + 2); }   // a ring that holds the speaker
     }
     post_xy() translate([0, 0, -0.1]) cylinder(d = screw_d + 0.4, h = bt + 0.2);                          // screws come in from the back
     post_xy() translate([0, 0, -0.1]) cylinder(d1 = 5.4, d2 = screw_d + 0.4, h = 2.5);                    // countersink
-    for (i = [-3 : 3]) translate([41 + i * 3.4, -22, -0.1]) cube([1.6, 14, wall + 0.2]);                  // speaker grille
-    translate([pw_x, body_h / 2 - wall - 0.5, wall + pw_t / 2 + 2]) cube([pw_travel + 7, wall * 3, 5], center = true);   // the power slider slot in the top edge
+    for (i = [-3 : 3]) translate([spk_x + i * 4.6 - 0.8, spk_y - 9, -0.1]) cube([1.6, 18, wall + 0.2]);       // speaker grille
+    translate([pw_x, body_h / 2 - wall - 0.5, wall + pw_t / 2 + 2]) cube([pw_travel + pw_lever_l + 2.8 + 0.6, wall * 3, pw_t + 1], center = true);   // the power slider slot in the top edge
     translate([-(cart_w + 2 * tol) / 2, body_h / 2 - wall - 1, cz]) cube([cart_w + 2 * tol, wall * 3, ct]);   // the cartridge slot in the top edge
     translate([bat_cx, bat_cy, -0.1]) cube([open_l, open_w, wall * 3], center = true);                        // the battery opening
     door_bosses() translate([0, 0, wall]) cylinder(d = screw_d - 0.4, h = 9);                                // pilot holes for the door screws
   }
 }
 
-// a block under the top edge with a pocket for the bought slide switch; its lever points at the slot and the slider cap sits on it
+// a block under the top edge with a pocket for the bought slide switch (open at the top: it drops in from above); its lever points at the slot
 module power_cradle() {
-  translate([pw_x, body_h / 2 - wall - 3.6, wall - 0.01]) difference() {
-    translate([0, 0, 4.5]) cube([pw_l + 6, 6, 9], center = true);
-    translate([0, -0.6, 6.5]) cube([pw_l + 0.4, pw_w + 0.4, 9], center = true);   // the switch body (open at the top: it drops in from above)
-    translate([0, 2.5, 6.5]) cube([pw_travel + 4, 4, 9], center = true);          // room for the lever to travel
+  yt = body_h / 2 - wall;                            // inside face of the top edge
+  face = yt - (pw_lever + 0.8);                      // the lever-side face of the switch body
+  translate([pw_x, 0, wall - 0.01]) difference() {
+    translate([-(pw_l + 6) / 2, face - pw_w - 1.5, 0]) cube([pw_l + 6, yt - (face - pw_w - 1.5) + 0.01, 2 + pw_t + 3]);
+    translate([-(pw_l + 0.4) / 2, face - pw_w - 0.2, 2]) cube([pw_l + 0.4, pw_w + 0.4, pw_t + 4]);                      // the switch body
+    translate([-(pw_travel + pw_lever_l + 1) / 2, face - 0.1, 2]) cube([pw_travel + pw_lever_l + 1, yt - face + 0.2, pw_t + 4]);   // room for the lever and the cap to travel
   }
 }
 
-// the slider cap: a ridged thumb piece that rides on the switch lever and pokes out through the top edge. OFF is left, ON is right (print ON/OFF on the shell).
+// the slider cap: a ridged thumb piece that rides on the switch lever and pokes out through the top edge (print flat on its back).
+// The lever socket is at y = 0; the cap is about 2.9 + wall + 1.2 long. OFF is left, ON is right (print ON/OFF on the shell).
 module power_slider() {
+  cw = pw_lever_l + 2 * 1.4;                         // cap width along the slide
   difference() {
     union() {
-      translate([-3.4, -0.5, 0]) cube([6.8, 3.0, 4.0]);                                    // inside the shell, around the lever
-      translate([-3.0, 2.5, 0.4]) cube([6.0, wall + 1.2, 3.2]);                            // through the slot
-      for (i = [-2 : 2]) translate([i * 1.1 - 0.35, 2.5 + wall + 1.2, 0.4]) cube([0.7, 0.9, 3.2]);  // grip ridges
+      translate([-cw / 2, -0.4, 0]) cube([cw, pw_lever + 0.9, pw_t - 0.1]);                                  // around the lever, inside the shell
+      translate([-cw / 2 + 0.4, pw_lever + 0.5, 0.4]) cube([cw - 0.8, wall + 1.6, pw_t - 0.9]);               // through the slot
+      for (i = [-2 : 2]) translate([i * 1.3 - 0.35, pw_lever + 0.5 + wall + 1.6, 0.4]) cube([0.7, 0.9, pw_t - 0.9]);   // grip ridges
     }
-    translate([-1.1, -0.6, 0.8]) cube([2.2, 2.2, 2.4]);                                   // the lever fits in here
+    translate([-(pw_lever_l + 0.4) / 2, -0.5, (pw_t - 0.1 - (pw_lever_t + 0.3)) / 2]) cube([pw_lever_l + 0.4, pw_lever + 0.3, pw_lever_t + 0.3]);   // the lever fits in here
   }
 }
 
