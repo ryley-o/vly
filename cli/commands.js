@@ -327,6 +327,35 @@ export const commands = {
     },
   },
 
+  publish: {
+    help: 'vly publish <cart or source> [--title "Name"] [--sources] [--site URL] [--new] [--dry-run]\n  Upload the cartridge to the VLY-1 site and print a play link (no account). It uploads the game, so ask the person first.\n  Run again in the same folder to revise the same game (the edit token is kept in .vly-publish.json: do not commit it).\n  --sources also sends the text files of src/ and assets/ so the game can be fetched back; --dry-run shows what would be sent.',
+    async run(args) {
+      const { rom } = await loadCart(args._[0]);
+      const site = String(args.flags.site || process.env.VLY_SITE || 'https://vly-1.vercel.app').replace(/\/$/, '');
+      const title = String(args.flags.title || path.basename(args._[0]).replace(/\.[^.]+$/, '')).toUpperCase().slice(0, 40);
+      const stateFile = path.resolve('.vly-publish.json');
+      let state = null;
+      if (!args.flags.new && fs.existsSync(stateFile)) { try { state = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { state = null; } }
+      const body = { title, cartridge_base64: Buffer.from(rom).toString('base64') };
+      if (state && state.site === site && state.game_id && state.edit_token) { body.game_id = state.game_id; body.edit_token = state.edit_token; }
+      if (args.flags.sources) {
+        const files = {};
+        const walk = (dir) => { for (const e of fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : []) { const p = path.join(dir, e.name); if (e.isDirectory()) walk(p); else if (/\.(vly|tiles|map|txt)$/i.test(e.name) && fs.statSync(p).size < 200000) files[p.split(path.sep).join('/')] = fs.readFileSync(p, 'utf8'); } };
+        walk('src'); walk('assets');
+        if (Object.keys(files).length) { body.files = files; const e = Object.keys(files).find((f) => /(^|\/)main\.vly$/.test(f)); if (e) body.entry = e; }
+      }
+      if (args.flags['dry-run']) return { text: `would upload ${title} (${rom.length} bytes${body.files ? `, ${Object.keys(body.files).length} source files` : ''}${body.game_id ? `, revising ${body.game_id}` : ', a new game'}) to ${site}/api/publish`, data: { site, title, bytes: rom.length, revising: body.game_id || null } };
+      let res;
+      try { res = await fetch(`${site}/api/publish`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); }
+      catch (e) { throw new CliError(`could not reach ${site} (${e.cause?.code || e.message}). Nothing was published. Ask the person to allow the network request, or hand them the game as a file: vly export ${args._[0]} --html game.html`); }
+      let j; try { j = await res.json(); } catch { throw new CliError(`${site} answered ${res.status} with something that is not JSON; nothing was published`); }
+      if (!res.ok || !j.ok) throw new CliError(`not published: ${j.error || (j.errors && j.errors[0] && j.errors[0].message) || res.status}`);
+      if (j.edit_token) fs.writeFileSync(stateFile, JSON.stringify({ site, game_id: j.game_id, edit_token: j.edit_token, play_url: j.play_url }, null, 2) + '\n');
+      const text = `${body.game_id ? 'revised' : 'published'} ${j.title} (revision ${j.revision})\nplay:  ${j.play_url}\nbuy:   ${j.buy_url}  (not on sale yet: promise no price or date)\nexpires: ${j.expires_at ? j.expires_at.slice(0, 10) : 'never'}${j.edit_token ? '\nthe edit token is saved in .vly-publish.json (keep it out of git); run this command again to revise' : ''}`;
+      return { text, data: { play_url: j.play_url, buy_url: j.buy_url, game_id: j.game_id, revision: j.revision, expires_at: j.expires_at, warnings: j.warnings || [] } };
+    },
+  },
+
   info: {
     help: 'vly info <cart> [--json]\n  Show a cartridge header and size.',
     async run(args) {

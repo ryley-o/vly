@@ -9,7 +9,7 @@ import { commands, CliError } from './commands.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const BOOLEAN_FLAGS = new Set(['profile', 'tile', 'accept', 
-  'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex',
+  'new', 'sources', 'dry-run', 'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex',
 ]);
 const SHORT = { o: 'out', h: 'help', f: 'frames', i: 'input', s: 'screenshot', j: 'json', v: 'version' };
 
@@ -62,6 +62,7 @@ Commands:
   isa                   Print the instruction set
   docs [topic]          Print documentation (run with no topic to list)
   export <cart>         Package a cartridge as one self-contained HTML file
+  publish <cart>       Upload the cartridge and get a play link (ask the person first)
   chunks <cart>         Plan on-chain storage (chunk contracts, ROM hash)
   mcp                   Start the MCP server on stdio (for AI agents)
   serve [dir]           Serve the website/playground locally
