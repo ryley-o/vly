@@ -685,11 +685,11 @@ export const commands = {
   },
 
   new: {
-    help: 'vly new <dir> [--template hello|game|pong|battle|platformer|puzzle|shooter|flow] [--force]\n  Create a starter project.',
+    help: 'vly new <dir> [--template blank|flow|hello|game|pong|battle|platformer|puzzle|shooter] [--force]\n  Create a project. The default, blank, is a title screen and nothing else: your game starts from there. flow has the menu, save, how-to page and level grid every game needs; the others are games to learn techniques from.',
     async run(args) {
       const dir = args._[0];
       if (!dir) throw new CliError('usage: vly new <dir>');
-      const template = args.flags.template || 'hello';
+      const template = args.flags.template || 'blank';
       const tdir = path.join(ROOT, 'templates', template);
       if (!fs.existsSync(tdir)) {
         const have = fs.existsSync(path.join(ROOT, 'templates')) ? fs.readdirSync(path.join(ROOT, 'templates')).join(', ') : 'none';
@@ -711,7 +711,9 @@ export const commands = {
         }
       };
       copy(tdir, dir);
-      return { text: `created ${dir} from template "${template}":\n  ${written.join('\n  ')}\nnext: write DESIGN.md (the game in one sentence, controls, screens, a content table) and show it to the person; then edit src/ and the "tests" in vly.json (they check the template's own game, so they fail once you change it), then cd ${dir} && vly build && vly run build/${name}.vlc --frames 60 --screenshot shot.png. This is a starting point to learn from: vly check flags a game that is only a re-skin of a template or sample game.`, data: { dir, template, files: written } };
+      const blank = template === 'blank', copyable = template === 'flow';
+      const edit = blank ? 'then edit src/main.vly (it only shows a title)' : copyable ? 'then replace its levels, art and rules with your own (the menu, save and grid code is meant to be kept)' : 'then edit src/ and the "tests" in vly.json (they check the template\'s own game, so they fail once you change it)';
+      return { text: `created ${dir} from template "${template}":\n  ${written.join('\n  ')}\nnext: write DESIGN.md (the game in one sentence, the controls, the screens, a content table, a "## Done when" list) and show it to the person; ${edit}; then cd ${dir} && vly build && vly run build/${name}.vlc --frames 60 --screenshot shot.png.${blank || copyable ? '' : ' This is a game to learn techniques from: vly check flags a game that is only a re-skin of a template or sample game.'} Read the design playbook first: vly docs design.`, data: { dir, template, files: written } };
     },
   },
 

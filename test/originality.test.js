@@ -11,7 +11,7 @@ import { buildIndex, compare, verdict, loadIndex, readProjectFiles } from '../sr
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const refDirs = () => {
   const refs = {};
-  for (const group of ['templates', 'games']) for (const e of fs.readdirSync(path.join(root, group), { withFileTypes: true })) if (e.isDirectory() && !(group === 'templates' && ['flow', 'hello'].includes(e.name)) && fs.existsSync(path.join(root, group, e.name, 'src'))) refs[`${group === 'templates' ? 'template ' : ''}${e.name}`] = path.join(root, group, e.name);
+  for (const group of ['templates', 'games']) for (const e of fs.readdirSync(path.join(root, group), { withFileTypes: true })) if (e.isDirectory() && !(group === 'templates' && ['flow', 'hello', 'blank'].includes(e.name)) && fs.existsSync(path.join(root, group, e.name, 'src'))) refs[`${group === 'templates' ? 'template ' : ''}${e.name}`] = path.join(root, group, e.name);
   return refs;
 };
 

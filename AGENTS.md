@@ -35,7 +35,7 @@ vly test                                                      # assertions in vl
 
 **Before designing, read `vly docs design`** (the quality bar: a good game has a title, pause, game over, sound for every event,
 more than one stage, depth; the playbook has numbers, readability rules and a finishing checklist). **Before calling it finished, run
-`vly check`** (quality gates) and fix or explain every WARN.
+`vly check`** (quality gates) and fix or explain every WARN. **To hand over, run `vly release`**: it builds, runs your tests and the check, loads an old release's save, records the opening, publishes (only with the person's OK) and verifies the link, and writes an offline copy.
 
 **Always look at the screenshot** (it is a PNG; `--ascii` gives a text version) and check that the `faults:` line says
 `none` and cycles per frame are well under 120,000. Add a test in `vly.json` for each behavior; use

@@ -1,0 +1,14 @@
+// {{name}}: a blank start. This file only shows a title screen; replace it with your game.
+// Language: `vly docs language`. Library: `vly docs stdlib`. Design: `vly docs design` (read it before you build).
+// For a menu with CONTINUE / NEW GAME, a how-to page and a level grid, start from `vly new <dir> --template flow` instead.
+
+func init() {
+  load_font(0);                                   // the built-in font -> tiles 0..94
+  bg_pal(0, rgb(15, 15, 15), rgb(11, 12, 14), rgb(5, 7, 11), rgb(1, 1, 4));
+  hide_all_sprites();
+  text(1, 1, "{{name}}");
+  lcd(LCD_BG);
+}
+
+func frame() {
+}

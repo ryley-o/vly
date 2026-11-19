@@ -8,7 +8,7 @@ Every command accepts `--json` and then prints one JSON object with `"ok": true|
 
 | Command | What it does |
 |---|---|
-| `vly new <dir> [--template hello\|game\|pong\|battle\|platformer\|puzzle\|shooter]` | create a starter project (src, assets, vly.json with tests) |
+| `vly new <dir> [--template blank\|flow\|hello\|game\|pong\|battle\|platformer\|puzzle\|shooter]` | create a project: `blank` (the default) is a title screen and nothing else, `flow` is the menu, save, how-to page and level grid every game needs, the others are games to learn techniques from |
 | `vly build [entry] [-o out.vlc] [--asm] [--symbols]` | compile `.vly` / assemble `.asm`; writes the cartridge and `<out>.map.json` (RAM map, function sizes); `--asm` also writes the generated assembly |
 | `vly run <cart or source> [options]` | run headlessly and report; see below |
 | `vly test [paths] [--update]` | run test specs (`vly.json` `"tests"`, `*.test.json`) |

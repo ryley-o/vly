@@ -1,0 +1,8 @@
+{
+  "name": "{{name}}",
+  "entry": "src/main.vly",
+  "out": "build/{{name}}.vlc",
+  "tests": [
+    { "name": "it starts and runs without faults", "frames": 30, "expect": { "maxCycles": 20000 } }
+  ]
+}
