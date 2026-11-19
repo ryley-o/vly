@@ -1,6 +1,6 @@
 {
   "name": "vly",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "VLY-1: a tiny deterministic handheld game console, its toolchain, and its on-chain cartridge format",
   "type": "module",
   "license": "MIT",
