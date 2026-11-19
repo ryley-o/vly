@@ -78,6 +78,31 @@ over and retry, bosses, power-ups, hit-stop, a difficulty curve. Where something
 
 Write it in the project folder before you code and show it to the person. A good one has: **the game in one sentence**; **what makes it this person's** (their name, their jokes, their rules); **controls**; **screens**; a **content table** (a row per stage or level: theme, new mechanic or enemy, boss or set-piece, music); **how progress works** (unlocks, level select, saves, records); and what makes it different from the nearest sample game. End it with a list headed `## Done when` with one line per promise ("8 stages, each with its own boss", "a recorded path clears stage 3", "level select shows medals"). `vly check` prints that list back at the end; go through it in your final message to the person: done, partly done or not done, with evidence. It is a best practice, not a gate: its value is that a gap is hard to hide.
 
+### What the classics teach (they had the same constraints)
+
+The games people still love from the NES and Game Boy era had a screen this small, four colours or a few more, a handful of buttons and almost no memory. They did not win by having more. Take their habits, not their sprites (and see the originality note above: learn the technique, then make your own game).
+
+- **Feel first, then levels.** Miyamoto's team tried a Mario that ran and bounced around before they had a level, and "realised that this was great fun"; they tested how a large character felt to control and made jumps far bigger than real life. Make the character move well in an empty room (section 6) before you build anything around it.
+- **Teach with the game, not with text.** World 1-1 has no instructions. The first enemy walks on the ground so jumping over it or on it is the obvious answer; some pits have floors so the first mistake does not end the run; the first power-up is hard to miss. Put each new idea in a safe place, make the player use it, and let the next level need it. `analyzeCampaign` checks that level 1, 2, 3 really require what they claim to teach.
+- **Four beats per idea: introduce, develop, twist, conclude.** Nintendo's level designers describe it as the four-act *kishōtenketsu* shape: show a mechanic safely, add depth to it, surprise the player with an unexpected use, then finish with a test. It is the same as "teach, test, twist" in section 9 with a closing beat; a level that only repeats the first beat is filler.
+- **Be kind to beginners, deep for experts.** Kirby's Dream Land was made easy on purpose: extra lives, flight, a generous attack, damage that is not instant death. The depth was for those who looked for it. A first-time player should be able to finish; a keen player should find a better grade, a hidden route or a harder mode.
+- **One idea, played well, in a short session.** Tetris needed no tutorial and no story, and it fitted the "pick up, play, put down" pattern of a handheld. If your idea does not fit in one sentence, it is probably two games.
+- **Simple rules, different personalities.** Pac-Man's four ghosts each follow a different one-line rule (chase, ambush ahead of you, mirror you, or flee when you come close). That gave a rich game from tiny code and kept it from being boring or impossible. Prefer three enemies that each need a different answer over ten that do the same thing.
+- **Withered technology, used laterally.** Gunpei Yokoi's rule for the Game Boy was to take mature, cheap technology and find a new use for it: a plain screen, long battery life, a great game in the box. The limits are the product. Do not fight them (no fake colours, no fake resolution); make them part of the look and the feel.
+- **Fun first, then everything else.** Iwatani on Pac-Man: "fun should be the first point of any game". If a feature is clever and not fun, remove it.
+
+### Familiar beats clever (Jakob's law)
+
+People spend most of their time playing *other* games, so they expect yours to work like those. Jakob Nielsen formulated this for websites, and it holds for any place people meet many designs: **a familiar pattern costs the player nothing; a new one costs attention you wanted to spend on the game**. This is the whole reason the VLY-1 has one common front end and one control layout.
+
+- **Spend your novelty on the one thing that is yours** (the core mechanic, the world, the jokes), not on controls, menus, health or pause.
+- **Use the conventions every handheld player already knows:** the D-pad moves; A is the main action and "yes"; B is the second action and "back"; START starts and pauses; "PRESS START" on the title; hearts or a bar for health; coins or stars for collecting; red and flashing for danger; the goal usually to the right or up; a pause that stops everything and a resume that is instant.
+- **Reuse menu and level-select patterns** (`std/ui`, `std/flow`) so a player who has used one VLY-1 game has already learned your menus.
+- **A familiar thing may look new.** Keep the behaviour, change the art. Keeping the behaviour is what makes the art feel good.
+- **Breaking a convention is allowed, but it has to earn its place.** Jakob's law describes a cost; it does not forbid paying it. If you do (a reversed control, a button that changes meaning, a screen that works differently), the gain must be one the player feels in the first minute, and the game must show it before it matters.
+
+Further reading, if you want the detail: Miyamoto on World 1-1 ([Game Developer](https://gamedeveloper.com/design/how-miyamoto-built-i-super-mario-bros-i-legendary-world-1-1), [AV Club](https://www.avclub.com/shigeru-miyamoto-explains-the-making-of-super-mario-bro-1798284041)); Nintendo's four-step level design ([MCV](https://www.mcvuk.com/development/video-nintendos-level-design-secrets-in-four-steps)); Sakurai on being kind to beginners ([Nintendo Life](https://www.nintendolife.com/news/2023/09/random-kirbys-dream-land-is-all-about-being-kind-to-beginners-says-sakurai)); Yokoi's lateral thinking with withered technology ([Wikipedia](https://en.wikipedia.org/wiki/Gunpei_Yokoi)); Pac-Man's ghosts ([Wikipedia](https://en.wikipedia.org/wiki/Ghosts_(Pac-Man)), [The Pac-Man Dossier](https://www.gamedeveloper.com/design/the-pac-man-dossier)); Jakob's law ([Laws of UX](https://lawsofux.com/jakobs-law/)).
+
 ## 1. Process: brief, one mechanic at a time, see everything, play the whole game
 
 1. **Write a one-page brief before any code**, and show it to the person in a few lines. It must settle:
@@ -193,7 +218,7 @@ People like to see, not read (an AI reads every word; a player glances). Design 
 6. The **hub**: a level-select grid (below). Then the level.
 
 **One menu pattern, everywhere, never explained**: UP/DOWN (or LEFT/RIGHT) move the cursor, **A or START choose, B goes back or cancels**. Every menu, confirm box and grid behaves the same, so the player learns it once and it needs no legend. Do not scatter hotkeys.
-Inside a level keep the controls to the arrows plus A and B. **Do not require SELECT while playing**, and be hard on extra controls: an undo, a zoomed or "open" view or a mode toggle each add a thing to learn and a way to get lost. Add one only when the game is really worse without it, and then put it on a button the player will find (and show it in the how-to page).
+Inside a level, the arrows plus A and B are usually enough (Mario, Tetris and Kirby needed nothing more), and a game rarely needs SELECT while playing. Extra controls (an undo, a zoomed or "open" view, a mode toggle) each add a thing to learn and a way to get lost, so add one only when the game is really better with it. When you do, put it on a button the player will find and show it on the how-to page.
 
 **Layout rules** (the screen is 20 x 18 cells; everything snaps to the 8-pixel grid):
 
