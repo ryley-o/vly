@@ -169,6 +169,7 @@ cartridges, costs and prototype steps) is in hardware-plan.md; where the two dif
 | LCD WR, DC, CS, RST, backlight | 18, 19, 20, 21, 22 |
 | Buttons | 2 to 9, as above |
 | Audio out (PWM) | 26 |
+| Display RD (read strobe) | not connected to a GPIO: tie it to the 3.3 V rail (the firmware never reads the display) |
 
 The display runs at the panel's minimum write cycle (66 ns, `LCD_WRITE_NS`): 320 x 288 x 2 bytes x 60 Hz needs a cycle
 of 90 ns or less. If a module cannot keep up, raise `LCD_WRITE_NS` and the picture drops to 30 Hz or the borders shrink.
