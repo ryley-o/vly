@@ -6,8 +6,9 @@ import { buildIndex, INDEX_FILE } from '../src/tools/originality.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const refs = {};
+const COPYABLE = new Set(['flow', 'hello']);                  // meant to be copied (the front end every game needs): not counted as someone else's game
 for (const group of ['templates', 'games']) {
-  for (const e of fs.readdirSync(path.join(root, group), { withFileTypes: true })) if (e.isDirectory() && fs.existsSync(path.join(root, group, e.name, 'src'))) refs[`${group === 'templates' ? 'template ' : ''}${e.name}`] = path.join(root, group, e.name);
+  for (const e of fs.readdirSync(path.join(root, group), { withFileTypes: true })) if (e.isDirectory() && !(group === 'templates' && COPYABLE.has(e.name)) && fs.existsSync(path.join(root, group, e.name, 'src'))) refs[`${group === 'templates' ? 'template ' : ''}${e.name}`] = path.join(root, group, e.name);
 }
 fs.writeFileSync(INDEX_FILE, JSON.stringify(buildIndex(refs)) + '\n');
 console.log(`wrote ${path.relative(root, INDEX_FILE)} (${Object.keys(refs).length} reference games)`);

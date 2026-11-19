@@ -1082,6 +1082,7 @@ export function compile(source, opts = {}) {
     unused: warnings.length,
     globals: [...usedGlobals],
     ram: ramMap,
+    assets: [...flat, ...banked].map((a) => ({ name: a.name, kind: a.kind, bytes: a.data.length, bank: a.bank })),
   };
   return { asm: out.join('\n') + '\n', warnings, stats };
 }

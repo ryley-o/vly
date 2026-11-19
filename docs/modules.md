@@ -200,6 +200,27 @@ second, slower layer with a few large sprites moving at half the camera speed. U
 physics, so nothing floats above the ground.
 
 
+## std/flow
+
+The front end and controls every game needs, so they are the same everywhere (`import "std/flow";`, which imports `std/ui`). `templates/flow` shows all of it working, with replay tests.
+
+| Function | What it does |
+|---|---|
+| `bt_update()` | call first in `frame()`: tracks how long each button is held |
+| `bt_tap(b)` | 1 on the frame a button is **released** after a short press (12 frames or fewer) |
+| `bt_hold(b, n)` | 1, once, on the frame the button has been held `n` frames |
+| `bt_released(b)`, `bt_frames(b)` | 1 on the release frame; how many frames it has been held |
+| `bt_flush()` | ignore every button held right now until it is released (call when the screen changes) |
+| `confirm_open(map, col, row, title, warning)` | a box naming what will be erased, **KEEP selected**, ERASE second (keep title and warning to 14 characters or so) |
+| `confirm_update()` | `-1` waiting, `0` keep (KEEP chosen, or B), `1` erase confirmed. LEFT/RIGHT/UP/DOWN move, A or START choose, B cancels |
+| `pg_get(level)`, `pg_record(level, grade)` | the best grade of a level (0 = not beaten, 1 = D ... 6 = AAA), kept in the save at `pg_base` (default byte 64), 4 bits a level; `pg_record` returns 1 on a new best |
+| `pg_save()` | seal and commit the save |
+| `pg_next(count)`, `pg_beaten(count)`, `pg_open(level, count)` | the first unbeaten level, how many are beaten, whether a level is open (progressive unlocking) |
+| `grade_for(turns, par)`, `grade_name(g)` | AAA at par, AA, A, B, C, D as turns pass it (the slack grows with par); the letters |
+| `grid_open(cols, count, start)`, `grid_update(unlocked)` | a level-select cursor: `-1` nothing yet, the level on A or START, `-3` on a locked level, `-2` on B. `grid_sel` is the cursor; you draw the cells |
+
+`menu_update()` in `std/ui` now treats START like A, so every menu follows the same pattern: UP/DOWN move, A or START choose, B goes back.
+
 ## std/fade and `spr_text`
 
 `std/fade` fades the whole screen to black and back by scaling every palette colour (4 is normal, 0 is black):

@@ -1,0 +1,19 @@
+# Pictograms for the how-to page and the level grid. 8x8 tiles; 0 is the background colour, 1 2 3 are palette colours.
+tile lock:
+  ..3333..
+  .3....3.
+  .3....3.
+  33333333
+  33322333
+  33322333
+  33333333
+  ........
+tile dpad:
+  ...33...
+  ...33...
+  ..3333..
+  33333333
+  33333333
+  ..3333..
+  ...33...
+  ...33...

@@ -178,6 +178,41 @@ A game is a state machine. Name the states and handle each in one place:
 - **Death is a moment, not a cut.** Freeze 20 to 30 frames, play the fail sound, flash or fall, then continue.
 - **Give feedback for every state change** (a sound, a flash, a number popping up). If nothing tells the player something happened, they will not know.
 
+### The common front end: one pattern on every screen, obsessively clear
+
+People like to see, not read (an AI reads every word; a player glances). Design every screen so it can be understood in a second without reading, and make the whole game follow **one pattern** so nothing needs explaining.
+`templates/flow` is a small working project of all of this (menus, confirm, how-to page, level grid, grades, saves, with replay tests): copy its front end, then make the game itself your own. `std/flow` has the parts.
+
+**The flow** (every game with progress):
+
+1. The console's boot logo (not yours). Then the game's **splash**: its art and name, a few seconds, any button skips.
+2. **Menu**: if a save with progress exists, **CONTINUE is first and selected**, then NEW GAME. On a first run there is only NEW GAME.
+3. **NEW GAME with a save asks first**: a box that names exactly what will be erased ("ERASE SAVE? ALL GRADES GO"), with **KEEP selected by default** and ERASE second. B cancels. Never erase on a single press.
+4. The **opening story**: a few short lines (or pictures) that give the player a reason to care. Always after the menu, both for CONTINUE and NEW GAME.
+5. The **how-to page**: shown every time at startup, because it is the one page that has to explain symbols. Pictograms, not paragraphs: a frame with the D-pad cross and "MOVE", a frame with "A" and "PICK", a frame with "B" and "BACK", plus whatever symbols the puzzle uses (draw each and say what it does). This is the only place where words explain pictures.
+6. The **hub**: a level-select grid (below). Then the level.
+
+**One menu pattern, everywhere, never explained**: UP/DOWN (or LEFT/RIGHT) move the cursor, **A or START choose, B goes back or cancels**. Every menu, confirm box and grid behaves the same, so the player learns it once and it needs no legend. Do not scatter hotkeys.
+Inside a level keep the controls to the arrows plus A and B. **Do not require SELECT while playing**, and be hard on extra controls: an undo, a zoomed or "open" view or a mode toggle each add a thing to learn and a way to get lost. Add one only when the game is really worse without it, and then put it on a button the player will find (and show it in the how-to page).
+
+**Layout rules** (the screen is 20 x 18 cells; everything snaps to the 8-pixel grid):
+
+- **One alignment per screen**: centred or left-justified, never a mix. Titles centred, lists left-justified in a column, numbers right-aligned in a fixed width. Use the same margins on every screen.
+- **Group, then space**: related things sit together (an icon next to its label, a score next to its heading); a blank row separates groups. Do not scatter items across the screen.
+- **The same thing in the same place** on every screen (title on row 0 or 2, the prompt at the bottom). Do not move the cursor column between menus.
+- **Show, don't tell**: a lock icon says "locked", a grade letter says how well you did, a blinking A frame says "press A", a coloured frame says "here". Prefer a picture, a number, a colour or motion to a sentence. At most three short lines of text on any screen.
+- **One thing blinks at a time**; the selected thing is the brightest (a different colour frame beats an arrow alone).
+- **Number your pictures too**: if you teach a rule with a picture (a tiny before and after for "swap"), put it where the player is looking when they first need it, not on a separate page.
+
+### Level select, progression and grades
+
+- A **grid** of levels (4 columns suits 160 pixels), one framed cell per level showing its number and its **best grade**; a lock icon on levels not yet open. Progress is the grid itself: you can see what is open, what is beaten and how well.
+- **Progressive unlocking**: beating a level opens the next. The cursor starts on **the next level you have not beaten**, so a returning player just presses A. Beaten levels stay selectable (favourites to replay and improve).
+- **What opens next is implied** by the next cell being open and the one after it locked; do not add a legend. Ordinary finishes advance the story; **grades and medals reward mastery** and are never required to move on (unless the game says so with a picture).
+- **Grades from a measurable par**: if you know the minimum (turns, moves, seconds), grade against it: AAA at par, then AA, A, B, C, D as the player strays (`grade_for(turns, par)` in `std/flow` is a good default: slack grows with the level's size). Show the grade on the result screen and in the grid. Time, collectibles or power-ups used can grade other genres the same way.
+- Keep grades in the save, 4 bits a level (`pg_get`, `pg_record`, `pg_next`, `pg_beaten` in `std/flow`): 200 levels take 100 bytes.
+- The **hub is where the player lives between levels**: it should look good, load instantly, and make the next step obvious.
+
 ## 5. Controls
 
 - Lock the map in the brief and show it on the title screen. Conventions that players already know:
@@ -188,6 +223,7 @@ A game is a state machine. Name the states and handle each in one place:
 - **Never rely on more than two buttons at once** and never require precise diagonal timing. Eight-way input is fine; do not require all eight.
 - **Forgive the player**: *coyote time* (allow a jump for about 5 frames after leaving a ledge), a *jump buffer* (remember a press for about 6 frames before landing), and generous hitboxes for the player's attacks and slightly smaller hitboxes for the player's own body.
 - On a handheld the thumb covers the lower left and right of the pad, so avoid fast sequences that alternate left and right buttons.
+- **Taps, holds and releases are three different inputs; test them separately.** If a tap means "go" and a hold means "go fast", a plain tap must not trigger the fast version, and a hold that begins on one screen must not carry into the next. `std/flow` has `bt_tap(b)` (fires on release of a press of 12 frames or fewer), `bt_hold(b, n)` (fires once, after n frames held) and `bt_flush()` (ignore a button already held when the screen changes until it is released): call `bt_update()` first in `frame()`. Write a replay test for each: a tap, a hold, a release, a tap-then-hold, a hold across a screen change, and pause/resume. A touch screen has no key repeat and a thumb that rolls, a keyboard has repeat and ghosting: try both.
 
 ## 6. Game feel: numbers that work
 
@@ -369,6 +405,8 @@ that mini-game star counts spread with reaction delay (a late bot should get 0 o
 about once a minute; the cartridge flash survives about 100,000 writes per sector, so a save every few seconds would wear it out within weeks (`vly check` warns above about 3 a minute).
 Keep numbers that grow past 32,767 (age in frames) in two words or compare with `ult` (the compiler warns when a constant above 32,767 meets a signed `<`).
 
+**Teach every mechanic by making the player use it, early.** Do not explain a rule and hope: build the first levels so that level 1 cannot be solved without mechanic A, level 2 not without mechanic B, level 3 only with both (a quilt puzzle: the first needs one turn, the second one swap, the third both), with a tiny before and after picture where the rule first matters. Then **prove it, do not assume it**: `src/tools/campaign.js` (`analyzeCampaign`) takes a solver you write (does this level have a solution using only these mechanics, and what is the fewest moves?) and reports the first level that actually requires each rule, the levels that claim to teach a rule but do not need it, an opening that is too easy (three of the first five levels solved in one move) and a difficulty that does not rise; put it in `tests/report.mjs` and `vly release` prints it. Over a long campaign also track which decisions get harder and where each new rule first matters, so you know what to playtest.
+
 **Puzzle.** Rules a person can state in a sentence; a tutorial level that teaches by doing; 15 or more levels ramping up (aim for far more on a rising curve, or a generator with a difficulty setting; see "Beyond the minimum"); undo and restart on a button; a clear "solved" moment with a sound; progress saved. The `puzzle` template has 7 levels and undo.
 
 **Arcade (endless).** One screen, rising speed, a score and a saved high score, a danger that escalates in phases (not just faster), and a combo or risk reward. Ends fast, restarts instantly.
@@ -395,6 +433,13 @@ Do all of these. Each has a tool.
 10. **Playtest with the real player** when there is one. Ask what they were trying to do and where they got stuck; fix that, not what you assumed.
 
 If you cannot see images, `screen_text` shows text and sprites; its `notes` call out sprites that cover text. Still ask for a picture to be looked at by a person when it matters.
+
+### Show yourself what the player experiences
+
+- **Record the opening**: `vly release` writes `release/opening.gif` and `release/opening.wav` (the first 30 seconds, driven by `tests/opening.input` if you have one). Look at it and listen: the boot logo, the splash, the menu, the story, the how-to page, the pauses between screens. Is the art good? Do the instructions read? Is there dead time? A solved-in-one-frame replay proves nothing about this.
+- **A warning always has a replay**: `vly check --save-input trace.input` writes the careless player's exact input; `vly run build/x.vlc --input-file trace.input --frames N --screenshot s.png` shows the frame. Audio warnings name the START and SELECT presses that muted or paused the game (a random tester that hit Mute is not a silent game).
+- **Verify the link, not just the build**: `vly publish` opens the play page, fetches the cartridge as a player would, compares it with what you built (revision, hash) and presses START on it; `vly release` does all of it in one command, including loading an old release's save.
+- **Keep players' progress across releases**: put a stable `"id"` in `vly.json` (the offline copy's save key follows it, not the cartridge hash) and keep a save from the previous release in `tests/legacy-saves/`; `vly release` loads it and keeps playing. Reserve save bytes for the future and version your save layout inside the game.
 
 ## 12. Finishing checklist (all must be true)
 

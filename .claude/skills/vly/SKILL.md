@@ -12,6 +12,7 @@ headlessly, screenshots and tests. Everything is checkable by a command.
 
 1. If the project does not exist: `vly new <dir>` (an empty starting point). **Do not start from a game template and re-skin it**: `vly check` flags a re-skin of a template or sample game, and the person deserves their own game. The templates (`hello`, `game`, `pong`, `battle`, `platformer`, `puzzle`, `shooter`) and `games/` exist to *learn techniques from*: read the closest one for how something is done, then write your own rules, levels, art and structure.
    Before coding, write `DESIGN.md` in the project (the game in one sentence, controls, screens, a content table with one row per stage or level) and show it to the person. `vly check` warns without it.
+   For the front end (menus, erase confirmation, how-to page, level grid, grades, saves) copy `--template flow`; it is meant to be copied. The game itself must be your own.
 2. Read the docs once: `vly docs language`, `vly docs stdlib` (or the `vly_docs` MCP tool).
 3. Edit `src/main.vly` and `assets/*.tiles`.
 4. Loop: `vly build` then

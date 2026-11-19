@@ -26,6 +26,33 @@ export function monkeyInput(seed = 12345) {
   };
 }
 
+const BTN_NAMES = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'A', 'B', 'START', 'SELECT'];
+const maskName = (m) => BTN_NAMES.filter((_, i) => m & (1 << i)).join('+') || 'nothing';
+/** The careless player's input as a script ("A+RIGHT@20-33,..."), so a warning can be replayed: vly run ... --input-file. */
+export function monkeyScript(seed = 12345, frames = 7200) {
+  const input = monkeyInput(seed), segs = [];
+  let cur = 0, from = 0;
+  for (let f = 0; f <= frames; f++) {
+    const m = f < frames ? input(f) : 0;
+    if (m !== cur || f === frames) { if (cur) segs.push(`${maskName(cur)}@${from}-${f - 1}`); cur = m; from = f; }
+  }
+  return `# the careless player of vly check (seed ${seed}), ${frames} frames\n${segs.join(',\n')}\n`;
+}
+/** What the careless player pressed that changes a game's state (START, SELECT) and when, for explaining a warning. */
+function describeMonkey(seed, frames) {
+  const input = monkeyInput(seed), out = { START: [], SELECT: [], first: new Map() };
+  let prevS = 0, prevSel = 0;
+  for (let f = 0; f < frames; f++) {
+    const m = input(f);
+    if ((m & C.BTN.SELECT) && !prevSel) out.SELECT.push(f);
+    if ((m & C.BTN.START) && !prevS) out.START.push(f);
+    prevSel = m & C.BTN.SELECT; prevS = m & C.BTN.START;
+    out.first.set(f, m);
+  }
+  return out;
+}
+const framesList = (a) => (a.length ? `${a.slice(0, 6).join(', ')}${a.length > 6 ? ` and ${a.length - 6} more` : ''}` : 'never');
+
 function audibility(samples, frames) {
   if (!samples) return { seconds: 0, of: frames / 60, peak: 0 };
   let peak = 0, loud = 0;
@@ -75,7 +102,8 @@ export function checkCartridge(rom, o = {}) {
   // scenario 2: START, then A, then nothing
   const started = runCartridge(rom, { frames: 300, input: 'START@30,A@120', audio: false });
   // scenario 3: the careless player, sampled
-  const monkey = monkeyInput(o.seed ?? 12345);
+  const seed = o.seed ?? 12345;
+  const monkey = monkeyInput(seed);
   const hashes = new Set(), screens = new Set();
   const notes = new Set();
   let maxSprites = 0, maxBlank = 0, maxOverBudget = 0;
@@ -122,9 +150,9 @@ export function checkCartridge(rom, o = {}) {
   }
 
   // faults
-  const faultOf = (r) => Object.entries(r.faults).filter(([, n]) => n > 0).map(([k, n]) => `${k} x${n} (first at frame ${r.firstFault[k]})`);
-  const faults = [...faultOf(idle), ...faultOf(started), ...faultOf(run), ...(script ? faultOf(script) : [])];
-  if (faults.length) add('faults', 'fail', `the machine reported faults: ${[...new Set(faults)].join('; ')}`, 'Division by zero, writing to read-only memory, an illegal instruction or running past the cycle budget. Use watch on the variables involved, or vly run --trace.');
+  const faultOf = (r, careless) => Object.entries(r.faults).filter(([, n]) => n > 0).map(([k, n]) => `${k} x${n} (first at frame ${r.firstFault[k]}${careless ? `, while the careless player held ${maskName(describeMonkey(seed, r.firstFault[k] + 1).first.get(r.firstFault[k]) || 0)}` : ''})`);
+  const faults = [...faultOf(idle), ...faultOf(started), ...faultOf(run, true), ...(script ? faultOf(script) : [])];
+  if (faults.length) add('faults', 'fail', `the machine reported faults: ${[...new Set(faults)].join('; ')}`, 'Division by zero, writing to read-only memory, an illegal instruction or running past the cycle budget. Replay the careless run with `vly check --save-input trace.input`, then `vly run build/x.vlc --input-file trace.input --frames <first frame + 1> --screenshot fault.png --watch <variables>`; or use vly run --trace.');
   else add('faults', 'pass', `no faults in ${600 + 300 + frames + (script ? script.frames : 0)} frames of play (idle, START, ${Math.round(frames / 60)} s of careless input${script ? `, and your recorded path of ${Math.round(script.frames / 60)} s` : ''})`);
 
   // budget
@@ -150,9 +178,11 @@ export function checkCartridge(rom, o = {}) {
 
   // sound
   const ti = audibility(idle.audio, 600), pl = audibility(run.audio, frames);
+  const mk = describeMonkey(seed, frames);
+  const pressedNote = ` (the careless player pressed START at frames ${framesList(mk.START)} and SELECT at frames ${framesList(mk.SELECT)}: if one of them mutes or pauses, that is the reason; replay it with --save-input)`;
   if (ti.seconds < 1) add('title_sound', 'warn', `the title screen is nearly silent (${ti.seconds.toFixed(1)} s of 10 s audible)`, 'Start the title music in init(), and call music_update() every frame.');
   else add('title_sound', 'pass', `the title screen has sound (${ti.seconds.toFixed(1)} of 10 s)`);
-  if (pl.seconds < 0.3 * pl.of) add('play_sound', 'warn', `only ${pl.seconds.toFixed(0)} of ${pl.of.toFixed(0)} seconds of play had any sound`, 'Add music that plays during the game and a distinct effect for every event (jump, hit, pickup, fail).');
+  if (pl.seconds < 0.3 * pl.of) add('play_sound', 'warn', `only ${pl.seconds.toFixed(0)} of ${pl.of.toFixed(0)} seconds of play had any sound${pressedNote}`, 'Add music that plays during the game and a distinct effect for every event (jump, hit, pickup, fail). If a button toggles sound or pauses, lower the volume instead of muting, or make the toggle hard to hit by accident.');
   else add('play_sound', 'pass', `sound is audible for ${pl.seconds.toFixed(0)} of ${pl.of.toFixed(0)} seconds of play`);
   if (Math.max(ti.peak, pl.peak) > 0.6) add('loud', 'warn', `the sound peaks at ${Math.max(ti.peak, pl.peak).toFixed(2)} of full scale`, 'Loud on a small speaker. Lower master_volume() or the channel volumes (music 5-8, effects 9-13).');
 
@@ -194,6 +224,6 @@ export function checkCartridge(rom, o = {}) {
     ok: verdict !== 'fail', verdict,
     summary: `${checks.filter((c) => c.status === 'pass').length} passed, ${checks.filter((c) => c.status === 'warn').length} warnings, ${checks.filter((c) => c.status === 'fail').length} failed`,
     checks,
-    stats: { frames, worst_frame_cycles: worst, avg_frame_cycles: run.cycles.avg, distinct_screens: screens.size, distinct_pictures: hashes.size, max_sprites: maxSprites },
+    stats: { frames, monkey_seed: seed, worst_frame_cycles: worst, avg_frame_cycles: run.cycles.avg, distinct_screens: screens.size, distinct_pictures: hashes.size, max_sprites: maxSprites },
   };
 }

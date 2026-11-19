@@ -1,0 +1,105 @@
+{
+  "name": "{{name}}",
+  "entry": "src/main.vly",
+  "out": "build/{{name}}.vlc",
+  "id": "{{name}}",
+  "tests": [
+    {
+      "name": "first start: the splash, then a menu with only NEW GAME",
+      "frames": 200,
+      "input": "",
+      "expect": {
+        "words": {
+          "state": 1,
+          "has_save": 0,
+          "menu_n": 1
+        }
+      }
+    },
+    {
+      "name": "NEW GAME with no save goes straight to the story, then the how-to page, then the grid",
+      "frames": 300,
+      "input": "A@130, A@170, A@200",
+      "expect": {
+        "words": {
+          "state": 4
+        }
+      }
+    },
+    {
+      "name": "finishing level 1 in the fewest turns earns AAA, unlocks level 2 and saves",
+      "frames": 400,
+      "input": "A@130, A@170, A@200, A@230, RIGHT@250, A@270, LEFT@290, A@310, A@340",
+      "expect": {
+        "words": {
+          "state": 4,
+          "last_grade": 6,
+          "beaten": 1,
+          "next_level": 1
+        },
+        "saves": 1
+      }
+    },
+    {
+      "name": "with a save, CONTINUE is first; NEW GAME asks before erasing and B keeps everything",
+      "frames": 300,
+      "save": "tests/saves/two-beaten.sav",
+      "input": "DOWN@130, A@150, B@190",
+      "expect": {
+        "words": {
+          "state": 1,
+          "has_save": 1,
+          "menu_n": 2,
+          "beaten": 2
+        }
+      }
+    },
+    {
+      "name": "NEW GAME then ERASE wipes the grades and starts the story",
+      "frames": 300,
+      "save": "tests/saves/two-beaten.sav",
+      "input": "DOWN@130, A@150, RIGHT@170, A@190",
+      "expect": {
+        "words": {
+          "state": 2,
+          "beaten": 0
+        }
+      }
+    },
+    {
+      "name": "NEW GAME then KEEP (the default) leaves the save alone",
+      "frames": 300,
+      "save": "tests/saves/two-beaten.sav",
+      "input": "DOWN@130, A@150, A@190",
+      "expect": {
+        "words": {
+          "state": 1,
+          "beaten": 2
+        }
+      }
+    },
+    {
+      "name": "an older release's save loads, and the grid starts on the next unbeaten level",
+      "frames": 300,
+      "save": "tests/saves/two-beaten.sav",
+      "input": "A@130, A@170, A@200, A@230",
+      "expect": {
+        "words": {
+          "state": 5,
+          "level": 2
+        }
+      }
+    },
+    {
+      "name": "B goes back from a level to the grid",
+      "frames": 400,
+      "save": "tests/saves/two-beaten.sav",
+      "input": "A@130, A@170, A@200, A@230, B@270",
+      "expect": {
+        "words": {
+          "state": 4
+        }
+      }
+    }
+  ]
+}

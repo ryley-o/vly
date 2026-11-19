@@ -11,6 +11,8 @@ shooter with bosses, built by an assistant from this guidance), each with source
 **Your game must be your own.** The templates and the sample games in `games/` are *references*: read them to learn a technique (how a tilemap is scanned, how a boss is staged, how a save is sealed). Never ship one with a new skin, new title, new art or renamed words:
 its rules, levels, code structure and art must be your own, designed for this person. `vly check` compares your sources with every template and sample game and **flags a re-skin**. Start from an empty project (`vly new mygame`), not from a game.
 
+**Copy the front end, not the game.** `vly new mygame --template flow` is a small working project of what every game needs around its levels: splash, menu (CONTINUE first, NEW GAME asks before erasing with KEEP as the default), the how-to page, a level grid with unlocks and grades, saves, all with replay tests. Menus everywhere: UP/DOWN move, A or START choose, B back. Show with pictures, not sentences. See "The common front end" in `vly docs design`.
+
 **Plan before you build.** Write `DESIGN.md` (one sentence, controls, screens, a content table with a row per stage or level, what makes this game different from the nearest sample game), show it to the person, then build. A real game is not three levels: see "Depth and length" in `vly docs design`.
 
 ## Set up

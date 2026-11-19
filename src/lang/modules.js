@@ -167,12 +167,12 @@ func menu_open(map, col, row, items, count) {
   for (var j = 0; j < count; j++) { put_text(map, col + 2, row + 1 + j, peek(items + j * 2)); }
   menu_draw_cursor();
 }
-// Handle the D-pad and buttons. Returns -1 while nothing is chosen, the chosen index (0..n-1) when A is pressed,
+// Handle the D-pad and buttons. Returns -1 while nothing is chosen, the chosen index (0..n-1) when A or START is pressed,
 // or -2 when B is pressed.
 func menu_update() {
   if (btnp(BTN_DOWN)) { menu_sel = menu_sel + 1; if (menu_sel >= menu_count) { menu_sel = 0; } menu_draw_cursor(); }
   if (btnp(BTN_UP)) { menu_sel = menu_sel - 1; if (menu_sel < 0) { menu_sel = menu_count - 1; } menu_draw_cursor(); }
-  if (btnp(BTN_A)) { return menu_sel; }
+  if (btnp(BTN_A) || btnp(BTN_START)) { return menu_sel; }
   if (btnp(BTN_B)) { return -2; }
   return -1;
 }
@@ -582,6 +582,173 @@ func fade_update() {
 }
 `;
 
+
+const FLOW_SOURCE = `
+// std/flow: the pieces every game's front end and controls need, so they are the same everywhere.
+//  - buttons: taps, holds and releases told apart (bt_*)
+//  - confirm: "erase your progress?" with KEEP as the default (confirm_*)
+//  - progress: a grade (D to AAA) for each level, kept in the save (pg_*, grade_*)
+//  - grid: a level-select grid cursor (grid_*)
+// The common menu pattern is in std/ui: UP/DOWN move, A or START choose, B goes back. Needs std/ui and load_font().
+import "std/ui";
+
+// ---- buttons ----
+// Call bt_update() first thing in frame(). Then, for a button mask such as BTN_B:
+//   bt_tap(b)       1 on the frame the button is RELEASED after a short press (12 frames or fewer)
+//   bt_hold(b, n)   1, once, on the frame the button has been held n frames (it never fires again until released)
+//   bt_released(b)  1 on the frame the button is released
+//   bt_frames(b)    how many frames it has been held (0 when it is not held)
+//   bt_flush()      ignore every button that is held right now until it is released (call it when the screen changes)
+const BT_TAP = 12;
+var bt_n[8];
+var bt_c[8];
+var bt_f[8];
+var bt_rel[8];
+func bt_i(m) {
+  var i = 0;
+  while (m > 1) { m = m >> 1; i++; }
+  return i;
+}
+func bt_update() {
+  for (var i = 0; i < 8; i++) {
+    bt_rel[i] = 0;
+    if (btn(1 << i)) {
+      if (bt_n[i] < 250) { bt_n[i]++; }
+    } else {
+      if (bt_n[i] > 0 && bt_c[i] == 0) { bt_rel[i] = bt_n[i]; }
+      bt_n[i] = 0; bt_c[i] = 0; bt_f[i] = 0;
+    }
+  }
+}
+func bt_frames(m) {
+  var i = bt_i(m);
+  if (bt_c[i]) { return 0; }
+  return bt_n[i];
+}
+func bt_released(m) { return bt_rel[bt_i(m)] > 0; }
+func bt_tap(m) {
+  var r = bt_rel[bt_i(m)];
+  return r > 0 && r <= BT_TAP;
+}
+func bt_hold(m, n) {
+  var i = bt_i(m);
+  if (bt_c[i] || bt_f[i] || bt_n[i] < n) { return 0; }
+  bt_f[i] = 1;
+  return 1;
+}
+func bt_flush() {
+  for (var i = 0; i < 8; i++) { if (bt_n[i] > 0) { bt_c[i] = 1; } }
+}
+
+// ---- confirm: a two-choice box, KEEP or ERASE ----
+// confirm_open(map, col, row, title, warning) draws it with KEEP selected. Call confirm_update() every frame:
+// -1 while waiting, 0 when the player keeps (chooses KEEP, or presses B), 1 when the player confirms ERASE.
+// LEFT/RIGHT or UP/DOWN move, A or START choose, B cancels. Name exactly what will be erased in title and warning.
+var cf_map;
+var cf_col;
+var cf_row;
+var cf_w;
+var cf_sel;
+func confirm_draw_choices() {
+  var x = cf_col + (cf_w - 13) / 2;
+  put_text(cf_map, x + 1, cf_row + 5, "KEEP");
+  put_text(cf_map, x + 8, cf_row + 5, "ERASE");
+  var keep = font_base;
+  var erase = font_base;
+  if (cf_sel == 0) { keep = ui_base + ui_tiles_ui_cursor + (text_pal << 12); } else { erase = ui_base + ui_tiles_ui_cursor + (text_pal << 12); }
+  poke(cf_map + (cf_row + 5) * 64 + x * 2, keep);
+  poke(cf_map + (cf_row + 5) * 64 + (x + 7) * 2, erase);
+}
+func confirm_open(map, col, row, title, warning) {
+  cf_map = map; cf_col = col; cf_row = row; cf_sel = 0;
+  cf_w = max(max(ui_strlen(title), ui_strlen(warning)), 14) + 4;
+  ui_box(map, col, row, cf_w, 7);
+  put_text(map, col + (cf_w - ui_strlen(title)) / 2, row + 1, title);
+  put_text(map, col + (cf_w - ui_strlen(warning)) / 2, row + 3, warning);
+  confirm_draw_choices();
+}
+func confirm_update() {
+  if (btnp(BTN_LEFT) || btnp(BTN_RIGHT) || btnp(BTN_UP) || btnp(BTN_DOWN)) { cf_sel = 1 - cf_sel; confirm_draw_choices(); }
+  if (btnp(BTN_B)) { return 0; }
+  if (btnp(BTN_A) || btnp(BTN_START)) { return cf_sel; }
+  return -1;
+}
+func confirm_close() { ui_clear(cf_map, cf_col, cf_row, cf_w, 7); }
+
+// ---- progress: a grade for each level, 4 bits each, in the save ----
+// grade 0 = not beaten yet, 1 = D, 2 = C, 3 = B, 4 = A, 5 = AA, 6 = AAA. Level numbers start at 0.
+// The grades live from save byte pg_base on (up to 1,900 levels fit before the checksum). The game keeps bytes below pg_base for itself.
+var pg_base = 64;
+func pg_get(level) {
+  var b = save_get8(pg_base + (level >> 1));
+  if (level & 1) { return b >> 4; }
+  return b & 15;
+}
+func pg_set(level, g) {
+  var a = pg_base + (level >> 1);
+  var b = save_get8(a);
+  if (level & 1) { save_set8(a, (b & 15) | (g << 4)); } else { save_set8(a, (b & 240) | g); }
+}
+// Keep the best grade. Returns 1 when this is a new best (or the first time the level is beaten). Call pg_save() afterwards.
+func pg_record(level, g) {
+  if (g > pg_get(level)) { pg_set(level, g); return 1; }
+  return 0;
+}
+func pg_save() { save_seal(); save_commit(); }
+// The first level that has not been beaten (count when all are), and how many are beaten.
+func pg_next(count) {
+  for (var i = 0; i < count; i++) { if (pg_get(i) == 0) { return i; } }
+  return count;
+}
+func pg_beaten(count) {
+  var n = 0;
+  for (var i = 0; i < count; i++) { if (pg_get(i) > 0) { n++; } }
+  return n;
+}
+// Progressive unlocking: every beaten level and the next one are open.
+func pg_open(level, count) { return level <= pg_next(count); }
+// Grade from the turns taken and the minimum possible (par): AAA at par, then a little more slack for each step down.
+func grade_for(turns, par) {
+  var over = turns - par;
+  var slack = max(1, par / 8);
+  if (over <= 0) { return 6; }
+  if (over <= slack) { return 5; }
+  if (over <= slack * 2) { return 4; }
+  if (over <= slack * 4) { return 3; }
+  if (over <= slack * 8) { return 2; }
+  return 1;
+}
+func grade_name(g) {
+  if (g == 6) { return "AAA"; }
+  if (g == 5) { return "AA"; }
+  if (g == 4) { return "A"; }
+  if (g == 3) { return "B"; }
+  if (g == 2) { return "C"; }
+  if (g == 1) { return "D"; }
+  return "-";
+}
+
+// ---- grid: a level-select cursor ----
+// grid_open(cols, count, start) puts the cursor on start. grid_update(unlocked) returns -1 while nothing is chosen, the level when A or START
+// is pressed on an open level, -3 on a locked one, -2 on B. Arrows move the cursor (no wrap). grid_sel is the cursor; draw the cells yourself.
+var grid_cols;
+var grid_count;
+var grid_sel;
+func grid_open(cols, count, start) { grid_cols = cols; grid_count = count; grid_sel = start; }
+func grid_update(unlocked) {
+  if (btnp(BTN_RIGHT) && grid_sel < grid_count - 1) { grid_sel++; }
+  if (btnp(BTN_LEFT) && grid_sel > 0) { grid_sel--; }
+  if (btnp(BTN_DOWN) && grid_sel + grid_cols < grid_count) { grid_sel = grid_sel + grid_cols; }
+  if (btnp(BTN_UP) && grid_sel >= grid_cols) { grid_sel = grid_sel - grid_cols; }
+  if (btnp(BTN_B)) { return -2; }
+  if (btnp(BTN_A) || btnp(BTN_START)) {
+    if (grid_sel <= unlocked) { return grid_sel; }
+    return -3;
+  }
+  return -1;
+}
+`;
+
 export const MODULES = {
   'std/ui': { source: UI_SOURCE, files: { 'std/ui.tiles': UI_TILES } },
   'std/anim': { source: ANIM_SOURCE, files: {} },
@@ -591,6 +758,7 @@ export const MODULES = {
   'std/stream': { source: STREAM_SOURCE, files: {} },
   'std/tunes': { source: TUNES_SOURCE, files: {} },
   'std/fade': { source: FADE_SOURCE, files: {} },
+  'std/flow': { source: FLOW_SOURCE, files: {} },
 };
 
 /** Embedded files (such as module art) by path. */

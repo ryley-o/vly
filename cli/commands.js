@@ -13,13 +13,13 @@ import { filmstrip, evenFrames } from '../src/tools/filmstrip.js';
 import { wavFromFloat } from '../src/core/audio.js';
 import { parseUntil } from '../src/tools/names.js';
 import { profileCartridge, profileFrames } from '../src/tools/profile.js';
-import { checkCartridge } from '../src/tools/check.js';
+import { checkCartridge, monkeyScript } from '../src/tools/check.js';
 import { compare as compareProject, verdict, loadIndex as loadOriginalityIndex, readProjectFiles } from '../src/tools/originality.js';
 import { parseTilesText, tilesFromRGBA, tilesToRGBA, pngToTilesText } from '../src/tools/tiles.js';
 import { runSpecFile, findSpecFiles } from '../src/tools/testrunner.js';
 import { disassemble } from '../src/asm/disasm.js';
 import { OPS } from '../src/core/isa.js';
-import { validateCartridge } from '../src/core/machine.js';
+import { validateCartridge, Machine } from '../src/core/machine.js';
 import { sha256Hex } from '../src/core/sha256.js';
 import { resolveAddr } from '../src/tools/names.js';
 import * as C from '../src/core/constants.js';
@@ -40,6 +40,14 @@ function loadProjectConfig(dir = process.cwd()) {
   const p = path.join(dir, 'vly.json');
   if (!fs.existsSync(p)) return null;
   try { return { ...JSON.parse(fs.readFileSync(p, 'utf8')), _dir: dir }; } catch (e) { throw new CliError(`vly.json is not valid JSON: ${e.message}`); }
+}
+
+/** The vly.json of the project around a file or folder (the nearest one up the tree), or null. */
+function nearestConfig(target) {
+  let dir = path.resolve(target || '.');
+  if (fs.existsSync(dir) && !fs.statSync(dir).isDirectory()) dir = path.dirname(dir);
+  while (!fs.existsSync(path.join(dir, 'vly.json')) && path.dirname(dir) !== dir) dir = path.dirname(dir);
+  return fs.existsSync(path.join(dir, 'vly.json')) ? loadProjectConfig(dir) : null;
 }
 
 function defaultEntry() {
@@ -82,6 +90,32 @@ function projectInfo(target) {
   if (m) for (const line of m[2].split('\n')) { const t = /^\s*(?:[-*]|\d+[.)])\s*(?:\[[ xX]\]\s*)?(.+?)\s*$/.exec(line); if (t && checklist.length < 15) checklist.push(t[1].slice(0, 160)); }
   out.brief = { present: fs.existsSync(brief), chars: briefText.trim().length, checklist };
   return out;
+}
+
+/** After publishing: open the play page, fetch the cartridge as a player would, compare it with what we sent, and press START on it. */
+async function verifyPublished(site, j, rom) {
+  const lines = []; let ok = true;
+  const bad = (m) => { ok = false; lines.push(`  FAIL  ${m}`); };
+  const good = (m) => lines.push(`  ok    ${m}`);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const page = await fetch(j.play_url, { cache: 'no-store' });
+      if (!page.ok) { if (attempt === 2) bad(`the play page answered ${page.status}`); else continue; } else if (attempt === 0 || !lines.length) good('the play page opens');
+      const r = await fetch(`${site}/api/cart?game=${j.game_id}`, { cache: 'no-store' });
+      if (!r.ok) { if (attempt === 2) bad(`the cartridge fetch answered ${r.status}`); else continue; }
+      else {
+        const got = new Uint8Array(await r.arrayBuffer());
+        const rev = r.headers.get('x-revision');
+        if (rev && String(j.revision) !== rev) bad(`the server serves revision ${rev}, not ${j.revision}`); else good(`revision ${j.revision} is what players get`);
+        if (sha256Hex(got) !== sha256Hex(rom)) bad('the cartridge players get is not the one that was uploaded'); else good('the cartridge is byte-identical to the one built here');
+        const idle = runCartridge(got, { frames: 120, input: '' }), started = runCartridge(got, { frames: 120, input: 'START@20' });
+        if (idle.frameHash === started.frameHash && idle.stateHash === started.stateHash) lines.push('  note  pressing START changed nothing on the title (the game may start another way)'); else good('START does something');
+      }
+      break;
+    } catch (e) { if (attempt === 2) bad(`could not verify (${e.cause?.code || e.message})`); }
+    await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+  }
+  return { ok, lines };
 }
 
 async function loadCart(target) {
@@ -133,7 +167,7 @@ export const commands = {
       if (args.flags.asm && b.asm) fs.writeFileSync(out.replace(/\.vlc$/, '') + '.asm', b.asm);
       fs.writeFileSync(mapFile, JSON.stringify({ size: b.bytes.length, ram: b.stats?.ram || {}, functions: fnInfo }, null, 2));
       const symbols = Object.fromEntries(Object.entries(b.symbols || {}).filter(([k, s]) => s.kind === 'label' && !/^L\d+$/.test(k) && !k.endsWith('__ret')).map(([k, s]) => [k, s.addr]));
-      const data = { out, map: mapFile, size: sizeReport(b.bytes.length), warnings: b.warnings || [], problems, kind: b.kind, ram: b.stats?.ram, functionBytes: b.stats?.functionBytes, flatBytes: b.stats?.flatBytes, flatLimit: b.stats?.flatLimit, bankBytes: b.stats?.bankBytes, autoBanked: b.stats?.autoBanked, ...(args.flags.symbols ? { symbols } : {}) };
+      const data = { out, map: mapFile, size: sizeReport(b.bytes.length), warnings: b.warnings || [], problems, kind: b.kind, ram: b.stats?.ram, functionBytes: b.stats?.functionBytes, flatBytes: b.stats?.flatBytes, flatLimit: b.stats?.flatLimit, bankBytes: b.stats?.bankBytes, autoBanked: b.stats?.autoBanked, assets: b.stats?.assets, ...(args.flags.symbols ? { symbols } : {}) };
       let text = `built ${out} (${b.bytes.length} bytes, ${data.size.banks} bank${data.size.banks === 1 ? '' : 's'}, ${data.size.percent}% of 1 MB)`;
       if (b.stats?.flatBytes) {
         // how close the program is to the limits that matter
@@ -142,6 +176,11 @@ export const commands = {
         const banks = Object.entries(b.stats.bankBytes || {}).map(([n, v]) => `bank ${n}: ${v}/8192`).join(', ');
         text += `\n${lim === 16384 ? 'always-visible region' : 'flat region'}: ${b.stats.flatBytes}/${lim} bytes (${Math.round(b.stats.flatBytes / lim * 100)}%)${banks ? '; ' + banks : ''}`;
         if (moved.length) text += `\nmoved to banks to make room: ${moved.map(([n, bk]) => `${n} (${bk})`).join(', ')}`;
+        // what takes the space: the biggest assets (and where they live), then the biggest functions
+        const assets = [...(b.stats.assets || [])].sort((x, y) => y.bytes - x.bytes).slice(0, 8);
+        if (assets.length) text += `\nbiggest assets: ${assets.map((a) => `${a.name} ${a.bytes} B (${a.bank === null ? 'always visible' : 'bank ' + a.bank})`).join(', ')}`;
+        const fns = Object.entries(b.stats.functionBytes || {}).filter(([k]) => !k.startsWith('__')).sort((x, y) => y[1] - x[1]).slice(0, 5);
+        if (fns.length) text += `\nbiggest functions: ${fns.map(([k, v]) => `${k} ${v} B`).join(', ')}`;
       }
       for (const w of data.warnings) text += `\nwarning: ${w}`;
       for (const p of problems) text += `\nPROBLEM: ${p}`;
@@ -339,14 +378,17 @@ export const commands = {
   },
 
   export: {
-    help: 'vly export <cart or source> [--html out.html] [--title "Name"]\n  Package a cartridge as ONE self-contained HTML file (emulator, cartridge, touch controls, sound, saves).',
+    help: 'vly export <cart or source> [--html out.html] [--title "Name"] [--id stable-id] [--legacy-id old1,old2]\n  Package a cartridge as ONE self-contained HTML file (emulator, cartridge, touch controls, sound, saves).\n  Saves live in the browser under a key. By default it comes from the cartridge hash, so every release starts with an empty save; set "id" in vly.json (or --id)\n  to keep saves across releases, and list older keys in "legacyIds" (or --legacy-id) to carry a previous release\'s saves forward.',
     async run(args) {
       const { rom } = await loadCart(args._[0]);
       const { exportHtml } = await import('../src/export/index.js');
       const base = path.basename(args._[0]).replace(/\.[^.]+$/, '');
       const out = args.flags.html || args.flags.out || `${base}.html`;
       const title = args.flags.title || base;
-      const html = exportHtml(rom, { title, description: args.flags.description });
+      const cfg = nearestConfig(args._[0]);
+      const id = args.flags.id || cfg?.id;                                                  // a stable game id keeps players' saves across releases
+      const legacyIds = [...String(args.flags['legacy-id'] || '').split(',').filter(Boolean), ...((cfg && cfg.legacyIds) || [])];
+      const html = exportHtml(rom, { title, description: args.flags.description, id, legacyIds });
       fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
       fs.writeFileSync(out, html);
       return { text: `wrote ${out} (${(html.length / 1024).toFixed(0)} KB). Open it in any browser, or host it anywhere as a static file.`, data: { out, bytes: html.length, title } };
@@ -354,7 +396,7 @@ export const commands = {
   },
 
   publish: {
-    help: 'vly publish <cart or source> [--title "Name"] [--no-sources] [--site URL] [--new] [--dry-run]\n  Upload the cartridge to the VLY-1 site and print a play link (no account). It uploads the game, so ask the person first.\n  Run again in the same folder to revise the same game (the edit token is kept in .vly-publish.json: do not commit it).\n  The text files of src/ and assets/ go along so the game can be fetched back; --no-sources leaves them out; --dry-run shows what would be sent.',
+    help: 'vly publish <cart or source> [--title "Name"] [--no-sources] [--no-verify] [--site URL] [--new] [--dry-run]\n  Upload the cartridge to the VLY-1 site and print a play link (no account). It uploads the game, so ask the person first.\n  Run again in the same folder to revise the same game (the edit token is kept in .vly-publish.json: do not commit it).\n  The text files of src/ and assets/ go along so the game can be fetched back; --no-sources leaves them out; --dry-run shows what would be sent.',
     async run(args) {
       const { rom } = await loadCart(args._[0]);
       const site = String(args.flags.site || process.env.VLY_SITE || 'https://vly-1.vercel.app').replace(/\/$/, '');
@@ -376,9 +418,93 @@ export const commands = {
       catch (e) { throw new CliError(`could not reach ${site} (${e.cause?.code || e.message}). Nothing was published. Ask the person to allow the network request, or hand them the game as a file: vly export ${args._[0]} --html game.html`); }
       let j; try { j = await res.json(); } catch { throw new CliError(`${site} answered ${res.status} with something that is not JSON; nothing was published`); }
       if (!res.ok || !j.ok) throw new CliError(`not published: ${j.error || (j.errors && j.errors[0] && j.errors[0].message) || res.status}`);
+      // Prove the link works for a player: the page opens, the cartridge that comes back is the one we sent (revision and hash), and pressing START does something.
+      let verify = { ok: true, lines: [] };
+      if (!args.flags['no-verify']) verify = await verifyPublished(site, j, rom);
       if (j.edit_token) fs.writeFileSync(stateFile, JSON.stringify({ site, game_id: j.game_id, edit_token: j.edit_token, play_url: j.play_url }, null, 2) + '\n');
       const text = `${body.game_id ? 'revised' : 'published'} ${j.title} (revision ${j.revision})\nplay:  ${j.play_url}\nbuy:   ${j.buy_url}  (not on sale yet: promise no price or date)\nexpires: ${j.expires_at ? j.expires_at.slice(0, 10) : 'never'}${j.edit_token ? '\nthe edit token is saved in .vly-publish.json (keep it out of git); run this command again to revise' : ''}`;
-      return { text, data: { play_url: j.play_url, buy_url: j.buy_url, game_id: j.game_id, revision: j.revision, expires_at: j.expires_at, warnings: j.warnings || [] } };
+      const full = text + (verify.lines.length ? '\n' + verify.lines.join('\n') : '');
+      if (!verify.ok) throw new CliError(`${full}\nThe game was published, but the link did not verify. Do not hand the link over yet: retry (vly publish again), or give the person the offline file (vly export).`);
+      return { text: full, data: { play_url: j.play_url, buy_url: j.buy_url, game_id: j.game_id, revision: j.revision, expires_at: j.expires_at, warnings: j.warnings || [], verified: !args.flags['no-verify'] } };
+    },
+  },
+
+  release: {
+    help: 'vly release [--title "Name"] [--site URL] [--no-publish] [--html out.html]\n  The whole release in one command, stopping at the first failure: build, run the tests, quality check, load every previous release\'s save and keep playing,\n  print the project\'s own report (tests/report.mjs, if any), publish and verify the play link (unless --no-publish), and write an offline copy with a stable save key.\n  Previous releases\' saves: files in tests/legacy-saves/*.sav, or "legacySaves" in vly.json.',
+    async run(args) {
+      const cfg = loadProjectConfig() || {};
+      const lines = []; let failed = false;
+      const step = (ok, name, detail = '') => { lines.push(`${ok ? '  ok    ' : '  FAIL  '}${name}${detail ? ': ' + detail : ''}`); if (!ok) failed = true; return ok; };
+      const entry = defaultEntry();
+      // 1. build
+      let rom, outPath;
+      try {
+        const r = await commands.build.run({ _: [], flags: {} });
+        outPath = r.data.out; rom = new Uint8Array(fs.readFileSync(outPath));
+        step(true, 'build', `${rom.length} bytes (${r.data.size.percent}% of 1 MB)`);
+      } catch (e) { step(false, 'build', e.message.split('\n')[0]); return { text: lines.join('\n'), ok: false, exitCode: 1 }; }
+      // 2. tests
+      if (fs.existsSync('vly.json') && (cfg.tests || []).length) {
+        const t = await commands.test.run({ _: [], flags: {} });
+        step(t.ok, 'tests', `${t.data.pass} passed, ${t.data.fail} failed`);
+        if (!t.ok) lines.push(t.text.split('\n').filter((l) => /^FAIL|^ {6}/.test(l)).slice(0, 12).join('\n'));
+      } else step(true, 'tests', 'none in vly.json (add some: every behaviour needs one)');
+      // 3. quality check
+      if (!failed) {
+        const project = projectInfo(entry);
+        const r = checkCartridge(rom, { frames: 3600, ...project });
+        step(r.ok, 'quality check', r.summary);
+        for (const c of r.checks.filter((c) => c.status === 'fail' || c.status === 'warn')) lines.push(`        ${c.status.toUpperCase()}  ${c.id}: ${c.message}`);
+      }
+      // 4. a previous release's save, then keep playing
+      const legacy = [...(cfg.legacySaves || []), ...(fs.existsSync('tests/legacy-saves') ? fs.readdirSync('tests/legacy-saves').filter((f) => f.endsWith('.sav')).map((f) => path.join('tests/legacy-saves', f)) : [])];
+      if (!legacy.length) lines.push('  note  no previous release\'s save to try: put one in tests/legacy-saves/ (a save made by the last release), so "update the game, keep the players\' progress" is tested');
+      for (const f of [...new Set(legacy)]) {
+        try {
+          const save = new Uint8Array(fs.readFileSync(f));
+          if (save.length !== 1024) { step(false, `old save ${f}`, `not a 1024-byte save (it is ${save.length} bytes)`); continue; }
+          const m = new Machine(rom, { save }); m.boot();
+          for (let i = 0; i < 20; i++) m.runFrame(0);
+          const saw = (m.status & C.ST_SAVE_LOADED) !== 0;
+          const r = runCartridge(rom, { frames: 900, input: 'START@30,A@60,RIGHT@90-200', save });
+          const faults = Object.entries(r.faults).filter(([, n]) => n > 0).map(([k]) => k);
+          step(saw && !faults.length, `old save ${f}`, !saw ? 'the machine did not load this save' : faults.length ? `faults after loading it: ${faults.join(', ')}` : 'loaded, and the game ran on from it');
+          // does the game actually use it? (a game that ignores or rejects the save looks the same as a fresh start)
+          const withSave = runCartridge(rom, { frames: 60, input: '', save }), fresh = runCartridge(rom, { frames: 60, input: '' });
+          if (withSave.frameHash === fresh.frameHash) lines.push(`        note  the first screen looks the same with this save as without: if the game should show its progress, add a vly.json test that loads it ("save": "${f}") and checks a value`);
+        } catch (e) { step(false, `old save ${f}`, e.message); }
+      }
+      // 5. the project's own report (difficulty, par, routes: whatever the genre needs)
+      if (fs.existsSync('tests/report.mjs')) {
+        const { spawnSync } = await import('node:child_process');
+        const rep = spawnSync('node', ['tests/report.mjs'], { encoding: 'utf8', timeout: 300000 });
+        lines.push(`  report (tests/report.mjs${rep.status ? `, exit ${rep.status}` : ''}):`);
+        lines.push((rep.stdout || rep.stderr || '').trimEnd().split('\n').map((l) => '        ' + l).join('\n'));
+        if (rep.status) failed = true;
+      }
+      if (failed) return { text: lines.join('\n') + '\n\nnot released: fix the failures above.', ok: false, exitCode: 1 };
+      // 5b. what the player experiences: the opening 30 seconds, with sound, as a picture and a WAV (tests/opening.input, if you have one, drives it)
+      try {
+        fs.mkdirSync('release', { recursive: true });
+        const flags = { frames: '1800', gif: 'release/opening.gif', 'gif-every': '4', wav: 'release/opening.wav', scale: '2' };
+        if (fs.existsSync('tests/opening.input')) flags['input-file'] = 'tests/opening.input';
+        await commands.run.run({ _: [outPath], flags });
+        lines.push(`  ok    the opening 30 seconds recorded: release/opening.gif and release/opening.wav (look at it and listen: title, art, instructions, the pauses between screens)${flags['input-file'] ? '' : '; add tests/opening.input to press the buttons a new player would'}`);
+      } catch (e) { lines.push(`  note  could not record the opening: ${e.message.split('\n')[0]}`); }
+      // 6. publish and verify, 7. offline copy
+      let play = null;
+      if (!args.flags['no-publish']) {
+        try {
+          const r = await commands.publish.run({ _: [outPath], flags: { title: args.flags.title, site: args.flags.site, 'no-sources': false } });
+          lines.push(r.text.split('\n').map((l) => '  ' + l).join('\n')); play = r.data.play_url;
+        } catch (e) { lines.push(`  FAIL  publish: ${e.message.split('\n').slice(0, 6).join('\n        ')}`); failed = true; }
+      }
+      try {
+        const out = args.flags.html || `${path.basename(outPath, '.vlc')}.html`;
+        const r = await commands.export.run({ _: [outPath], flags: { html: out, title: args.flags.title } });
+        lines.push(`  ok    offline copy: ${out}${cfg.id ? ` (save key "${cfg.id}")` : ' (no "id" in vly.json: its save key follows the cartridge hash, so the next release will not see these saves)'}`);
+      } catch (e) { lines.push(`  FAIL  offline copy: ${e.message}`); failed = true; }
+      return { text: lines.join('\n') + (failed ? '\n\nreleased with problems (see FAIL).' : `\n\nreleased and verified${play ? `: ${play}` : ''}`), ok: !failed, exitCode: failed ? 1 : 0, data: { play_url: play } };
     },
   },
 
@@ -435,7 +561,7 @@ export const commands = {
   },
 
   check: {
-    help: 'vly check [cart.vlc|source] [--frames N] [--input-file path.input [--save file.sav]] [--json]\n  Quality gates: plays the game with no input, with START, and with a careless player for N frames (default 7200, two\n  minutes), and reports faults, cycle budget, whether it is alive, sound, sprite use, text covered by sprites and variety.\n  Every WARN is a bug to fix or a decision to explain; any FAIL means it is not finished. Exit code 1 on a FAIL.',
+    help: 'vly check [cart.vlc|source] [--frames N] [--input-file path.input [--save file.sav]] [--save-input trace.input] [--json]\n  Quality gates: plays the game with no input, with START, and with a careless player for N frames (default 7200, two\n  minutes), and reports faults, cycle budget, whether it is alive, sound, sprite use, text covered by sprites and variety.\n  Every WARN is a bug to fix or a decision to explain; any FAIL means it is not finished. Exit code 1 on a FAIL.',
     async run(args) {
       if (!args._[0] && fs.existsSync('vly.json')) { try { const cfg = JSON.parse(fs.readFileSync('vly.json', 'utf8')); if (cfg.entry) args._[0] = cfg.entry; } catch { /* fall through to the error below */ } }
       const { rom } = await loadCart(args._[0]);
@@ -445,6 +571,7 @@ export const commands = {
       const save = args.flags.save ? new Uint8Array(fs.readFileSync(args.flags.save)) : null;
       const project = projectInfo(args._[0]);
       const r = checkCartridge(rom, { frames, script, save, ...project });
+      if (args.flags['save-input']) fs.writeFileSync(String(args.flags['save-input']), monkeyScript(12345, frames));
       const mark = { pass: 'PASS', warn: 'WARN', fail: 'FAIL', info: 'INFO' };
       let text = `quality check (${Math.round(frames / 60)} s of careless play): ${r.verdict.toUpperCase()}, ${r.summary}\n`;
       for (const c of r.checks) text += `  ${mark[c.status]}  ${c.id}: ${c.message}${c.hint ? `\n        -> ${c.hint}` : ''}\n`;
@@ -539,7 +666,7 @@ export const commands = {
   },
 
   new: {
-    help: 'vly new <dir> [--template hello|game|pong|battle|platformer|puzzle|shooter] [--force]\n  Create a starter project.',
+    help: 'vly new <dir> [--template hello|game|pong|battle|platformer|puzzle|shooter|flow] [--force]\n  Create a starter project.',
     async run(args) {
       const dir = args._[0];
       if (!dir) throw new CliError('usage: vly new <dir>');

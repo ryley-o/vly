@@ -1,0 +1,181 @@
+{
+  "size": 3202,
+  "ram": {
+    "r": {
+      "addr": 46080,
+      "bytes": 2,
+      "type": "word"
+    },
+    "cf_map": {
+      "addr": 46082,
+      "bytes": 2,
+      "type": "word"
+    },
+    "cf_col": {
+      "addr": 46084,
+      "bytes": 2,
+      "type": "word"
+    },
+    "cf_row": {
+      "addr": 46086,
+      "bytes": 2,
+      "type": "word"
+    },
+    "cf_sel": {
+      "addr": 46088,
+      "bytes": 2,
+      "type": "word"
+    },
+    "cf_w": {
+      "addr": 46090,
+      "bytes": 2,
+      "type": "word"
+    },
+    "font_base": {
+      "addr": 46092,
+      "bytes": 2,
+      "type": "word"
+    },
+    "ui_base": {
+      "addr": 46094,
+      "bytes": 2,
+      "type": "word"
+    },
+    "text_pal": {
+      "addr": 46096,
+      "bytes": 2,
+      "type": "word"
+    },
+    "pg_base": {
+      "addr": 46098,
+      "bytes": 2,
+      "type": "word"
+    },
+    "bt_c": {
+      "addr": 46100,
+      "bytes": 16,
+      "type": "word[]"
+    },
+    "bt_f": {
+      "addr": 46116,
+      "bytes": 16,
+      "type": "word[]"
+    },
+    "bt_n": {
+      "addr": 46132,
+      "bytes": 16,
+      "type": "word[]"
+    },
+    "bt_rel": {
+      "addr": 46148,
+      "bytes": 16,
+      "type": "word[]"
+    }
+  },
+  "functions": {
+    "init": {
+      "addr": 42,
+      "bytes": 80
+    },
+    "frame": {
+      "addr": 122,
+      "bytes": 174
+    },
+    "load_font": {
+      "addr": 296,
+      "bytes": 56
+    },
+    "ui_init": {
+      "addr": 352,
+      "bytes": 44
+    },
+    "lcd": {
+      "addr": 396,
+      "bytes": 18
+    },
+    "confirm_open": {
+      "addr": 414,
+      "bytes": 276
+    },
+    "bt_update": {
+      "addr": 690,
+      "bytes": 210
+    },
+    "confirm_update": {
+      "addr": 900,
+      "bytes": 166
+    },
+    "bt_tap": {
+      "addr": 1066,
+      "bytes": 72
+    },
+    "bt_hold": {
+      "addr": 1138,
+      "bytes": 108
+    },
+    "grade_for": {
+      "addr": 1246,
+      "bytes": 190
+    },
+    "pg_record": {
+      "addr": 1436,
+      "bytes": 66
+    },
+    "pg_get": {
+      "addr": 1502,
+      "bytes": 72
+    },
+    "load_tiles": {
+      "addr": 1574,
+      "bytes": 52
+    },
+    "ui_strlen": {
+      "addr": 1626,
+      "bytes": 56
+    },
+    "max": {
+      "addr": 1682,
+      "bytes": 36
+    },
+    "ui_box": {
+      "addr": 1718,
+      "bytes": 374
+    },
+    "put_text": {
+      "addr": 2092,
+      "bytes": 208
+    },
+    "confirm_draw_choices": {
+      "addr": 2300,
+      "bytes": 240
+    },
+    "btn": {
+      "addr": 2540,
+      "bytes": 38
+    },
+    "btnp": {
+      "addr": 2578,
+      "bytes": 38
+    },
+    "bt_i": {
+      "addr": 2616,
+      "bytes": 60
+    },
+    "pg_set": {
+      "addr": 2676,
+      "bytes": 134
+    },
+    "save_get8": {
+      "addr": 2810,
+      "bytes": 22
+    },
+    "ui_cell": {
+      "addr": 2832,
+      "bytes": 66
+    },
+    "save_set8": {
+      "addr": 2898,
+      "bytes": 26
+    }
+  }
+}

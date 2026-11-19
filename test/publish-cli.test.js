@@ -16,22 +16,27 @@ const run = (cwd, ...args) => new Promise((resolve) => {
   p.on('close', (status) => resolve({ status, out }));
 });
 
-test('vly publish: sends the cartridge, saves the token, revises the same game next time, and reports an unreachable site', async () => {
+test('vly publish: sends the cartridge, verifies the play link, saves the token, revises the same game next time, and reports an unreachable site', async (t) => {
   const seen = [];
+  let stored = null;
   const server = http.createServer((req, res) => {
     let b = ''; req.on('data', (d) => { b += d; });
     req.on('end', () => {
+      if (req.method === 'GET' && req.url.startsWith('/g/')) { res.setHeader('content-type', 'text/html'); return res.end('<html>play</html>'); }
+      if (req.method === 'GET' && req.url.startsWith('/api/cart')) { res.setHeader('x-revision', String(stored.revision)); return res.end(Buffer.from(stored.rom)); }
       const j = JSON.parse(b); seen.push(j);
+      stored = { rom: Buffer.from(j.cartridge_base64, 'base64'), revision: j.game_id ? 2 : 1 };
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify(j.game_id
-        ? { ok: true, game_id: j.game_id, title: j.title, revision: 2, play_url: 'http://x/g/' + j.game_id, buy_url: 'http://x/buy', expires_at: '2030-01-01T00:00:00Z' }
-        : { ok: true, game_id: 'gabc', title: j.title, revision: 1, play_url: 'http://x/g/gabc', buy_url: 'http://x/buy', expires_at: '2030-01-01T00:00:00Z', edit_token: 'secret-token' }));
+        ? { ok: true, game_id: j.game_id, title: j.title, revision: 2, play_url: `${site}/g/` + j.game_id, buy_url: 'http://x/buy', expires_at: '2030-01-01T00:00:00Z' }
+        : { ok: true, game_id: 'gabc', title: j.title, revision: 1, play_url: `${site}/g/gabc`, buy_url: 'http://x/buy', expires_at: '2030-01-01T00:00:00Z', edit_token: 'secret-token' }));
     });
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const site = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => server.close());
+  var site = `http://127.0.0.1:${server.address().port}`;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-pub-'));
-  const b = await buildText({ text: 'var n;\nfunc init() { load_font(0); lcd(LCD_BG); text(1, 1, "HI"); }\nfunc frame() { n++; print_u(1, 3, n); }', filename: 'main.vly', baseDir: '/nonexistent' });
+  const b = await buildText({ text: 'var n;\nfunc init() { load_font(0); lcd(LCD_BG); text(1, 1, "HI"); }\nfunc frame() { n++; if (btnp(BTN_START)) { n = 500; } print_u(1, 3, n); }', filename: 'main.vly', baseDir: '/nonexistent' });
   fs.writeFileSync(path.join(dir, 'game.vlc'), b.bytes);
   fs.mkdirSync(path.join(dir, 'src')); fs.writeFileSync(path.join(dir, 'src', 'main.vly'), 'func frame() {}');
 
@@ -40,7 +45,10 @@ test('vly publish: sends the cartridge, saves the token, revises the same game n
 
   const first = await run(dir, 'publish', 'game.vlc', '--title', 'My Game', '--site', site);
   assert.equal(first.status, 0, first.out);
-  assert.match(first.out, /play:\s+http:\/\/x\/g\/gabc/);
+  assert.match(first.out, /play:\s+http:\/\/127\.0\.0\.1:\d+\/g\/gabc/);
+  assert.match(first.out, /ok\s+revision 1 is what players get/);
+  assert.match(first.out, /ok\s+the cartridge is byte-identical/);
+  assert.match(first.out, /ok\s+START does something/);
   assert.equal(seen[0].title, 'MY GAME');
   assert.equal(Buffer.from(seen[0].cartridge_base64, 'base64').length, b.bytes.length, 'the cartridge goes up as it is');
   assert.ok(seen[0].files['src/main.vly'], 'sources were asked for');
@@ -49,8 +57,6 @@ test('vly publish: sends the cartridge, saves the token, revises the same game n
   const second = await run(dir, 'publish', 'game.vlc', '--site', site);
   assert.match(second.out, /revised/);
   assert.equal(seen[1].game_id, 'gabc'); assert.equal(seen[1].edit_token, 'secret-token');
-  server.close();
-
   const down = await run(dir, 'publish', 'game.vlc', '--site', 'http://127.0.0.1:1', '--new');
   assert.equal(down.status, 1);
   assert.match(down.out, /could not reach.*Nothing was published.*vly export/s);

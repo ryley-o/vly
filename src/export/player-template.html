@@ -48,7 +48,7 @@ button.k.down { background: var(--btn-down); }
   var WASM = "__WASM_BASE64__";
   var ROM = "__ROM_BASE64__";
   var BOOT = "__BOOT_BASE64__", BOOT_FRAMES = __BOOT_FRAMES__;   // the VLY-1 logo cartridge runs first, then the game starts fresh
-  var SAVE_KEY = "vly-save:__ROM_ID__";
+  var SAVE_KEY = "vly-save:__ROM_ID__", LEGACY_IDS = __LEGACY_IDS__;   // older keys whose saves are carried forward to this one
   function b64(s) { var bin = atob(s), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
   var canvas = document.getElementById("screen"), ctx = canvas.getContext("2d"), img = ctx.createImageData(160, 144);
   var keyMap = { ArrowUp: 1, ArrowDown: 2, ArrowLeft: 4, ArrowRight: 8, w: 1, s: 2, a: 4, d: 8, x: 16, k: 16, z: 32, j: 32, Enter: 64, " ": 64, Shift: 128, Backspace: 128 };
@@ -78,7 +78,10 @@ button.k.down { background: var(--btn-down); }
   function show(t) { document.getElementById("msgtext").textContent = t; document.getElementById("msg").className = "show"; }
 
   var saved = null;
-  try { var s = localStorage.getItem(SAVE_KEY); if (s) saved = b64(s); if (saved && saved.length !== 1024) saved = null; } catch (e) {}
+  try {
+    var s = localStorage.getItem(SAVE_KEY);
+    for (var li = 0; !s && li < LEGACY_IDS.length; li++) { s = localStorage.getItem("vly-save:" + LEGACY_IDS[li]); }   // a previous release's save
+    if (s) saved = b64(s); if (saved && saved.length !== 1024) saved = null; } catch (e) {}
 
   WebAssembly.instantiate(b64(WASM), {}).then(function (r) {
     var x = r.instance.exports, rom = b64(ROM);

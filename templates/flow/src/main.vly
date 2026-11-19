@@ -1,0 +1,175 @@
+// {{name}}: the front end every game needs, as one small working project. Learn from it; do not ship it as your game.
+//   splash -> menu (CONTINUE first when there is a save; NEW GAME asks before erasing, KEEP is the default)
+//   -> story -> the how-to page (always) -> a level grid -> a level, graded by turns against the minimum (par)
+// The pattern is the same on every menu, so it needs no explaining: UP/DOWN (or LEFT/RIGHT) move, A or START choose, B goes back.
+// Shows: std/ui menus, std/flow (confirm, per-level grades kept in the save, the grid cursor), pictograms instead of words.
+
+import "std/flow";
+
+tileset art = "../assets/gfx.tiles";
+
+const T = 100;                       // the pictograms live at tile 100..; the UI frame tiles at 60..
+const S_SPLASH = 0; const S_MENU = 1; const S_STORY = 2; const S_HOWTO = 3; const S_GRID = 4; const S_PLAY = 5; const S_CONFIRM = 6;
+const LEVELS = 12;
+
+var state;
+var t;                               // frames in this screen
+var has_save;                        // 1 when the save holds progress
+var menu_n;                          // how many items the menu has (1 or 2)
+var beaten;                          // levels beaten
+var next_level;                      // the first level not beaten yet
+var level;                           // the level being played
+var goal; var now; var turns; var pick;
+var done; var last_grade; var msg_t;
+table menu_all = { "CONTINUE", "NEW GAME" };
+table menu_new = { "NEW GAME" };
+
+func put_num(col, row, n) {          // a number of up to two digits, drawn with the font
+  var pal = text_pal << 12;
+  var tens = n / 10;
+  var tile = font_base;
+  if (tens > 0) { tile = (48 + tens - 32) + font_base + pal; }
+  poke(BG_MAP + (row * 32 + col) * 2, tile);
+  poke(BG_MAP + (row * 32 + col + 1) * 2, (48 + (n - tens * 10) - 32) + font_base + pal);
+}
+func centre(row, s) { put_text(BG_MAP, (20 - ui_strlen(s)) / 2, row, s); }
+func icon(col, row, tile) { poke(BG_MAP + (row * 32 + col) * 2, T + tile + (text_pal << 12)); }
+// A button pictogram: the letter in a small frame (3 x 3 cells). glyph is a font character, or 0 for the D-pad cross.
+func key_box(col, row, glyph) {
+  ui_box(BG_MAP, col, row, 3, 3);
+  if (glyph == 0) { icon(col + 1, row + 1, art_dpad); } else { poke(BG_MAP + ((row + 1) * 32 + col + 1) * 2, (glyph - 32) + font_base + (text_pal << 12)); }
+}
+func blink_a(col, row) {             // the quiet way to say "press A": the A frame blinks
+  if ((t >> 4) & 1) { ui_clear(BG_MAP, col, row, 3, 3); } else { key_box(col, row, 65); }
+}
+func par_for(l) {
+  var g = 4 + l * 3;
+  return g / 3 + (g - (g / 3) * 3);
+}
+func refresh() {                     // progress numbers from the save
+  has_save = save_valid() && pg_beaten(LEVELS) > 0;
+  beaten = pg_beaten(LEVELS);
+  next_level = pg_next(LEVELS);
+}
+
+func go(s) {
+  state = s; t = 0;
+  clear_bg();
+  text_pal = 0;
+  if (s == S_MENU) {
+    refresh();
+    if (has_save) { menu_n = 2; menu_open(BG_MAP, 4, 9, menu_all, 2); } else { menu_n = 1; menu_open(BG_MAP, 4, 9, menu_new, 1); }
+  }
+  if (s == S_STORY) {
+    centre(5, "YOUR STORY GOES");
+    centre(7, "HERE, IN A FEW");
+    centre(9, "SHORT LINES.");
+  }
+  if (s == S_HOWTO) {
+    centre(2, "HOW TO PLAY");
+    key_box(4, 5, 0);   put_text(BG_MAP, 9, 6, "MOVE");
+    key_box(4, 9, 65);  put_text(BG_MAP, 9, 10, "PICK");
+    key_box(4, 13, 66); put_text(BG_MAP, 9, 14, "BACK");
+  }
+  if (s == S_GRID) { refresh(); grid_open(4, LEVELS, next_level < LEVELS ? next_level : LEVELS - 1); draw_grid(); }
+  if (s == S_PLAY) { goal = 4 + level * 3; now = 0; turns = 0; pick = 0; done = 0; msg_t = 0; draw_play(); }
+}
+
+func draw_grid() {
+  clear_bg();
+  text_pal = 0;
+  centre(0, "LEVELS");
+  for (var i = 0; i < LEVELS; i++) {
+    var c = i - (i / 4) * 4;
+    var r = i / 4;
+    var x = c * 5;
+    var y = 2 + r * 5;
+    var open = i <= next_level;
+    text_pal = 2;
+    if (open) { text_pal = 0; }
+    if (i == grid_sel) { text_pal = 1; }
+    ui_box(BG_MAP, x, y, 5, 4);
+    put_num(x + 1, y + 1, i + 1);          // one digit sits in the middle of the cell, two are left of centre
+    if (open) {
+      if (pg_get(i) > 0) { put_text(BG_MAP, x + 1 + (3 - ui_strlen(grade_name(pg_get(i)))) / 2, y + 2, grade_name(pg_get(i))); }
+    } else { icon(x + 2, y + 2, art_lock); }
+  }
+  text_pal = 0;
+}
+func draw_play() {
+  clear_bg();
+  text_pal = 0;
+  put_text(BG_MAP, 5, 2, "LEVEL"); put_num(11, 2, level + 1);
+  put_text(BG_MAP, 5, 5, "GOAL");  put_num(11, 5, goal);
+  put_text(BG_MAP, 5, 7, "NOW");   put_num(11, 7, now);
+  put_text(BG_MAP, 5, 9, "TURNS"); put_num(11, 9, turns);
+  put_text(BG_MAP, 6, 12, "+1"); put_text(BG_MAP, 12, 12, "+3");
+  poke(BG_MAP + (12 * 32 + 5 + pick * 6) * 2, ui_base + ui_tiles_ui_cursor + (text_pal << 12));
+  if (done) { centre(15, grade_name(last_grade)); }
+  if (msg_t > 0) { put_text(BG_MAP, 6, 14, "TOO FAR"); }
+}
+
+func init() {
+  load_font(0);
+  ui_init(60);
+  load_tiles(art, T, art_COUNT);
+  bg_pal(0, rgb(1, 2, 5), rgb(6, 8, 12), rgb(11, 13, 15), rgb(15, 15, 15));
+  bg_pal(1, rgb(1, 2, 5), rgb(8, 7, 2), rgb(14, 12, 3), rgb(15, 15, 6));
+  bg_pal(2, rgb(1, 2, 5), rgb(2, 3, 6), rgb(4, 5, 8), rgb(6, 7, 10));
+  lcd(LCD_BG);
+  refresh();
+  go(S_SPLASH);
+  centre(8, "FLOW");
+}
+
+func frame() {
+  t++;
+  if (state == S_SPLASH) {
+    if (t == 1) { centre(8, "FLOW"); }
+    if (t >= 120 || btnp(BTN_A) || btnp(BTN_START)) { go(S_MENU); }
+  } else if (state == S_MENU) {
+    var m = menu_update();
+    if (m >= 0) {
+      var pickd = m;
+      if (menu_n == 1) { pickd = 1; }        // with no save the only item is NEW GAME
+      if (pickd == 0) { go(S_STORY); }
+      else if (has_save) { go(S_CONFIRM); confirm_open(BG_MAP, 2, 6, "ERASE SAVE?", "ALL GRADES GO"); }
+      else { go(S_STORY); }
+    }
+  } else if (state == S_CONFIRM) {
+    var c = confirm_update();
+    if (c == 0) { go(S_MENU); }
+    if (c == 1) { save_clear(); pg_save(); refresh(); go(S_STORY); }
+  } else if (state == S_STORY) {
+    blink_a(9, 14);
+    if (btnp(BTN_A) || btnp(BTN_START)) { go(S_HOWTO); }
+  } else if (state == S_HOWTO) {
+    if (btnp(BTN_A) || btnp(BTN_START)) { go(S_GRID); }
+  } else if (state == S_GRID) {
+    var before = grid_sel;
+    var g = grid_update(next_level);
+    if (grid_sel != before) { draw_grid(); }
+    if (g >= 0) { level = g; go(S_PLAY); }
+    if (g == -3) { /* a locked level: nothing happens (the lock says why) */ }
+  } else if (state == S_PLAY) {
+    if (msg_t > 0) { msg_t--; if (msg_t == 0) { draw_play(); } }
+    if (done) {
+      if (btnp(BTN_A) || btnp(BTN_START) || btnp(BTN_B)) { go(S_GRID); }
+    } else {
+      if (btnp(BTN_B)) { go(S_GRID); }
+      if (btnp(BTN_RIGHT) || btnp(BTN_LEFT) || btnp(BTN_UP) || btnp(BTN_DOWN)) { pick = 1 - pick; draw_play(); }
+      if (btnp(BTN_A) || btnp(BTN_START)) {
+        turns++;
+        now = now + 1 + pick * 2;
+        if (now > goal) { now = 0; msg_t = 50; }
+        if (now == goal) {
+          done = 1;
+          last_grade = grade_for(turns, par_for(level));
+          if (pg_record(level, last_grade)) { pg_save(); }
+          refresh();
+        }
+        draw_play();
+      }
+    }
+  }
+}

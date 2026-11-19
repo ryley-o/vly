@@ -11,12 +11,15 @@ vly docs language        # the language (read all of it, it is short)
 vly docs stdlib          # the functions you can call
 ```
 
-## 2. Start from a template
+## 2. Start from an empty project
 
 ```
-vly new mygame --template game     # a scrolling world; or --template hello
+vly new mygame        # an empty project. Never start by re-skinning a template or a sample game
 cd mygame
 ```
+
+The templates (`--template game|pong|battle|platformer|puzzle|shooter|flow`) and `games/` are to learn techniques from. `--template flow` is the exception that is meant to be copied: its
+front end (splash, menu, erase confirmation, how-to page, level grid, grades, saves) is the same in every game, so use it and make the game itself your own.
 
 ## 3. The edit loop
 
