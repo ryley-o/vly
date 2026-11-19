@@ -65,7 +65,8 @@ with `, marker`, spawn points (`level_P_X`, `level_P_Y`, `level_E_list`). Scan c
 
 The CPU always sees 16 KB of ROM plus one 8 KB bank at a time, but you rarely need to care: when code outgrows that,
 the compiler moves functions into banks by itself and `vly build` reports it. What you should do as a game grows is
-move art to a bank (`tileset art bank 3 = "art.tiles";` then `select_bank(bankof(art))` before loading). You can also
+move art and data to banks and let the compiler choose which (`tileset art bank auto = "art.tiles";` then `select_bank(bankof(art))` before loading; for 100 levels,
+`asset levels bank auto records 240 = incbin("levels.bin");` and `levels_load(i, buf)`). You can also
 place code yourself (`func title_screen() bank 4 { ... }`); a banked function cannot read data from a different bank.
 If something cannot fit, the error lists the biggest functions and why each one has to stay visible.
 

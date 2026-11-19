@@ -382,7 +382,7 @@ thinking game is reading time**: a bot that knows every answer finishes in a min
 each lock (20 to 60 seconds for a person) when you compare with the "10+ minutes" target, and give every lock a way forward (a hint) so nobody is stuck for good.
 
 **Long scrolling platformer (stages wider than a screen).** What worked in `games/ninja-chef` (three stages of 240 tiles, bosses, checkpoints):
-store each stage as **one byte per tile in a banked `asset`** written by a small generator script (`tools/mklevels.mjs`: ASCII rows in, `.bin` out), because a `tilemap`
+store each stage as **one byte per tile in a banked `asset`** (or, for many levels, `asset levels bank auto records 240 = incbin("levels.bin");` and `levels_load(i, grid)`: the compiler spreads them over banks, see `vly docs language`) written by a small generator script (`tools/mklevels.mjs`: ASCII rows in, `.bin` out), because a `tilemap`
 costs 2 bytes per cell in the always-visible 16 KB; copy the stage into RAM (or stream a column at a time as the camera moves) and test collisions against that. Keep the
 hero in whole pixels plus a sub-pixel remainder (a 1,920 px world does not fit in 8.8). Hand-tuned feel, measured with `--watch py,vx`: gravity 64, jump -1024,
 walk 384, terminal 1152 gave a 30 px held jump (14 frames to the peak, 30 airborne), a 10 px tap, full speed in 9 frames and a stop in 6; a 4-tile gap is the longest

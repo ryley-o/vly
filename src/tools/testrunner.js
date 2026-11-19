@@ -19,6 +19,7 @@ import path from 'node:path';
 import { runCartridge } from './run.js';
 import { buildFile } from './build.js';
 import { resolveAddr } from './names.js';
+import { faultSnapshot, firstFaultOf, formatSnapshot } from './snapshot.js';
 
 const num = (v) => (typeof v === 'number' ? v : parseInt(String(v), v && /^\s*0x/i.test(String(v)) ? 16 : 10));
 
@@ -26,10 +27,10 @@ export async function runSpecFile(specPath, { update = false, accept = false } =
   const abs = path.resolve(specPath);
   const dir = path.dirname(abs);
   const spec = JSON.parse(fs.readFileSync(abs, 'utf8'));
-  let rom, ram = {};
+  let rom, ram = {}, symbols;
   if (spec.src || spec.entry) {
     const b = await buildFile(path.resolve(dir, spec.src || spec.entry));
-    rom = b.bytes; ram = b.stats?.ram || {};
+    rom = b.bytes; ram = b.stats?.ram || {}; symbols = b.symbols;
   } else if (spec.cart) {
     const cp = path.resolve(dir, spec.cart);
     rom = new Uint8Array(fs.readFileSync(cp));
@@ -47,6 +48,7 @@ export async function runSpecFile(specPath, { update = false, accept = false } =
       if (t.save) save = new Uint8Array(fs.readFileSync(path.resolve(dir, t.save)));
       const input = [t.input || '', t.inputFile ? fs.readFileSync(path.resolve(dir, t.inputFile), 'utf8') : ''].filter(Boolean).join('\n');
       res = runCartridge(rom, { frames: t.frames ?? 60, input, save });
+      res._input = input; res._save = save;
     } catch (e) {
       results.push({ name: t.name, ok: false, failures: [`error: ${e.message}`] });
       continue;
@@ -90,7 +92,12 @@ export async function runSpecFile(specPath, { update = false, accept = false } =
     if (!t.allowFaults) {
       if (res.init.overran) failures.push(`init() ran out of its ${res.init.budget}-cycle budget`);
       const f = Object.entries(res.faults).filter(([, n]) => n > 0).map(([k, n]) => `${k} x${n} (first at frame ${res.firstFault[k]})`);
-      if (f.length) failures.push(`faults: ${f.join(', ')}`);
+      if (f.length) {
+        let why = '';
+        const first = firstFaultOf(res);
+        try { const snap = first && faultSnapshot(rom, { ...first, input: res._input, save: res._save, symbols, ram, watch: spec.watch }); if (snap) why = `\n    ${formatSnapshot(snap)}`; } catch { /* the explanation is extra */ }
+        failures.push(`faults: ${f.join(', ')}${why}`);
+      }
     }
     let note;
     if (stale.length) {

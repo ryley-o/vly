@@ -1,5 +1,6 @@
 // Quality gates: play a cartridge the way a careless player would, for a few minutes of game time, and report what a
 // reviewer would want to know. Every WARN is a bug to fix or a decision to explain; every FAIL blocks "finished".
+import { faultSnapshot, firstFaultOf, formatSnapshot } from './snapshot.js';
 import * as C from '../core/constants.js';
 import { toHex } from '../core/sha256.js';
 import { runCartridge, screenText } from './run.js';
@@ -152,7 +153,21 @@ export function checkCartridge(rom, o = {}) {
   // faults
   const faultOf = (r, careless) => Object.entries(r.faults).filter(([, n]) => n > 0).map(([k, n]) => `${k} x${n} (first at frame ${r.firstFault[k]}${careless ? `, while the careless player held ${maskName(describeMonkey(seed, r.firstFault[k] + 1).first.get(r.firstFault[k]) || 0)}` : ''})`);
   const faults = [...faultOf(idle), ...faultOf(started), ...faultOf(run, true), ...(script ? faultOf(script) : [])];
-  if (faults.length) add('faults', 'fail', `the machine reported faults: ${[...new Set(faults)].join('; ')}`, 'Division by zero, writing to read-only memory, an illegal instruction or running past the cycle budget. Replay the careless run with `vly check --save-input trace.input`, then `vly run build/x.vlc --input-file trace.input --frames <first frame + 1> --screenshot fault.png --watch <variables>`; or use vly run --trace.');
+  let snapshot = null;
+  if (faults.length) {
+    // the earliest fault over all the scenarios: replay that scenario up to it and say what the game was doing
+    const scenarios = [['the idle title', idle, '', null], ['START then A', started, 'START@30,A@120', null], ['the careless run', run, monkey, monkeyScript(seed, frames)], ...(script ? [['your recorded path', script, o.script, o.script]] : [])];
+    const first = scenarios.map(([name, r, input, text]) => ({ name, input, text, f: firstFaultOf(r) })).filter((x) => x.f).sort((a, b) => a.f.frame - b.f.frame)[0];
+    if (first) {
+      try {
+        snapshot = faultSnapshot(rom, { kind: first.f.kind, frame: first.f.frame, input: first.input, save: first.name === 'your recorded path' ? o.save || null : null, symbols: o.symbols, ram: o.ram, watch: o.watch });
+        if (snapshot) { snapshot.scenario = first.name; snapshot.inputText = first.text ?? first.input; }
+      } catch { /* the explanation is extra: never fail the check for it */ }
+    }
+  }
+  if (faults.length) add('faults', 'fail', `the machine reported faults: ${[...new Set(faults)].join('; ')}`, snapshot
+    ? `${formatSnapshot(snapshot)}\n        (found in ${snapshot.scenario}; the picture and the exact input are saved in build/ as check-fault.png and check-fault.input.\n        Replay it: vly run <your game> --input-file build/check-fault.input --frames ${snapshot.frame + 1} --screenshot s.png --watch <variables>)`
+    : 'Division by zero, writing to read-only memory, an illegal instruction or running past the cycle budget. Replay the careless run with `vly check --save-input trace.input`, then `vly run build/x.vlc --input-file trace.input --frames <first frame + 1> --screenshot fault.png --watch <variables>`; or use vly run --trace.');
   else add('faults', 'pass', `no faults in ${600 + 300 + frames + (script ? script.frames : 0)} frames of play (idle, START, ${Math.round(frames / 60)} s of careless input${script ? `, and your recorded path of ${Math.round(script.frames / 60)} s` : ''})`);
 
   // budget
@@ -224,6 +239,7 @@ export function checkCartridge(rom, o = {}) {
     ok: verdict !== 'fail', verdict,
     summary: `${checks.filter((c) => c.status === 'pass').length} passed, ${checks.filter((c) => c.status === 'warn').length} warnings, ${checks.filter((c) => c.status === 'fail').length} failed`,
     checks,
+    ...(snapshot ? { snapshot } : {}),
     stats: { frames, monkey_seed: seed, worst_frame_cycles: worst, avg_frame_cycles: run.cycles.avg, distinct_screens: screens.size, distinct_pictures: hashes.size, max_sprites: maxSprites },
   };
 }

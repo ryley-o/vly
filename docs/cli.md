@@ -62,6 +62,18 @@ identical hashes; use them to detect regressions) and any memory you asked for. 
 START SELECT` joined with `+`. Frames are a number, a range `10-20` (inclusive) or open-ended `30-`. Examples:
 `RIGHT@0-59`, `A+RIGHT@60-79, START@100`, `B@0-`. Add `/P` to press for one frame out of every `P`: `A@30-3000/3` mashes A (frames 30, 33, 36, ...), which is how to drive menus and dialogue. Frames are numbered from 0.
 
+## When something faults: what the game was doing
+
+`vly run`, `vly check` and `vly test` do not stop at "DIV0 at frame 6". They replay the run to the first fault (the machine is deterministic, so the replay is exact) and print the function it happened in, the calls that led there and the game's variables (the ones in `"watch"` first):
+
+```
+DIV0: the game divided by zero on frame 6, in compute() (inside a built-in routine, 0x00AC: DIV r0, r1)
+        called from tick
+        variables: state=7 d=0 enemies=[5,100,0,0]
+```
+
+`vly run` also saves the picture of that frame (`build/fault.png`); `vly check` saves the picture and the exact input of the careless run (`build/check-fault.png`, `build/check-fault.input`) so you can replay it with `vly run <game> --input-file build/check-fault.input --frames <frame + 1>`. `--json` has the same data as `snapshot`. Build from source (`vly check src/main.vly`) to get names: a bare `.vlc` only gives the address and the instruction.
+
 ## Projects: `vly.json`
 
 ```json
@@ -82,7 +94,8 @@ A test runs the program for `frames` with `input`, then checks `expect`:
 - `frameHash`, `stateHash`: the exact screen / machine state. Write `"auto"` and run `vly test --update` to record.
 - `maxCycles`: the busiest frame must stay under this.
 - `saves`: how many times the cartridge requested a save (`save_commit()`); `saveWords`: words of the last requested save by byte offset, e.g. `{ "0": 7 }`.
-- Faults (div by zero, bad opcode, ROM writes, overruns, init over budget) fail a test unless `"allowFaults": true`.
+- Faults (div by zero, bad opcode, ROM writes, overruns, init over budget) fail a test unless `"allowFaults": true`. The failure says where it happened, as in the next section.
+- `"watch": ["state", "level"]` (top level of `vly.json`): the variables to show first when something faults.
 - `"save": "file.sav"` starts the test from a save file.
 - `"inputFile": "tests/clear.input"` reads the input script from a file (in addition to `input`): newlines separate segments and `#` starts a comment. Use it for long inputs recorded by a bot (see `vly docs workflow`).
 

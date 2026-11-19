@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { buildFile, AsmError } from '../src/tools/build.js';
 import { runCartridge, asciiScreen } from '../src/tools/run.js';
 import { encodePNG, decodePNG, upscale } from '../src/tools/png.js';
+import { faultSnapshot, firstFaultOf, formatSnapshot } from '../src/tools/snapshot.js';
 import { encodeGif } from '../src/tools/gif.js';
 import { filmstrip, evenFrames } from '../src/tools/filmstrip.js';
 import { wavFromFloat } from '../src/core/audio.js';
@@ -74,7 +75,8 @@ function projectInfo(target) {
   if (fs.existsSync(dir) && !fs.statSync(dir).isDirectory()) dir = path.dirname(dir);
   while (!fs.existsSync(path.join(dir, 'vly.json')) && path.dirname(dir) !== dir) dir = path.dirname(dir);
   if (!fs.existsSync(path.join(dir, 'vly.json'))) return {};
-  const out = {};
+  const out = { dir };
+  try { const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'vly.json'), 'utf8')); if (Array.isArray(cfg.watch)) out.watch = cfg.watch.filter((x) => typeof x === 'string'); } catch { /* vly.json is checked elsewhere */ }
   try {
     const idx = loadOriginalityIndex();
     const self = ['templates', 'games'].map((g) => path.relative(path.join(ROOT, g), dir)).find((r) => r && !r.startsWith('..') && !r.includes(path.sep));
@@ -178,7 +180,7 @@ export const commands = {
         if (moved.length) text += `\nmoved to banks to make room: ${moved.map(([n, bk]) => `${n} (${bk})`).join(', ')}`;
         // what takes the space: the biggest assets (and where they live), then the biggest functions
         const assets = [...(b.stats.assets || [])].sort((x, y) => y.bytes - x.bytes).slice(0, 8);
-        if (assets.length) text += `\nbiggest assets: ${assets.map((a) => `${a.name} ${a.bytes} B (${a.bank === null ? 'always visible' : 'bank ' + a.bank})`).join(', ')}`;
+        if (assets.length) text += `\nbiggest assets: ${assets.map((a) => `${a.name} ${a.bytes} B (${a.bank === null ? 'always visible' : a.banks > 1 ? `banks ${a.bank}-${a.bank + a.banks - 1}${a.records ? `, ${a.records} records` : ''}` : 'bank ' + a.bank})`).join(', ')}`;
         const fns = Object.entries(b.stats.functionBytes || {}).filter(([k]) => !k.startsWith('__')).sort((x, y) => y[1] - x[1]).slice(0, 5);
         if (fns.length) text += `\nbiggest functions: ${fns.map(([k, v]) => `${k} ${v} B`).join(', ')}`;
       }
@@ -299,6 +301,17 @@ export const commands = {
         } catch { /* the frame list is advice; never fail the run for it */ }
       }
       text += `faults: ${faultList.length ? faultList.join(', ') : 'none'}\n`;
+      const firstF = firstFaultOf(r);
+      if (firstF) {                                         // what the game was doing at the first fault
+        try {
+          const snap = faultSnapshot(rom, { ...firstF, input: inputText(args), save, symbols: built?.symbols, ram });
+          if (snap) {
+            text += `  ${formatSnapshot(snap)}\n`;
+            data.snapshot = snap;
+            if (args.flags.screenshot === undefined && snap.rgba) { const f = args.flags['fault-shot'] || path.join('build', 'fault.png'); writePng(f, snap.rgba, 3); files.push(f); text += `  picture of that frame: ${f}\n`; }
+          }
+        } catch { /* the explanation is extra: never fail the run for it */ }
+      }
       text += `frame hash: ${r.frameHash}\nstate hash: ${r.stateHash}\n`;
       if (r.saves.length) text += `save requests: ${r.saves.length}\n`;
       r.mem.forEach((m, i) => { text += `mem ${mem[i].name} @ ${hex(m.addr)}: ${m.bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ')}${m.bytes.length === 2 ? `  (= ${m.bytes[0] | (m.bytes[1] << 8)})` : ''}\n`; });
@@ -564,13 +577,19 @@ export const commands = {
     help: 'vly check [cart.vlc|source] [--frames N] [--input-file path.input [--save file.sav]] [--save-input trace.input] [--json]\n  Quality gates: plays the game with no input, with START, and with a careless player for N frames (default 7200, two\n  minutes), and reports faults, cycle budget, whether it is alive, sound, sprite use, text covered by sprites and variety.\n  Every WARN is a bug to fix or a decision to explain; any FAIL means it is not finished. Exit code 1 on a FAIL.',
     async run(args) {
       if (!args._[0] && fs.existsSync('vly.json')) { try { const cfg = JSON.parse(fs.readFileSync('vly.json', 'utf8')); if (cfg.entry) args._[0] = cfg.entry; } catch { /* fall through to the error below */ } }
-      const { rom } = await loadCart(args._[0]);
+      const { rom, built } = await loadCart(args._[0]);
       const frames = int(args.flags.frames ?? 7200);
       if (!(frames >= 600 && frames <= 18000)) throw new CliError('--frames must be 600 to 18000');
       const script = inputText(args) || null;                              // --input / --input-file: a recorded path (a bot's winning run) to check as well
       const save = args.flags.save ? new Uint8Array(fs.readFileSync(args.flags.save)) : null;
       const project = projectInfo(args._[0]);
-      const r = checkCartridge(rom, { frames, script, save, ...project });
+      const r = checkCartridge(rom, { frames, script, save, symbols: built?.symbols, ram: built?.stats?.ram, ...project });
+      if (r.snapshot) {                                     // keep the evidence next to the build: the picture and the exact input
+        const dir = path.join(project.dir || process.cwd(), 'build');
+        fs.mkdirSync(dir, { recursive: true });
+        if (r.snapshot.rgba) writePng(path.join(dir, 'check-fault.png'), r.snapshot.rgba, 3);
+        fs.writeFileSync(path.join(dir, 'check-fault.input'), r.snapshot.inputText || '# no buttons pressed in this scenario\n');
+      }
       if (args.flags['save-input']) fs.writeFileSync(String(args.flags['save-input']), monkeyScript(12345, frames));
       const mark = { pass: 'PASS', warn: 'WARN', fail: 'FAIL', info: 'INFO' };
       let text = `quality check (${Math.round(frames / 60)} s of careless play): ${r.verdict.toUpperCase()}, ${r.summary}\n`;

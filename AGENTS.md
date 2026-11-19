@@ -72,8 +72,11 @@ same inputs = same pixels, so tests can check exact hashes.
 - Don't spend cycles redrawing text every frame; update when values change.
 - Reachable-only: unused functions and variables are dropped from the cartridge.
 - Big games just work: when code outgrows the 16 KB the CPU always sees, the compiler moves functions into ROM banks by
-  itself (`vly build` reports it). Put art in a bank once a game grows (`tileset art bank 3 = "art.tiles";` then
-  `select_bank(bankof(art))` before loading it); see "Banks" in `vly docs language`.
+  itself (`vly build` reports it). Put art and data in banks once a game grows, and let the compiler choose which:
+  `tileset art bank auto = "art.tiles";` (then `select_bank(bankof(art))` before loading it), and for many levels
+  `asset levels bank auto records 240 = incbin("levels.bin");` read with `levels_load(i, buf)`; see "Banks" in `vly docs language`.
+- When something faults, `vly run`, `vly check` and `vly test` say which function, which calls led there and the game's variables
+  (list the ones you care about as `"watch": [...]` in `vly.json`), and save the picture and the input to replay it.
 
 ## Report what hurt, send fixes
 

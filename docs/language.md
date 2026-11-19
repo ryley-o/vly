@@ -206,6 +206,27 @@ A cartridge is up to 1 MB, but the CPU has a 16-bit address space, so it sees th
   through a computed address with `peek`/`copy`, or contains `asm`). If that does not fit, the error lists the biggest
   functions and why each one has to stay.
 
+**Let the compiler choose the bank: `bank auto`.** Write `bank auto` instead of a number and the compiler packs your assets into banks itself (largest first, several small ones to a bank, never in a bank you named yourself). Read them from anywhere with `bank_peek8(bankof(x), x + i)`, or `str_get(NAME, NAME_BANK, ...)` for strings. Nothing is wasted in the cartridge but the room left in the last bank, and `vly build` prints what went where. Assets without `bank` stay in the always-visible 16 KB, which is the fastest to read (no bank switch), so keep small things you touch every frame there.
+
+```
+tileset art bank auto = "art.tiles";
+strings story bank auto = "story.txt";
+asset music bank auto = incbin("music.bin");
+```
+
+**Many levels or records: `records`.** An asset can be a table of fixed-size records, such as 200 levels of 240 bytes. It is spread over as many banks as it needs (whole records only, 34 of them to a bank here), and you read it by number without thinking about banks:
+
+```
+asset levels bank auto records 240 = incbin("levels.bin");   // a generator script writes levels.bin: 240 bytes per level
+...
+n = levels_load(7, grid);        // copy level 7 into RAM at grid (fast: use this at the start of a level)
+t = levels_peek8(i, j);          // byte j of level i, straight from ROM (about 60 cycles; fine for the odd read, not a loop of thousands)
+w = levels_peek(i, j);           // the word at byte j of level i
+levels_COUNT   levels_RECORD   levels_PER_BANK   // constants: records, bytes per record, records per bank
+```
+
+The file must be a whole number of records. A record size that does not divide 8192 well wastes room in every bank (3000-byte records leave 2192 of 8192 unused), and `vly build` warns when more than 1 KB per bank is lost: pad or split the records to a nicer size such as 2048, 1024 or 512. Up to about 1 MB (125 banks) fits.
+
 **Put art and data in a bank** once a game grows; it is the easiest room to make. (A `tilemap` is the exception: `.map` levels stay in the
 always-visible region, 2 bytes per cell, so a 240x17 level costs 8 KB. For a long level keep one tile per byte in a banked `asset` (a small
 generator script writes the `.bin`), `select_bank(bankof(level))` and read a column at a time, or use `std/stream`.)

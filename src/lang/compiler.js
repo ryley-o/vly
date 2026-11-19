@@ -181,7 +181,7 @@ class Ctx {
             for (const b of bodies) bytes.push(...b, 0);
             data = Uint8Array.from(bytes);
             this.syms.set(`${name}_COUNT`, { kind: 'constval', name: `${name}_COUNT`, value: lines.length, node: it, std });
-            this.syms.set(`${name}_BANK`, { kind: 'constval', name: `${name}_BANK`, value: it.bank ?? 0, node: it, std });
+            this.syms.set(`${name}_BANK`, { kind: 'constval', name: `${name}_BANK`, value: typeof it.bank === 'number' ? it.bank : 0, node: it, std });
           } else {
             const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
             const t = parseTilesText(text, it.path);
@@ -196,16 +196,77 @@ class Ctx {
           return;
         }
         sym.data = data;
-        this.syms.set(`${name}_SIZE`, { kind: 'constval', name: `${name}_SIZE`, value: w16(data.length), node: it, std });
+        if (it.records) this.declareRecords(it, sym, name, data, std);
+        else this.syms.set(`${name}_SIZE`, { kind: 'constval', name: `${name}_SIZE`, value: w16(data.length), node: it, std });
         if (it.bank !== null) {
-          if (it.bank < 3 || it.bank > 127) this.err(it, 'bank must be 3..127 (banks 0-2 are the flat region)');
-          if (data.length > 8192) this.err(it, `${it.path} is ${data.length} bytes; a banked asset must fit in one 8 KB bank${it.k === 'strings' ? ' (split the text over several strings files, each in its own bank)' : ''}`);
+          if (typeof it.bank === 'number' && (it.bank < 3 || it.bank > 127)) this.err(it, 'bank must be 3..127 (banks 0-2 are the flat region)');
+          if (data.length > 8192 && !it.records) this.err(it, `${it.path} is ${data.length} bytes; a banked asset must fit in one 8 KB bank${it.k === 'strings' ? ' (split the text over several strings files, each in its own bank)' : it.k === 'asset' ? ` (for a table of fixed-size entries, such as levels, write: asset ${name} bank auto records <bytes per entry> = incbin("${it.path}"); and the compiler spreads it over as many banks as it needs)` : ''}`);
         }
         break;
       }
       default: return;
     }
     this.syms.set(name, sym);
+  }
+
+  // asset NAME bank auto records R = incbin("file.bin"): R-byte records, as many per bank as fit, spread over consecutive banks.
+  // NAME_peek8(i, j), NAME_peek(i, j) and NAME_load(i, dst) read them from anywhere (they switch the bank and put it back).
+  declareRecords(it, sym, name, data, std) {
+    const R = it.records;
+    if (!data.length || data.length % R) { this.err(it, `${it.path} is ${data.length} bytes, which is not a whole number of ${R}-byte records`); return; }
+    const per = Math.floor(8192 / R), count = data.length / R, banks = Math.ceil(count / per);
+    if (banks > 120) { this.err(it, `${count} records of ${R} bytes need ${banks} banks; the cartridge has 125`); return; }
+    sym.records = R; sym.perBank = per; sym.count = count;
+    const waste = 8192 - per * R;
+    if (banks > 1 && waste >= 1024) this.warnings.push(`${it.file}:${it.line}: ${name}: ${R}-byte records leave ${waste} bytes of every bank unused (${per} fit in 8192). A record size of ${[...Array(R).keys()].map((k) => R - k).find((r) => 8192 % r === 0 || 8192 - Math.floor(8192 / r) * r < 512)} bytes or a divisor of 8192 would pack tighter`);
+    const c = (n, v) => this.syms.set(`${name}_${n}`, { kind: 'constval', name: `${name}_${n}`, value: w16(v), node: it, std });
+    c('COUNT', count); c('RECORD', R); c('PER_BANK', per);
+    const at = `bankof(${name}) + udiv(i, ${per})`, a = `16384 + umod(i, ${per}) * ${R}`;
+    this.loadSource([
+      `func ${name}_peek8(i, j) { return bank_peek8(${at}, ${a} + j); }`,
+      `func ${name}_peek(i, j) { return bank_peek(${at}, ${a} + j); }`,
+      `func ${name}_load(i, dst) { var prev = peek8(ROMBANK); select_bank(${at}); copy(dst, ${a}, ${R}); select_bank(prev); return ${R}; }`,
+    ].join('\n'), `<records ${name}>`, true);
+  }
+
+  // Give every `bank auto` asset a real bank: record tables get consecutive banks of their own, the others are packed together
+  // (largest first). Banks that something names explicitly are left alone.
+  packAutoBanks() {
+    const taken = new Set();
+    const autos = [];
+    for (const s of this.syms.values()) {
+      if (s.kind === 'func' && s.bank != null) taken.add(s.bank);
+      else if ((s.kind === 'asset' || s.kind === 'tileset' || s.kind === 'tilemap') && s.node && s.node.bank !== undefined) {
+        if (s.bank === 'auto') autos.push(s); else if (typeof s.bank === 'number') taken.add(s.bank);
+      }
+    }
+    if (!autos.length) return;
+    const isFree = (b) => b >= 3 && b <= 127 && !taken.has(b);
+    const sizeOf = (s) => (s.kind === 'tilemap' ? s.map.width * s.map.height * 2 : s.data.length);
+    const fail = (s) => this.err(s.node, 'the cartridge has no free ROM bank left for this (banks 3 to 127 are all in use)');
+    for (const s of autos.filter((a) => a.records)) {
+      const n = Math.ceil(s.count / s.perBank);
+      let first = 3;
+      for (; first + n - 1 <= 127; first++) { let ok = true; for (let b = first; b < first + n; b++) if (!isFree(b)) { ok = false; break; } if (ok) break; }
+      if (first + n - 1 > 127) { fail(s); continue; }
+      for (let b = first; b < first + n; b++) taken.add(b);
+      s.bank = first; s.node.bank = first; s.banks = n;
+    }
+    const bins = [];
+    const plain = autos.filter((a) => !a.records).sort((x, y) => sizeOf(y) - sizeOf(x));
+    for (const s of plain) {
+      const size = sizeOf(s);
+      let bin = bins.find((b) => b.room >= size);
+      if (!bin) {
+        let b = 3; while (b <= 127 && !isFree(b)) b++;
+        if (b > 127) { fail(s); continue; }
+        taken.add(b); bin = { bank: b, room: 8192 }; bins.push(bin);
+      }
+      bin.room -= size;
+      s.bank = bin.bank; s.node.bank = bin.bank;
+      const k = this.syms.get(`${s.name}_BANK`);
+      if (k) k.value = bin.bank;
+    }
   }
 
   suggest(name, extra = []) {
@@ -880,6 +941,8 @@ export function compile(source, opts = {}) {
   if (!opts.nostd) protect(() => ctx.loadSource(STDLIB_SOURCE, '<std>', true));
   protect(() => ctx.loadSource(source, file, false));
   if (errors.length) throw new CompileError(errors);
+  protect(() => ctx.packAutoBanks());
+  if (errors.length) throw new CompileError(errors);
 
   const frameSym = ctx.syms.get('frame');
   if (!frameSym || frameSym.kind !== 'func') errors.push({ file, line: 1, col: 1, message: 'missing required function: func frame() { ... } runs once per frame (60 times a second)' });
@@ -1064,11 +1127,17 @@ export function compile(source, opts = {}) {
   }
   for (const s of flat) out.push(`a_${s.name}:`, ...dbLines(s.data));
   out.push('__flat_end:');
-  const bankNums = [...new Set([...banked.map((x) => x.bank), ...bankedFns.map((x) => x.bank)])].sort((x, y) => x - y);
+  // a record table is cut into one piece per bank (as many whole records as fit)
+  const placed = banked.flatMap((s) => {
+    if (!s.records) return [{ bank: s.bank, label: `a_${s.name}`, data: s.data }];
+    const step = s.perBank * s.records;
+    return Array.from({ length: s.banks }, (_, i) => ({ bank: s.bank + i, label: i === 0 ? `a_${s.name}` : null, data: s.data.subarray(i * step, Math.min((i + 1) * step, s.data.length)) }));
+  });
+  const bankNums = [...new Set([...placed.map((x) => x.bank), ...bankedFns.map((x) => x.bank)])].sort((x, y) => x - y);
   for (const b of bankNums) {
     out.push(`.bank ${b}`, `__bank_${b}:`);
     for (const rec of bankedFns) if (rec.bank === b) out.push(...rec.lines);
-    for (const a of banked) if (a.bank === b) out.push(`a_${a.name}:`, ...dbLines(a.data));
+    for (const a of placed) if (a.bank === b) out.push(...(a.label ? [`${a.label}:`] : []), ...dbLines(a.data));
     out.push(`__bank_${b}_end:`);
   }
 
@@ -1082,7 +1151,7 @@ export function compile(source, opts = {}) {
     unused: warnings.length,
     globals: [...usedGlobals],
     ram: ramMap,
-    assets: [...flat, ...banked].map((a) => ({ name: a.name, kind: a.kind, bytes: a.data.length, bank: a.bank })),
+    assets: [...flat, ...banked].map((a) => ({ name: a.name, kind: a.kind, bytes: a.data.length, bank: a.bank, ...(a.records ? { banks: a.banks, records: a.count } : {}) })),
   };
   return { asm: out.join('\n') + '\n', warnings, stats };
 }

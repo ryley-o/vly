@@ -262,13 +262,24 @@ export function parse(src, file) {
         case 'asset': case 'tileset': case 'tilemap': case 'strings': {
           p++;
           const name = expectId('a name');
-          let bank = null;
+          let bank = null, records = null;
           if (isKw('bank')) {
             p++;
             const b = peek();
-            if (b.t !== 'num') err(b, 'bank needs a number (2..127)');
+            if (b.t === 'id' && b.v === 'auto') { bank = 'auto'; p++; }            // the compiler picks the bank (packs the assets of the program together)
+            else if (b.t === 'num') { bank = b.v; p++; }
+            else err(b, 'bank needs a number (3..127), or the word auto to let the compiler choose');
+          }
+          if (peek().t === 'id' && peek().v === 'records') {                       // asset NAME bank auto records 240 = incbin("levels.bin"): a table of fixed-size records spread over banks
+            const rw = peek();
+            if (t.v !== 'asset') err(rw, 'records N works with an asset: asset levels bank auto records 240 = incbin("levels.bin");');
             p++;
-            bank = b.v;
+            const n = peek();
+            if (n.t !== 'num' || n.v < 1 || n.v > 8192) err(n, 'records needs the size of one record in bytes (1 to 8192), for example: records 240');
+            p++;
+            records = n.v;
+            if (bank === null) bank = 'auto';
+            else if (bank !== 'auto') err(rw, 'records chooses its own banks: write bank auto records N, or leave bank out');
           }
           expectOp('=');
           let path;
@@ -288,7 +299,7 @@ export function parse(src, file) {
             path = s.v;
           }
           expectOp(';');
-          items.push({ k: t.v, name: name.v, bank, path, ...pos(name) });
+          items.push({ k: t.v, name: name.v, bank, ...(records ? { records } : {}), path, ...pos(name) });
           break;
         }
         case 'func': {
