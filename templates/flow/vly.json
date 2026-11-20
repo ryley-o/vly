@@ -41,6 +41,31 @@
       }
     },
     {
+      "name": "in one session: beat a level, B back to the title: the menu already offers CONTINUE, NEW GAME, ERASE DATA",
+      "frames": 420,
+      "input": "A@130, A@170, A@200, A@230, RIGHT@250, A@270, LEFT@290, A@310, A@340, B@370",
+      "expect": {
+        "words": {
+          "state": 1,
+          "has_save": 1,
+          "menu_n": 3,
+          "beaten": 1
+        }
+      }
+    },
+    {
+      "name": "in one session: beat a level, go back to the title: CONTINUE is there at once; NEW GAME then ERASE leaves no marks",
+      "frames": 560,
+      "input": "A@130, A@170, A@200, A@230, RIGHT@250, A@270, LEFT@290, A@310, A@340, B@370, DOWN@410, A@430, RIGHT@450, A@470",
+      "expect": {
+        "words": {
+          "state": 2,
+          "beaten": 0,
+          "has_save": 0
+        }
+      }
+    },
+    {
       "name": "with a save the menu is CONTINUE, NEW GAME, ERASE DATA; NEW GAME asks before erasing and B keeps everything",
       "frames": 300,
       "save": "tests/saves/two-beaten.sav",

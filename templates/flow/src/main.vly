@@ -166,6 +166,7 @@ func frame() {
     if (grid_sel != before) { sfx_play(SFX_SELECT); if (grid_drawn >= LEVELS) { draw_cell(before); draw_cell(grid_sel); } else { grid_drawn = 0; } }
     if (g >= 0) { level = g; sfx_play(SFX_COIN); go(S_PLAY); }
     if (g == -3) { sfx_play(SFX_HIT); }
+    if (g == -2) { sfx_play(SFX_BACK); go(S_MENU); }          // B: back to the menu, which re-reads the save (CONTINUE appears as soon as there is progress)
   } else if (state == S_PLAY) {
     if (msg_t > 0) { msg_t--; if (msg_t == 0) { draw_play(); } }
     if (done) {
