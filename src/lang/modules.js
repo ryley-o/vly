@@ -941,7 +941,7 @@ func pl_camera(world_w) {
 var pl_inv;                  // frames of invulnerability left (blinking); counts down in pl_step
 var pl_stomp_t;              // frames in which a second contact still counts as a stomp
 var pl_hurt_inset = 2;
-var pl_inv_max = 90;
+var pl_inv_max = 168;        // SMB1's own: an injury timer of 8, counted down once per 21 frames (about 2.8 seconds)
 func pl_enemy(ex, ey, ew, eh) {
   var px0 = pl_x + pl_hurt_inset; var px1 = pl_x + pl_w - pl_hurt_inset;
   var py0 = pl_y + 2; var py1 = pl_y + pl_h;

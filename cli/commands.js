@@ -15,6 +15,7 @@ import { wavFromFloat } from '../src/core/audio.js';
 import { parseUntil } from '../src/tools/names.js';
 import { profileCartridge, profileFrames } from '../src/tools/profile.js';
 import { checkCartridge, monkeyScript, audibility } from '../src/tools/check.js';
+import { analyzeLevel, formatLevelProfile } from '../src/tools/levelprofile.js';
 import { compare as compareProject, verdict, loadIndex as loadOriginalityIndex, readProjectFiles } from '../src/tools/originality.js';
 import { parseTilesText, tilesFromRGBA, tilesToRGBA, pngToTilesText } from '../src/tools/tiles.js';
 import { runSpecFile, findSpecFiles } from '../src/tools/testrunner.js';
@@ -668,6 +669,21 @@ export const commands = {
       if (info.palette) text += `\npalette (light to dark): ${info.palette.join(' ')}`;
       for (const f of files) text += `\nwrote ${f}`;
       return { text, data: { ...info, bytes: data.length, files } };
+    },
+  },
+
+  levels: {
+    help: 'vly levels <map.txt ...> [--window N] [--max-flat-run N] [--json]\n  Is this level interesting? Profile an ASCII level map (rows top to bottom, # solid, ^ hazard, a-z enemy types, o pickup, S spring, C checkpoint, G goal, . empty; a column with no floor is a pit):\n  dead screens, long flat empty runs, ground variety, repeated enemies, a new hazard introduced with company, jumps with no consequence, intensity rising and falling. It lists what to look at; it cannot say a level is fun (see docs ref-levels).',
+    async run(args) {
+      if (!args._.length) throw new CliError('give one or more level map text files (ASCII: rows top to bottom, # solid, ^ hazard, a-z enemies, o pickups, . empty)');
+      const opts = {};
+      if (args.flags.window) opts.window = int(args.flags.window);
+      if (args.flags['max-flat-run']) opts.maxFlatRun = int(args.flags['max-flat-run']);
+      const results = args._.map((f) => {
+        if (!fs.existsSync(f)) throw new CliError(`no such file: ${f}`);
+        return { file: f, ...analyzeLevel(fs.readFileSync(f, 'utf8'), opts) };
+      });
+      return { text: results.map((r) => formatLevelProfile(path.basename(r.file), r)).join('\n\n'), data: { levels: results } };
     },
   },
 

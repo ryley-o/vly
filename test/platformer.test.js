@@ -155,7 +155,7 @@ test('rising into an enemy from below hurts, never stomps; being hit makes the c
   const under = await contact('40, 70, 12, 12', 'A@5-40', 60, '36, 96');
   assert.ok(under.hit > 0, 'from below is a hurt');
   assert.ok(under.stomp === 0 || under.hit < under.stomp, 'the first thing that happens is the hurt, not a stomp');
-  // walk into an enemy and keep pushing: the first contact hurts, then 90 frames of blinking mean no more hits
+  // walk into an enemy and keep pushing: the first contact hurts, then the blinking (168 frames) means no more hits
   const twice = await contact('60, 100, 12, 12', 'RIGHT@0-200', 100, '20, 96', '');
   assert.equal(twice.n, 1, `hurt once while blinking (${twice.n})`);
 });

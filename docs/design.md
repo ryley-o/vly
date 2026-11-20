@@ -12,16 +12,20 @@ This playbook says what a good game needs. The reference guides say exactly how,
 |---|---|---|
 | a character that runs and jumps through a scrolling level | `vly docs ref-sidescroller` | the exact Super Mario Bros. movement numbers (walk, run, skid, variable jump, air control), collision and corner sliding, how Mario judges enemy contact (falling onto an enemy always stomps), forgiveness, camera, level design philosophy; and `import "std/platformer"`, a tested module that does it |
 | music (every game) | `vly docs ref-music` | channel roles on this machine, what Kondo, the Baroque-minded Castlevania composers and Uematsu did, public-domain classical pieces to arrange, loop length and variation, mixing for a tiny speaker |
+| **any game, before you choose the idea** | `vly docs ref-originality` | how to invent a mechanic that is simple, elegant and tied to the story: a process with random constraints to escape the first-idea trap, ten elegance tests, being original in several facets at once, and making the levels come from the mechanic |
+| levels (every game with stages) | `vly docs ref-levels` | what makes levels fun: every jump needs a consequence, the four beats, pacing and rest, enemy arrangements, terrain and verticality, a working method, and `vly levels` to find dead screens, flat runs, repeated enemies and jumps with no consequence |
+| power-ups and abilities | `vly docs ref-powerups` | why Mario's mushroom, flower and star are elegant, how they really work (read from the code), a process for inventing your own with a cost and a visible state, and a small implementation |
+| the shape of the game, exploring, atmosphere | `vly docs ref-worlds` | ten structures beyond "scroll right, checkpoints, ending", how to choose one from the story, what makes exploring satisfying, and cheap ways to make a four-colour screen beautiful |
 | any game | `vly docs ref-genres` | the recipe per genre: platformer, racer, shooter, puzzle, story, rhythm, virtual pet, versus; the sample game to read for each |
 
-More deep guides (puzzle, shooter, racer, rhythm, pet) are added as those genres are tested; until then `ref-genres` is the guide.
+**Read `ref-originality` first, then the others as they apply.** More deep guides (puzzle, shooter, racer, rhythm, pet) are added as those genres are tested; until then `ref-genres` is the guide.
 
 ## 0. The quality bar
 
 **Your game must be your own.** The templates and the sample games in `games/` are *references*: read them to learn a technique (how a tilemap is scanned, how a boss is staged, how a save is sealed). Never ship one with a new skin, new title, new art or renamed words:
 its rules, levels, code structure and art must be your own, designed for this person. `vly check` compares your sources with every template and sample game and **flags a re-skin**. Start from an empty project (`vly new mygame`), not from a game. A game that only changes the title, the colours, the sprites or the story around someone else's levels is a re-skin, however nicely it runs. If you catch yourself reusing a template's level data or its main loop, stop and design your own.
 
-**Be original, not only different.** Copying a classic's *feel* (Mario's movement, Tetris's controls, a shooter's weapon curve) is the right start, because feel is hard and the classics solved it. Copying its *look, cast and world* is not: no brick-and-question-mark blocks, mushroom walkers, green pipes, plumbers or princesses; no falling blocks that are Tetris with a new colour. Combine the classic's feel with something of your own, in at least one way that changes how the game *plays* (a new mechanic, a tool, a world rule) and in your own theme, sprites, palettes, story and sound. Write down in `DESIGN.md` what you borrowed, what is new, and three things the classic does not have. A reader should be able to tell the game from a single screenshot.
+**Be original, not only different.** Copying a classic's *feel* (Mario's movement, Tetris's controls, a shooter's weapon curve) is the right start, because feel is hard and the classics solved it. Copying its *look, cast and world* is not: no brick-and-question-mark blocks, mushroom walkers, green pipes, plumbers or princesses; no falling blocks that are Tetris with a new colour. Combine the classic's feel with something of your own, in at least one way that changes how the game *plays* (a new mechanic, a tool, a world rule) and in your own theme, sprites, palettes, story and sound. Write down in `DESIGN.md` what you borrowed, what is new, and three things the classic does not have. A reader should be able to tell the game from a single screenshot. **`vly docs ref-originality` is how to get there**: a process for inventing a simple, elegant mechanic that is tied to your story, and for being original in several facets (mechanic, structure, art, sound, story) at once, not one.
 
 **Aim for the depth and polish of a good NES-era game, not a tech demo.** A person who is given this game should still be
 playing it an hour later, and should be able to tell where the care went. Concretely, a finished game has:
@@ -90,7 +94,7 @@ over and retry, bosses, power-ups, hit-stop, a difficulty curve. Where something
 
 ### `DESIGN.md`: the plan, and a checklist (best practice)
 
-Write it in the project folder before you code and show it to the person. A good one has: **the game in one sentence**; **what makes it this person's** (their name, their jokes, their rules); **what it borrows and what is its own** (the classic feel you copied, the mechanic and the theme and story that are new, three things the classic does not have); **controls**; **screens**; a **content table** (a row per stage or level: theme, new mechanic or enemy, boss or set-piece, music); **how progress works** (unlocks, level select, saves, records); and what makes it different from the nearest sample game. End it with a list headed `## Done when` with one line per promise ("8 stages, each with its own boss", "a recorded path clears stage 3", "level select shows medals"). `vly check` prints that list back at the end; go through it in your final message to the person: done, partly done or not done, with evidence. It is a best practice, not a gate: its value is that a gap is hard to hide.
+Write it in the project folder before you code and show it to the person. A good one has: **the game in one sentence**; **what makes it this person's** (their name, their jokes, their rules); **what it borrows and what is its own** (the classic feel you copied, the mechanic and the theme and story that are new, three things the classic does not have); **the idea** (the one-sentence mechanic, ten candidate titles with the three finalists, and five level ideas for the one you chose: `vly docs ref-originality`); **the structure and why** (`vly docs ref-worlds`); **your power-ups** and what each costs (`vly docs ref-powerups`); **controls**; **screens**; a **content table** (a row per stage or level: theme, new mechanic or enemy, boss or set-piece, music); **how progress works** (unlocks, level select, saves, records); and what makes it different from the nearest sample game. End it with a list headed `## Done when` with one line per promise ("8 stages, each with its own boss", "a recorded path clears stage 3", "level select shows medals"). `vly check` prints that list back at the end; go through it in your final message to the person: done, partly done or not done, with evidence. It is a best practice, not a gate: its value is that a gap is hard to hide.
 
 ### What the classics teach (they had the same constraints)
 
@@ -286,7 +290,7 @@ the velocity in 8.8. The platformer template does this; `games/ninja-chef` does 
 | Terminal fall speed | 4 to 5 px/frame |
 | Camera | follow with a small lead in the move direction; max 2 px/frame; do not snap |
 | Projectile | 3 to 4 px/frame, fewer than 4 on screen |
-| Invulnerability after a hit | 60 to 90 frames, hero blinks every 4 |
+| Invulnerability after a hit | 90 to 170 frames (SMB1: 168), hero blinks every 4 |
 | Hit-stop (freeze on impact) | 2 to 4 frames |
 | Screen shake | scroll offset of 1 to 2 px for 6 to 10 frames, on big impacts only |
 | Knockback | 2 to 3 px/frame away for 8 to 10 frames |
@@ -349,6 +353,8 @@ frame), which cooperate so effects interrupt the music cleanly and the music com
   actually produces sound (`audible_seconds` should be most of the run) and that the title screen has music.
 
 ## 9. Level and content design
+
+**For levels read `vly docs ref-levels`** (every jump needs a consequence; no dead screens or long flat runs; vary enemy arrangements; terrain and verticality; a working method) and run **`vly levels yourmap.txt`** on your level maps. For power-ups, `vly docs ref-powerups`. For the shape of the whole game (not always "scroll right, checkpoints, ending") and for exploration and atmosphere, `vly docs ref-worlds`.
 
 - **Teach, test, twist.** Introduce a hazard in a safe place, then test it with a small challenge, then combine it with
   another hazard. A new thing every 20 to 40 seconds keeps attention.

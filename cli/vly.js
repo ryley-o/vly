@@ -59,6 +59,7 @@ Commands:
   check [cart|source]   Quality gates: play with careless input for two minutes and report faults, budget, frozen game, sound, covered text
   import <picture.png>  Turn a PNG into .tiles art (colours reduced to what the hardware allows)
   tiles <file>          Convert .tiles/.png art to tile data, or preview a tile sheet
+  levels <map.txt>      Profile an ASCII level map: dead screens, flat runs, repeated enemies, jumps with no consequence
   isa                   Print the instruction set
   docs [topic]          Print documentation (run with no topic to list)
   export <cart>         Package a cartridge as one self-contained HTML file

@@ -142,6 +142,10 @@ fs.writeFileSync('tests/after-win.sav', r.save);                  // a finished 
 Other tricks that paid off: `vly run ... --watch score,left` shows exactly when things happen (the first kill, the first
 death), and `--filmstrip 12 --filmstrip-out strip.png` shows a whole run in one image.
 
+### Are the levels interesting? `vly levels`
+
+Write levels as ASCII maps (one character per block; `vly docs ref-levels` has the legend) and run `vly levels stage1.txt stage2.txt`: it flags dead screens, long flat empty runs, repeated enemies, a new hazard that first appears with company, jumps with no consequence and flat intensity. A bot proves a level can be finished; this finds the ones that are dull to finish.
+
 ### A search bot for action games: look ahead on clones (`Machine.clone()`)
 
 A policy bot ("if the foe is left, go left") is enough for puzzles and simple shooters. A **platformer, a racer or anything with timing and phases** needs a bot that *tries things*: copy the machine, run each candidate plan a few dozen frames ahead on the copy, keep the plan that scores best, commit its first few frames on the real machine, repeat. This is the bot that finds what `vly check` cannot: a goal your level generator erased, a platform one pixel too high to reach, a collectible out of jump range, a **soft-lock** (a spot where the player can no longer progress, such as a spring left behind off-screen).
