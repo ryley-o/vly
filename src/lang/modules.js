@@ -920,15 +920,38 @@ func pl_camera(world_w) {
   if (pl_x > world_w - pl_w) { pl_x = world_w - pl_w; pl_vx = 0; pl_fx = 0; }
 }
 
+// Enemy contact, the way SMB1 judges it (see docs/ref-sidescroller.md "Enemy contact"): when in doubt the player wins.
+//   pl_enemy(ex, ey, ew, eh) -> 0 no contact, 1 the character stomps it (kill it, then call pl_bounce()), 2 the character is hurt (call pl_hurt()).
+// A contact is a STOMP when the character is falling at all (pl_vy > 0: SMB1 has no height test for a falling character), or has just landed with the
+// feet in the top half of the enemy, or stomped something within the last few frames (the SMB1 stomp timer: two enemies side by side both die).
+// Otherwise (walking into it, rising into it from below) it is a hurt, unless the character is still blinking from the last one (pl_inv > 0).
+// The boxes are a little smaller than the sprites (pl_hurt_inset pixels off each side of the character, 1 off the enemy), so a graze is not a hit.
+var pl_inv;                  // frames of invulnerability left (blinking); counts down in pl_step
+var pl_stomp_t;              // frames in which a second contact still counts as a stomp
+var pl_hurt_inset = 2;
+var pl_inv_max = 90;
+func pl_enemy(ex, ey, ew, eh) {
+  var px0 = pl_x + pl_hurt_inset; var px1 = pl_x + pl_w - pl_hurt_inset;
+  var py0 = pl_y + 2; var py1 = pl_y + pl_h;
+  if (px1 <= ex + 1 || px0 >= ex + ew - 1 || py1 <= ey || py0 >= ey + eh) { return 0; }
+  if (pl_vy > 0 || pl_stomp_t > 0) { return 1; }
+  if (pl_vy >= 0 && py1 <= ey + eh / 2 + 2) { return 1; }    // standing or landing with the feet in the top half of it
+  if (pl_inv > 0) { return 0; }
+  return 2;
+}
+func pl_hurt() { pl_inv = pl_inv_max; }                     // the character was hit: blink, and ignore enemies (but not stomp them) for pl_inv_max frames
+
 // One frame of Mario: dir -1, 0 or 1 (the D-pad), run (B held), jump_pressed (A went down this frame), jump_held (A is down).
 func pl_step(dir, run, jump_pressed, jump_held) {
   pl_bump = 0;
+  if (pl_inv > 0) { pl_inv--; }
+  if (pl_stomp_t > 0) { pl_stomp_t--; }
   if (pl_hit()) { pl_eject(); }
   pl_hstep(dir, run);
   pl_vstep(jump_pressed, jump_held);
 }
 // Landed on an enemy: spring off it (SMB1: the same hop whatever the buttons).
-func pl_bounce() { pl_vy = -1024; pl_fy = 0; pl_ground = 0; pl_coyote = 0; }
+func pl_bounce() { pl_vy = -1024; pl_fy = 0; pl_ground = 0; pl_coyote = 0; pl_stomp_t = 6; }
 `;
 
 export const MODULES = {

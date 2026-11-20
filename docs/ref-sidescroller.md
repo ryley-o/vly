@@ -91,10 +91,25 @@ SMB1 is strict; modern players, and a 160 x 144 screen with small buttons, rewar
 - **Pixel probes, not tiles.** The module asks `pl_solid(x, y)` at points along the body's edges (every 8 pixels and the end) as it moves one pixel at a time. Your `pl_solid` can read tiles, a collision map, moving platforms or anything else; keep it cheap (a table lookup).
 - **Order: X first, then Y**, each as a loop of single pixels. Resolve each axis fully before the next. This gives sliding along walls and floors for free.
 - **Body smaller than the sprite.** The sprite is 16 x 16; the body is 12 x 16 (draw the sprite at `pl_x - 2`). A narrower body forgives side contact and makes jumping between pillars fair.
-- **Stomping:** an enemy hit counts as a stomp when the character is falling (`pl_vy > 0`) and the feet are in the top half of the enemy; otherwise the character is hurt. Test on the *previous* frame's position if enemies move fast. On a stomp: defeat the enemy, `pl_bounce()`, a sound, 100 points.
-- **Hurt:** brief invulnerability (about 60 frames, flash every other frame), a small knockback (set `pl_vx` and `pl_vy`), no instant death for the first hit if the game has power-ups. A pit is a death; a hit is not.
+- **Enemy contact: use `pl_enemy` and read "Enemy contact" below.** Mario is forgiving, and that forgiveness is most of why it feels fair.
 - **One-way platforms and moving platforms:** a one-way platform is solid only for a falling character whose feet were above its top last frame (your `pl_solid` cannot know: handle it with a second check after `pl_step`). A moving platform carries the character by adding its movement to `pl_x`/`pl_y` after the step.
 - **Slopes are not supported** by this module. If your game needs them, say so in `DESIGN.md` and write a separate floor-height function; most of the best games on this hardware did not need slopes.
+
+## 5b. Enemy contact: Mario is forgiving (when in doubt, the player wins)
+
+**Use `pl_enemy(ex, ey, ew, eh)` for every enemy: it returns 0 (no contact), 1 (stomp: kill it, call `pl_bounce()`, play the sound, give points) or 2 (hurt: call `pl_hurt()`, knock back, lose a hit point).** The rules, and where each comes from (verified in the annotated disassembly of SMB1 unless marked as ours):
+
+1. **Falling onto an enemy always stomps it.** SMB1's check reads the character's vertical speed: any speed downwards is a stomp, with *no test of where the feet are* (`lda Player_Y_Speed / bmi ChkInj / bne EnemyStomped`). So the player who is coming down and touches an enemy at all, at its top, its side or its middle, kills it and not the other way round. This is the single most forgiving rule in the game. Our `pl_enemy` does the same (`pl_vy > 0`), and also counts a landing or standing contact with the feet in the top half of the enemy as a stomp.
+2. **Only walking into it, or rising into it from below, hurts.** For the common enemies (Goombas and Koopas) a level or upward contact hurts with no height test at all; some later enemy types add a test that the feet were at least 12 px above the enemy's top. So the way to avoid a hurt is simple to learn: jump on them.
+3. **A stomp timer makes chains work.** After a stomp, a short window (`pl_stomp_t`, 6 frames here) treats the next contact as a stomp too, so two enemies side by side both die and bouncing from head to head scores the chain (100, 200, 400, 500, 800, 1000, 2000, 4000, 5000, 8000, then a 1-up; the first few steps are verified, the later values are the community's numbers). A hurt is checked after the stomp, never before.
+4. **Stomps still work while blinking.** After a hit the character is invulnerable for a while (`pl_inv`, `pl_hurt()` sets it to 90 frames; flash the sprite every other frame) and is not hurt again, *but can still stomp*, which is how a player fights their way out of a bad spot. SMB1 sets a short injury timer (8 on the first hit; how fast it counts down was not verified, so the 90 frames are our choice).
+5. **A hit is not death for a powered-up character.** Big Mario shrinks and survives; small Mario dies. Give every game a hit point buffer (hearts, a power-up that is lost first) so the first mistake is survivable. A pit is a death; a hit is not.
+6. **Contacts are checked a little less than perfectly.** SMB1 resolves player-enemy contact on every other frame only, enemy hit boxes are smaller than their sprites, and enemies that are still off the edge of the screen cannot touch the character (they wake up about 72 px beyond the screen edge). We copy the spirit: `pl_enemy` shrinks the character's box by `pl_hurt_inset` (2 px each side) and the enemy's by 1 px, so a graze with a sprite's corner is not a hit; do not let enemies hurt from off-screen; do not check contact on the frame an enemy spawns. (The every-other-frame check itself is an NES quirk, not something to copy.)
+7. **Things that always hurt are rare and obvious.** Spikes, fire, a piranha plant, a boss's body: no stomp possible, drawn so you can see it. Make those the exception and mark them with a different colour and a spiky shape (a Spiny hurts when stomped in SMB1: it is the one the player learns not to jump on).
+8. **A kicked shell is the hardest thing in the game to read, so it is taught in safety:** a stationary shell is kicked by touching it (it moves at 3 px/frame), a moving shell hurts the character from the side and can be stomped to stop it.
+9. **After a stomp the bounce is a small constant hop** whatever the buttons (SMB1's stomp path sets a speed of about -3 units; `pl_bounce()` uses -4 px/frame: either way the player lands on the next enemy or ledge without having to aim). Make the bounce high enough to clear the next enemy so chains are possible.
+
+**Things to test:** drop the character onto an enemy from 5 different horizontal offsets: always a stomp. Walk into one: hurt. Jump into its underside: hurt, never a stomp. Stand in it while blinking: hurt once. Two enemies 10 px apart: stomp both with one jump. `test/platformer.test.js` does these on the module.
 
 ## 6. Scaling to your block size
 
@@ -164,7 +179,8 @@ These come from people playing agent-built platformers. Test each one yourself, 
 7. **Slide round corners.** Jumping up under the edge of a block must slide the character round it, not stop the jump (SMB1's behaviour; `pl_nudge` pixels). Tested in `std/platformer`: use it.
 8. **The front end is the common one.** A saved game gives CONTINUE, NEW GAME, ERASE DATA on the title, with NEW GAME and ERASE DATA each asking KEEP or ERASE (KEEP selected). No save: NEW GAME alone. Start from `vly new mygame --template flow`, which has exactly this and tests for it.
 9. **Length.** 24 or more stages in 6 to 8 worlds is a full game (SMB1 has 32 in 8). 12 stages is a demo to anyone who played the classics.
-10. **Centre what you draw.** Grids, menus and titles are centred with `ui_centre(width)`; a block that sits a cell or two left looks wrong.
+10. **Combat is forgiving.** If you jump and an enemy and you touch, you kill it, not the other way round: falling onto an enemy always stomps, only walking into it or hitting it from below hurts, a hit starts a blinking invulnerability in which you can still stomp, and the first hit never kills (section 5b, `pl_enemy`). Players who played Fox Shift asked for exactly this.
+11. **Centre what you draw.** Grids, menus and titles are centred with `ui_centre(width)`; a block that sits a cell or two left looks wrong.
 
 ## Sources and honesty
 

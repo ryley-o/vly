@@ -10,7 +10,7 @@ This playbook says what a good game needs. The reference guides say exactly how,
 
 | Your game has... | Read | What is in it |
 |---|---|---|
-| a character that runs and jumps through a scrolling level | `vly docs ref-sidescroller` | the exact Super Mario Bros. movement numbers (walk, run, skid, variable jump, air control), collision and corner sliding, forgiveness, camera, level design philosophy; and `import "std/platformer"`, a tested module that does it |
+| a character that runs and jumps through a scrolling level | `vly docs ref-sidescroller` | the exact Super Mario Bros. movement numbers (walk, run, skid, variable jump, air control), collision and corner sliding, how Mario judges enemy contact (falling onto an enemy always stomps), forgiveness, camera, level design philosophy; and `import "std/platformer"`, a tested module that does it |
 | music (every game) | `vly docs ref-music` | channel roles on this machine, what Kondo, the Baroque-minded Castlevania composers and Uematsu did, public-domain classical pieces to arrange, loop length and variation, mixing for a tiny speaker |
 | any game | `vly docs ref-genres` | the recipe per genre: platformer, racer, shooter, puzzle, story, rhythm, virtual pet, versus; the sample game to read for each |
 
@@ -260,7 +260,7 @@ Inside a level, the arrows plus A and B are usually enough (Mario, Tetris and Ki
 - **Use `btnp` for one-shot actions** (jump, menu choices, shoot once per press) and `btn` for held actions (run, accelerate).
   Using `btn` for a menu makes it fly past the choice.
 - **Never rely on more than two buttons at once** and never require precise diagonal timing. Eight-way input is fine; do not require all eight.
-- **Forgive the player**: *coyote time* (allow a jump for about 5 frames after leaving a ledge), a *jump buffer* (remember a press for about 6 frames before landing), and generous hitboxes for the player's attacks and slightly smaller hitboxes for the player's own body.
+- **Forgive the player, in combat above all**: in Mario, if you are coming down and touch an enemy, *you* kill it (any downward contact is a stomp; only walking into it or hitting it from below hurts), a hit starts a blinking invulnerability in which stomps still work, and the first hit never kills (`vly docs ref-sidescroller`, "Enemy contact"). Also *coyote time* (allow a jump for about 5 frames after leaving a ledge), a *jump buffer* (remember a press for about 6 frames before landing), and generous hitboxes for the player's attacks and slightly smaller hitboxes for the player's own body.
 - On a handheld the thumb covers the lower left and right of the pad, so avoid fast sequences that alternate left and right buttons.
 - **Taps, holds and releases are three different inputs; test them separately.** If a tap means "go" and a hold means "go fast", a plain tap must not trigger the fast version, and a hold that begins on one screen must not carry into the next. `std/flow` has `bt_tap(b)` (fires on release of a press of 12 frames or fewer), `bt_hold(b, n)` (fires once, after n frames held) and `bt_flush()` (ignore a button already held when the screen changes until it is released): call `bt_update()` first in `frame()`. Write a replay test for each: a tap, a hold, a release, a tap-then-hold, a hold across a screen change, and pause/resume. A touch screen has no key repeat and a thumb that rolls, a keyboard has repeat and ghosting: try both.
 

@@ -121,3 +121,61 @@ func frame() { pl_step(btn(BTN_RIGHT) - btn(BTN_LEFT), btn(BTN_B), btnp(BTN_A), 
   const left = rows[420];
   assert.ok(left.x >= left.cam, 'cannot walk off the left of the screen');
 });
+
+// ---- enemy contact (SMB1's rule: falling onto an enemy always stomps; otherwise it hurts; when in doubt the player wins) ----
+async function contact(enemy, input, frames, start, extra = '') {
+  const text = `import "std/platformer";
+func pl_solid(x, y) { return y >= ${FLOOR}; }
+var res; var first_hit; var first_stomp; var n_hit;
+func init() { pl_init(${start}); }
+func frame() {
+  pl_step(btn(BTN_RIGHT) - btn(BTN_LEFT), btn(BTN_B), btnp(BTN_A), btn(BTN_A));
+  ${extra}
+  res = pl_enemy(${enemy});
+  if (res == 1 && first_stomp == 0) { first_stomp = frames(); pl_bounce(); }
+  if (res == 2) { if (first_hit == 0) { first_hit = frames(); } n_hit++; pl_hurt(); }
+}`;
+  const b = await buildText({ text, filename: 'main.vly', baseDir: '/x' });
+  const ram = b.stats.ram; let out = null;
+  runCartridge(b.bytes, { frames, input, mem: [] , onFrame: (f, m) => { out = { stomp: m.read16(ram.first_stomp.addr), hit: m.read16(ram.first_hit.addr), n: m.read16(ram.n_hit.addr) }; } });
+  return out;
+}
+
+test('falling onto an enemy stomps it, even if you land beside its middle; walking into it from the side hurts', async () => {
+  // enemy 12x12 standing on the floor at x 60 (y 100); the character drops onto it from above, off-centre by 5 pixels
+  const jump = await contact('60, 100, 12, 12', '', 80, '53, 50');
+  assert.ok(jump.stomp > 0, 'coming down on it stomps');
+  assert.ok(jump.hit === 0 || jump.stomp < jump.hit, 'the stomp comes first (the enemy stays in this test, so landing on it again later may hurt)');
+  const walk = await contact('60, 100, 12, 12', 'RIGHT@0-200', 200, '20, 96');
+  assert.equal(walk.stomp, 0);
+  assert.ok(walk.hit > 0, 'walking into it hurts');
+});
+
+test('rising into an enemy from below hurts, never stomps; being hit makes the character blink, so standing in the enemy hurts only once', async () => {
+  const under = await contact('40, 70, 12, 12', 'A@5-40', 60, '36, 96');
+  assert.ok(under.hit > 0, 'from below is a hurt');
+  assert.ok(under.stomp === 0 || under.hit < under.stomp, 'the first thing that happens is the hurt, not a stomp');
+  // walk into an enemy and keep pushing: the first contact hurts, then 90 frames of blinking mean no more hits
+  const twice = await contact('60, 100, 12, 12', 'RIGHT@0-200', 100, '20, 96', '');
+  assert.equal(twice.n, 1, `hurt once while blinking (${twice.n})`);
+});
+
+test('two enemies side by side: the second contact right after a stomp is a stomp too (SMB1 stomp timer)', async () => {
+  const text = `import "std/platformer";
+func pl_solid(x, y) { return y >= ${FLOOR}; }
+var stomps; var hurts;
+func init() { pl_init(40, 70); pl_vy = 600; }
+func frame() {
+  pl_step(0, 0, 0, 0);
+  var a = pl_enemy(36, 98, 12, 12);                 // the first enemy, under the character
+  if (a == 1) { pl_bounce(); stomps++; }
+  var r = pl_enemy(46, 98, 12, 12);                 // its neighbour, touched on the way back up
+  if (r == 1) { stomps++; }
+  if (r == 2) { hurts++; }
+}`;
+  const b = await buildText({ text, filename: 'main.vly', baseDir: '/x' });
+  const ram = b.stats.ram; let out = null;
+  runCartridge(b.bytes, { frames: 40, onFrame: (f, m) => { out = { stomps: m.read16(ram.stomps.addr), hurts: m.read16(ram.hurts.addr) }; } });
+  assert.ok(out.stomps >= 2, `both stomped (${out.stomps})`);
+  assert.equal(out.hurts, 0, 'and nothing hurt');
+});
