@@ -142,7 +142,10 @@ Rules to design by (they come from Miyamoto's and Hayashida's own descriptions o
 11. **One signature per stage:** each stage has one new idea (a hazard, a mechanic or a set-piece) and one memorable place. A boss is a test of the idea the stage taught.
 12. **Length:** 60 to 120 seconds of play per stage for a first-time player (see "Depth and length" in the playbook), more stages beat longer ones, and the last stage is not the hardest by raw difficulty only: it uses everything.
 
-Layout checklist before you call a level done: play it with the delayed bot; read it as a row of 10-block screens and ask each one "what is new here, what is the challenge, where is the rest"; count the first time each hazard appears and check it is safe; find the longest stretch with nothing to do and cut or fill it.
+13. **The ground is a landscape, not a floor.** A bot-proven level can still be a long flat strip with things standing on it, which reads as empty. Change the ground height (a step up, a dip, a raised block island, a ceiling) at least every 2 screens; keep no stretch of dead flat floor longer than about 12 tiles without a block row, a coin arc, a slope of steps or a pipe; give every stage at least two heights to run on and one place where the player chooses between a high safe route and a low risky one. Vertical variety is what makes a stage feel designed (and it makes the jump heights matter).
+14. **A level is a path with a path for the eye.** Pull the player forward with a line of coins, a light, a distant landmark in the parallax; end the stage with a visible goal and a short fanfare.
+
+Layout checklist before you call a level done: play it with the delayed bot; read it as a row of 10-block screens and ask each one "what is new here, what is the challenge, where is the rest"; count the first time each hazard appears and check it is safe; find the longest stretch with nothing to do and cut or fill it; list the ground height per column (a `tools/` script over your level data) and check it changes at least every 2 screens; prove with a **search bot** that every collectible is reachable and the level has no soft-lock (`vly docs workflow`, "A search bot for action games").
 
 ## Sources and honesty
 
