@@ -33,7 +33,7 @@ vly run build/mygame.vlc --frames 120 --input "RIGHT@0-59" --screenshot shot.png
 vly test                                                      # assertions in vly.json
 ```
 
-**Before designing, read `vly docs design`** (the quality bar: a good game has a title, pause, game over, sound for every event,
+**Before designing, read `vly docs design`** (its table of reference guides sends you on: `vly docs ref-sidescroller` is the Mario recipe and `import "std/platformer"` for anything that runs and jumps; `vly docs ref-music` for the music) (the quality bar: a good game has a title, pause, game over, sound for every event,
 more than one stage, depth; the playbook has numbers, readability rules and a finishing checklist). **Before calling it finished, run
 `vly check`** (quality gates) and fix or explain every WARN. **To hand over, run `vly release`**: it builds, runs your tests and the check, loads an old release's save, records the opening, publishes (only with the person's OK) and verifies the link, and writes an offline copy.
 

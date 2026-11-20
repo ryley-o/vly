@@ -5,7 +5,7 @@
 ```
 import "std/ui";       // boxes, menus, typewriter dialogue
 import "std/anim";     // animation and timing helpers
-import "std/music";    // a three-voice tracker for background music and jingles
+import "std/music";    // a three-voice tracker for background music and jingles (what to write: `vly docs ref-music`)
 ```
 
 Built-in modules are written in VLY. Like the standard library, only the functions and variables your program uses are
@@ -91,6 +91,17 @@ Notes are semitones named `N_C2` (1) up to `N_B6` (60); sharps are `N_CS4`, `N_D
 song with `MUS_LOOP` (repeat forever) or `MUS_END` (play once: good for fanfares on a spare voice). Each note starts
 at full volume and fades toward half, which gives a soft pluck. Keep one or two channels free for sound effects
 (`tone(1, hz, vol, duty)`, and channel 3 is noise).
+
+## `std/platformer`: Super Mario Bros. movement and collision
+
+```
+import "std/platformer";
+func pl_solid(x, y) { return level_is_solid(x, y); }     // you write this: 1 if the world pixel is solid
+func init() { pl_init(24, 96); }
+func frame() { pl_step(btn(BTN_RIGHT) - btn(BTN_LEFT), btn(BTN_B), btnp(BTN_A), btn(BTN_A)); }
+```
+
+Walk 1.5 px/frame, run 2.5 (B), 40 frames to top speed, skid, a 10-frame run timer, a jump that is a hop when tapped and 4 to 5 blocks when held, speed kept in the air, 12 x 16 body, one pixel at a time, slides round block corners, coyote time and a jump buffer. Read `pl_x, pl_y, pl_vx, pl_vy, pl_face, pl_ground`; check `pl_jumped, pl_landed, pl_bump (pl_bx, pl_by)` for sounds and block hits; call `pl_bounce()` after stomping an enemy; tune with `pl_coyote_max`, `pl_buffer_max`, `pl_nudge`, `pl_inset`, `pl_w`, `pl_h`. The numbers, why they feel right, collision, camera and level design are in `vly docs ref-sidescroller`.
 
 ## Tilemaps: levels as ASCII art
 

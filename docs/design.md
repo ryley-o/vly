@@ -4,6 +4,17 @@ Read this before you design anything, and again before you call a game finished.
 design and verification mistakes, not coding mistakes. This page is the difference between a toy and a game someone wants
 to keep playing.
 
+## Reference guides (the central index)
+
+This playbook says what a good game needs. The reference guides say exactly how, with numbers; read the ones that fit your game *before* you build that part, and say in `DESIGN.md` which you used.
+
+| Your game has... | Read | What is in it |
+|---|---|---|
+| a character that runs and jumps through a scrolling level | `vly docs ref-sidescroller` | the exact Super Mario Bros. movement numbers (walk, run, skid, variable jump, air control), collision and corner sliding, forgiveness, camera, level design philosophy; and `import "std/platformer"`, a tested module that does it |
+| music (every game) | `vly docs ref-music` | channel roles on this machine, what Kondo, the Baroque-minded Castlevania composers and Uematsu did, public-domain classical pieces to arrange, loop length and variation, mixing for a tiny speaker |
+
+More guides are added as genres are tested (puzzle, shooter, racer, rhythm, pet). Until one exists, the "Genre recipes" in section 10 are the guide.
+
 ## 0. The quality bar
 
 **Your game must be your own.** The templates and the sample games in `games/` are *references*: read them to learn a technique (how a tilemap is scanned, how a boss is staged, how a save is sealed). Never ship one with a new skin, new title, new art or renamed words:
@@ -240,6 +251,7 @@ Inside a level, the arrows plus A and B are usually enough (Mario, Tetris and Ki
 
 ## 5. Controls
 
+- **Running and jumping through a level? Read `vly docs ref-sidescroller` first and start from `import "std/platformer"`**: it is Mario's movement, measured, and it saves you the weeks that feel-tuning takes.
 - Lock the map in the brief and show it on the title screen. Conventions that players already know:
   D-pad moves; **A is the main action** (jump, confirm, accelerate); **B is the second action** (attack, run, turbo, cancel);
   START pauses and starts; SELECT is for something rare (map, options, change item). Menus: D-pad moves, A confirms, B backs out.
@@ -295,6 +307,8 @@ Players feel the difference between a game that responds and one that merely upd
 - Death and win animations, a stage clear jingle, a fanfare for a new best score.
 
 ## 8. Sound and music
+
+**For the music itself (writing a tune that is remembered, how long it should be, what to borrow from the classics and from public-domain composers) read `vly docs ref-music`.** What follows is the checklist.
 
 The machine has 4 channels: **0 and 1 are pulse (square), 2 is triangle, 3 is noise.** Plan them before writing anything:
 

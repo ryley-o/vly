@@ -749,6 +749,151 @@ func grid_update(unlocked) {
 }
 `;
 
+const PLATFORMER_SOURCE = `
+// ===== std/platformer: Super Mario Bros. movement, collision and jumping =====
+// Write one function in your game:   func pl_solid(x, y) { return ...; }   1 if the world pixel (x, y) is solid, else 0.
+// Then each frame:   pl_step(dir, run, jump_pressed, jump_held);   and draw a sprite at (pl_x - 2, pl_y) for the default 12 x 16 body.
+// The numbers are SMB1's own (see docs/ref/sidescroller.md): walk 1.5 px/frame, run 2.5, jump 4 blocks with A held, a tap still hops a block.
+// Positions are whole pixels (pl_x, pl_y: the top-left of the body) plus remainders, so a 1,920-pixel world works.
+var pl_x; var pl_y; var pl_fx; var pl_fy;
+var pl_vx;                   // 1/4096 pixel per frame (6144 = 1.5 px/frame)
+var pl_vy;                   // 1/256 pixel per frame
+var pl_w = 12; var pl_h = 16;
+var pl_face = 1;             // 1 faces right, -1 left
+var pl_ground;               // 1 while standing on something
+var pl_rt;                   // run timer: the run speed is kept for 10 frames after B is let go
+var pl_coyote; var pl_jbuf;
+var pl_gu = 32; var pl_gd = 112;     // gravity while rising with A held, and otherwise (1/256 px/frame per frame)
+var pl_coyote_max = 4;       // frames after walking off a ledge in which a jump still works (0 = strict SMB1)
+var pl_buffer_max = 5;       // frames a jump press is remembered before landing (0 = strict SMB1)
+var pl_nudge = 4;            // a head that clips a block's corner by this many pixels or less slides round it
+var pl_inset = 2;            // feet need to overlap a ledge by more than this many pixels to stand on it
+var pl_bump;                 // 1 on the frame the head hit something; pl_bx, pl_by say where (pixels)
+var pl_bx; var pl_by;
+var pl_jumped;               // 1 on the frame a jump started (play the sound)
+var pl_landed;               // 1 on the frame the feet touched down (play the thud, puff the dust)
+
+func pl_init(x, y) { pl_x = x; pl_y = y; pl_fx = 0; pl_fy = 0; pl_vx = 0; pl_vy = 0; pl_ground = 0; pl_rt = 0; pl_coyote = 0; pl_jbuf = 0; pl_gu = 32; pl_gd = 112; }
+
+func pl_col(x, y0, h) {      // anything solid on the vertical line x, from y0 down h pixels (every 8 px, and the last)
+  var r = 0;
+  while (r < h - 1) { if (pl_solid(x, y0 + r)) { return 1; } r += 8; }
+  return pl_solid(x, y0 + h - 1);
+}
+func pl_row(y, x0, w) {      // anything solid on the horizontal line y, from x0 across w pixels
+  var r = 0;
+  while (r < w - 1) { if (pl_solid(x0 + r, y)) { return 1; } r += 8; }
+  return pl_solid(x0 + w - 1, y);
+}
+func pl_move_x(d) {
+  var c = pl_x + pl_w;
+  if (d < 0) { c = pl_x - 1; }
+  if (pl_col(c, pl_y, pl_h)) { return 0; }
+  pl_x += d;
+  return 1;
+}
+
+func pl_hstep(dir, b) {
+  var mv = 0;
+  if (pl_vx > 0) { mv = 1; } else if (pl_vx < 0) { mv = -1; }
+  var av = abs(pl_vx);
+  if (pl_ground) { if (b && dir != 0 && dir == mv) { pl_rt = 10; } else if (pl_rt > 0) { pl_rt--; } }
+  if (dir == 0) {
+    if (pl_ground && mv != 0) {                       // let go: slide to a stop (the air keeps its speed)
+      var f = 152;
+      if (av >= 7168) { f = 208; }
+      if (av <= f) { pl_vx = 0; } else { pl_vx -= mv * f; }
+    }
+  } else {
+    pl_face = dir;
+    var a = 152;                                      // walking acceleration
+    if (b || pl_rt > 0) { a = 228; }                  // running
+    if (!pl_ground) { a = 152; if (av >= 6400) { a = 228; } }
+    if (mv != 0 && dir != mv) {                       // pushing against the motion: skid, twice as hard
+      if (av < 2816) { pl_vx = 0; a = 152; }          // slow enough to turn on the spot
+      else { a = 304; if (av >= 7168) { a = 416; } }
+    }
+    pl_vx += dir * a;
+    var cap = 6144;
+    if (pl_rt > 0) { cap = 10240; }
+    if (dir == mv || mv == 0) { if (abs(pl_vx) > cap) { pl_vx = dir * cap; } }   // the walking cap snaps back once B has been let go for 10 frames
+  }
+  var tot = pl_fx + pl_vx;
+  var steps = tot >> 12;
+  pl_fx = tot & 4095;
+  while (steps > 0) { if (!pl_move_x(1)) { pl_vx = 0; pl_fx = 0; break; } steps--; }
+  while (steps < 0) { if (!pl_move_x(-1)) { pl_vx = 0; pl_fx = 0; break; } steps++; }
+  if (pl_vx != 0) {                                   // flush against a wall: no speed left (SMB1 zeroes it too)
+    var c = pl_x + pl_w;
+    if (pl_vx < 0) { c = pl_x - 1; }
+    if (pl_col(c, pl_y, pl_h)) { pl_vx = 0; pl_fx = 0; }
+  }
+}
+
+func pl_up() {                                        // one pixel up; 0 if something is in the way (after trying to slide round a corner)
+  var row = pl_y - 1;
+  if (!pl_row(row, pl_x, pl_w)) { pl_y--; return 1; }
+  var d = 1;
+  if (pl_vx < 0) { d = -1; }
+  var tries = 0;
+  while (tries < 2) {
+    var n = 0; var ok = 0;
+    while (n < pl_nudge) {
+      if (!pl_move_x(d)) { break; }
+      n++;
+      if (!pl_row(row, pl_x, pl_w)) { ok = 1; break; }
+    }
+    if (ok) { pl_y--; return 1; }
+    pl_x -= d * n;
+    d = -d; tries++;
+  }
+  pl_bx = pl_x + (pl_w >> 1); pl_by = row;
+  return 0;
+}
+
+func pl_vstep(jp, jh) {
+  pl_landed = 0; pl_jumped = 0;
+  if (pl_vy >= 0) {
+    var on = pl_row(pl_y + pl_h, pl_x + pl_inset, pl_w - pl_inset * 2);
+    if (on && !pl_ground) { pl_landed = 1; }
+    pl_ground = on;
+  }
+  if (pl_ground) { pl_coyote = pl_coyote_max; pl_vy = 0; pl_fy = 0; } else if (pl_coyote > 0) { pl_coyote--; }
+  if (jp) { pl_jbuf = pl_buffer_max; } else if (pl_jbuf > 0) { pl_jbuf--; }
+  if ((jp || pl_jbuf > 0) && (pl_ground || pl_coyote > 0)) {
+    var av = abs(pl_vx);
+    pl_vy = -1024; pl_gu = 32; pl_gd = 112;                                   // SMB1: faster on the ground, higher and heavier
+    if (av >= 6400) { pl_vy = -1280; pl_gu = 40; pl_gd = 144; }
+    else if (av >= 4096) { pl_gu = 30; pl_gd = 96; }
+    pl_fy = 0; pl_ground = 0; pl_coyote = 0; pl_jbuf = 0; pl_jumped = 1;
+  }
+  if (pl_ground) { return; }
+  var g = pl_gd;
+  if (pl_vy < 0 && jh) { g = pl_gu; }                                          // holding A keeps the light gravity while rising
+  pl_vy = min(pl_vy + g, 1024);
+  var tot = pl_fy + pl_vy;
+  var steps = tot >> 8;
+  pl_fy = tot & 255;
+  while (steps < 0) {
+    if (!pl_up()) { pl_vy = 256; pl_fy = 0; pl_bump = 1; break; }              // bonk: start falling at once
+    steps++;
+  }
+  while (steps > 0) {
+    if (pl_row(pl_y + pl_h, pl_x + pl_inset, pl_w - pl_inset * 2)) { pl_ground = 1; pl_landed = 1; pl_vy = 0; pl_fy = 0; break; }
+    pl_y++; steps--;
+  }
+}
+
+// One frame of Mario: dir -1, 0 or 1 (the D-pad), run (B held), jump_pressed (A went down this frame), jump_held (A is down).
+func pl_step(dir, run, jump_pressed, jump_held) {
+  pl_bump = 0;
+  pl_hstep(dir, run);
+  pl_vstep(jump_pressed, jump_held);
+}
+// Landed on an enemy: spring off it (SMB1: the same hop whatever the buttons).
+func pl_bounce() { pl_vy = -1024; pl_fy = 0; pl_ground = 0; pl_coyote = 0; }
+`;
+
 export const MODULES = {
   'std/ui': { source: UI_SOURCE, files: { 'std/ui.tiles': UI_TILES } },
   'std/anim': { source: ANIM_SOURCE, files: {} },
@@ -759,6 +904,7 @@ export const MODULES = {
   'std/tunes': { source: TUNES_SOURCE, files: {} },
   'std/fade': { source: FADE_SOURCE, files: {} },
   'std/flow': { source: FLOW_SOURCE, files: {} },
+  'std/platformer': { source: PLATFORMER_SOURCE, files: {} },
 };
 
 /** Embedded files (such as module art) by path. */
