@@ -97,6 +97,19 @@ song with `MUS_LOOP` (repeat forever) or `MUS_END` (play once: good for fanfares
 at full volume and fades toward half, which gives a soft pluck. Keep one or two channels free for sound effects
 (`tone(1, hz, vol, duty)`, and channel 3 is noise).
 
+**A whole soundtrack: songs live in ROM banks, one at a time in RAM.** A `btable` lives in the always-visible 16 KB, which nine 32-bar songs overflow. A song is just bytes (`note, steps` pairs ending in `MUS_LOOP` or `MUS_END`) at an address, and `music_play` takes any address, in RAM too. So keep every song in a banked `records` asset (one record per song, sized for the longest: 1024 bytes gives 8 songs a bank), and copy the song you need into a RAM buffer when a stage starts:
+
+```
+asset songs bank auto records 1024 = incbin("songs.bin");     // your generator script writes songs.bin: one 1024-byte record per song
+byte buf0[1024]; byte buf1[1024]; byte buf2[1024];           // one RAM buffer per voice
+func start_song(i) {                                          // song i is three records: lead, harmony, bass (3 * i, 3 * i + 1, 3 * i + 2)
+  songs_load(3 * i, buf0); songs_load(3 * i + 1, buf1); songs_load(3 * i + 2, buf2);
+  music_play(0, 0, buf0, 8); music_play(1, 1, buf1, 6); music_play(2, 2, buf2, 9);
+}
+```
+
+`songs_load` is named after your asset (`asset songs ... records` gives `songs_load`, `songs_peek8`, `songs_COUNT`). The load costs a few thousand cycles: do it when a stage starts, behind a fade, not in the middle of play. Do not call `select_bank` yourself around `music_update`: the music runs every frame, and a bank left selected for the rest of the frame breaks whatever reads another bank after it.
+
 ## `std/platformer`: Super Mario Bros. movement and collision
 
 ```

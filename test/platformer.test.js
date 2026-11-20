@@ -191,3 +191,11 @@ test('SMB1 ImpedePlayerMove: a solid touching one side pushes the character one 
   assert.ok(at(50) <= 34 && at(50) >= 30, `free after about 6 pixels (${at(50)})`);
   assert.equal(rows[50].vx, 0);
 });
+
+test('coyote time is exactly pl_coyote_max (4) frames: counting the frame the feet leave the ledge, a jump on the 4th still works and on the 6th does not', async () => {
+  const ledge = `y >= ${FLOOR} && x < 60 || y >= 200`;
+  const start = (await play(ledge, 'RIGHT@0-200', 80, '20, 96')).findIndex((r) => !r.ground);
+  const jumped = async (k) => Math.min(...(await play(ledge, `RIGHT@0-200,A@${start + k}-${start + k + 1}`, start + 30, '20, 96')).slice(start).map((r) => r.vy)) < -900;
+  assert.equal(await jumped(3), true, 'on the 4th frame (start+3)');
+  assert.equal(await jumped(6), false, 'two frames beyond the window');
+});

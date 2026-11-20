@@ -110,7 +110,7 @@ SMB1 is stricter in some ways (no coyote time, no jump buffer); modern players, 
 8. **A kicked shell is the hardest thing in the game to read, so it is taught in safety:** a stationary shell is kicked by touching it (it moves at 3 px/frame), a moving shell hurts the character from the side and can be stomped to stop it.
 9. **After a stomp the bounce is a small constant hop** whatever the buttons (SMB1's stomp path sets a speed of about -3 units; `pl_bounce()` uses -4 px/frame: either way the player lands on the next enemy or ledge without having to aim). Make the bounce high enough to clear the next enemy so chains are possible.
 
-**Things to test:** drop the character onto an enemy from 5 different horizontal offsets: always a stomp. Walk into one: hurt. Jump into its underside: hurt, never a stomp. Stand in it while blinking: hurt once. Two enemies 10 px apart: stomp both with one jump. `test/platformer.test.js` does these on the module.
+**Things to test:** drop the character onto an enemy from 5 different horizontal offsets: always a stomp. Walk into one: hurt. Jump into its underside: hurt, never a stomp. Stand in it while blinking: hurt once. Two enemies 10 px apart: stomp both with one jump. the toolchain's `test/platformer.test.js` does these on the module.
 
 ## 6. Scaling to your block size
 
@@ -141,7 +141,7 @@ In an empty test room (a flat floor and one wall), with a script of `RIGHT@...,A
 7. The worst frame stays under 30,000 cycles with the movement, 8 enemies and the camera.
 8. A bot with a reaction delay (`vly docs workflow`) can finish the level, and a bot that holds only RIGHT cannot (the level asks for jumps).
 
-The tests in `test/platformer.test.js` of the toolchain do exactly this for `std/platformer`; copy their approach.
+The toolchain's own tests (`test/platformer.test.js` in https://github.com/ryley-o/vly) do exactly this for `std/platformer`; copy their approach.
 
 ## 9. Level design (the philosophy, then the layout)
 
@@ -164,6 +164,12 @@ Rules to design by (they come from Miyamoto's and Hayashida's own descriptions o
 
 13. **Vary the ground.** A stage reads as designed when the ground changes: a step up, a dip, a raised block island, a low ceiling, a second height with a choice between a high safe route and a low risky one. A long stretch of bare flat floor with things standing on it reads as empty; fill it with a block row, a coin arc, steps or a pipe. (Players who played Fox Shift, a bot-proven 12-stage game, found its ground and level layout reasonable, so this is a guide, not a hard limit.)
 14. **A level is a path with a path for the eye.** Pull the player forward with a line of coins, a light, a distant landmark in the parallax; end the stage with a visible goal and a short fanfare.
+
+15. **Stage 1 is gentle: gaps of 3 blocks or less, nothing needing a run, until the player has been taught.** In a trial a bot with a quick human's reaction delay (16 frames) could not clear a first stage with 4 and 5 block pits (11 deaths), while it cleared the later, better taught stages. A 4-block gap needs A held for the whole arc and a 5-block gap needs a run (see the jump numbers in section 2): teach them in world 2, not on the first screen.
+
+### How long a stage is, and where it lives in memory
+
+A stage should take 60 to 120 seconds, which is 5,000 to 10,000 pixels at a walking pace of 1.5 px/frame to 2.5 px/frame running: **about 300 to 600 columns of 16-pixel blocks**. That does not fit a RAM level buffer (a 256-column buffer is about 4,000 pixels, 40 seconds of walking), and it does not need one. Store each stage as **one byte per 16 x 16 block** in a banked `records` asset (`asset stages bank auto records 4096 = incbin("stages.bin");` : 437 columns of 9 rows is 3.9 KB, one record), and read the block you need straight from ROM with `stages_peek8(stage, col * ROWS + row)` (about 60 cycles a read). Both `pl_solid(x, y)` and `stream_tile(wx, row)` (std/stream) can be that one lookup, so no copy of the level is held in RAM and its length is only limited by the 1 MB cartridge. A stage longer than a record is two acts (two records with a fade between them, hearts and score carried over), which also gives you a natural place for a checkpoint. A level generator script writes `stages.bin` (`tools/mklevels.mjs` in `games/ninja-chef` is an example), and `vly test` replays a recorded path through every stage.
 
 Layout checklist before you call a level done: play it with the delayed bot; read it as a row of 10-block screens and ask each one "what is new here, what is the challenge, where is the rest"; count the first time each hazard appears and check it is safe; find the longest stretch with nothing to do and cut or fill it; list the ground height per column (a `tools/` script over your level data) and check it changes at least every 2 screens; prove with a **search bot** that every collectible is reachable and the level has no soft-lock (`vly docs workflow`, "A search bot for action games").
 

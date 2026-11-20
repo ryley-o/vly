@@ -17,7 +17,7 @@ Four channels: **0 and 1 pulse** (a square wave with four duty widths: thin and 
 
 `music_tempo(n)` is frames per step. Treat a step as a sixteenth note: **BPM = 900 / n** (tempo 9 is 100 BPM, 8 is 112, 6 is 150, 5 is 180).
 Length in seconds = bars x 16 steps x n / 60 (4/4 time). A 16-bar tune at tempo 8 lasts 34 s; a 32-bar tune at tempo 9 lasts 77 s.
-Music is data, and data is cheap: a 32-bar, two-voice tune is a few hundred bytes. **ROM space is never a reason for a short loop.**
+Music is data, and data is cheap: a 32-bar, two-voice tune is a few hundred bytes. **ROM space is never a reason for a short loop.** (Nine 32-bar songs do not fit in the always-visible 16 KB as `btable`s: put them in a banked `records` asset and copy the current one into a RAM buffer when a stage starts; the recipe is under `std/music` in `vly docs modules`.)
 
 ## 2. What the classics did (techniques to learn, not notes to copy)
 

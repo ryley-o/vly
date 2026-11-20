@@ -124,3 +124,34 @@ test('an overfull bank is explained even when the always-visible part defines as
   assert.ok(err, 'an error is produced');
   assert.match(err.message, /bank 2 holds \d+ bytes, but a bank is 8192/);
 });
+
+test('too much unbanked art: the error names the assets that fill the always-visible region and how to bank them', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-bank-'));
+  fs.writeFileSync(path.join(dir, 'big.bin'), Buffer.alloc(20000, 7));
+  fs.writeFileSync(path.join(dir, 'small.bin'), Buffer.alloc(100, 3));
+  fs.writeFileSync(path.join(dir, 'main.vly'), 'asset sheet = incbin("big.bin");\nasset other bank 3 = incbin("small.bin");\nvar n;\nfunc frame() { n += peek8(sheet) + bank_peek8(bankof(other), other); }\n');
+  await assert.rejects(() => buildFile(path.join(dir, 'main.vly')), (e) => /Unbanked art and data[^.]*biggest first: sheet 20000/.test(e.message) && /bank auto/.test(e.message));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('the soundtrack recipe in docs/modules.md works: songs in a banked records asset, copied into RAM buffers, played by std/music', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-songs-'));
+  const recs = [];
+  for (let i = 0; i < 6; i++) { const b = Buffer.alloc(1024); for (let k = 0; k < 32; k++) { b[k * 2] = 20 + (k % 6) * 2 + i; b[k * 2 + 1] = 2; } b[64] = 255; recs.push(b); }
+  fs.writeFileSync(path.join(dir, 'songs.bin'), Buffer.concat(recs));
+  fs.writeFileSync(path.join(dir, 'main.vly'), `import "std/music";
+asset songs bank auto records 1024 = incbin("songs.bin");
+byte buf0[1024]; byte buf1[1024]; byte buf2[1024];
+func start_song(i) {
+  songs_load(3 * i, buf0); songs_load(3 * i + 1, buf1); songs_load(3 * i + 2, buf2);
+  music_play(0, 0, buf0, 8); music_play(1, 1, buf1, 6); music_play(2, 2, buf2, 9);
+}
+func init() { master_volume(10); start_song(1); }
+func frame() { music_update(); }
+`);
+  const b = await buildFile(path.join(dir, 'main.vly'));
+  const r = runCartridge(b.bytes, { frames: 120, audio: true });
+  assert.deepEqual(r.faults, { DIV0: 0, RO_WRITE: 0, ILLEGAL: 0, OVERRUN: 0 });
+  assert.ok(r.audio.some((v) => Math.abs(v) > 0.02), 'the music is audible');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

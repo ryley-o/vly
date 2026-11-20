@@ -148,6 +148,8 @@ set_cell(2, 3, 100 + art_grass);        // art_grass is the tile index within th
 sprite(0, x, y, 100 + art_hero, SPR_16X16);
 ```
 
+**For a real game, put the art in a bank:** `tileset art bank auto = "art.tiles";` and call `select_bank(bankof(art));` before `load_tiles` (see "Banks"). A plain `tileset` sits in the 16 KB the CPU always sees, and a game with a few hundred tiles of art will not build that way (the error names the unbanked assets that fill it).
+
 `NAME_COUNT` is the tile count, `NAME_SIZE` the byte size, and `NAME_tilename` the first tile index of each named
 tile or sprite. A sprite of `WxH` tiles uses `W*H` consecutive tiles in row-major order, exactly what the sprite
 hardware expects. Sprite color 0 is transparent; background color 0 is opaque. **Draw order: a lower sprite number draws on top of a higher one**, so the first sprite you place is the frontmost (put a pet's face before its body, a message before the scenery); `std/sprites` numbers sprites in the order you call `spr()`, so call what must be on top first and far scenery (mountains, clouds) last. In a `.tiles` pixel row every character is a pixel: a stray

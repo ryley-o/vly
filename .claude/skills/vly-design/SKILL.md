@@ -39,6 +39,8 @@ bot through every one. Repeating sounds (guns, ticks) stay below 800 Hz and quie
 
 ## Numbers that work (pixels per frame at 60 fps; use 8.8 fixed point)
 
+*Generic starting numbers. For a Mario-style platformer use `vly docs ref-sidescroller` instead: its numbers differ on purpose (about 40 frames to walking speed, a 62 px held jump, two gravities, no speed cut on release) and it wins for that genre.*
+
 Walk 1.0-1.5; run 2.0-2.5; reach top speed in 8-12 frames, stop in 6-8. Gravity 0.25; jump launch -4.0 (peak 32 px, about 32 frames in the
 air); release A early to cut the jump; terminal fall 4-5. Coyote time 5 frames, jump buffer 6. Hit-stop 2-4 frames; invulnerability
 60-90 frames blinking; knockback 2-3 px for 8-10 frames; shake 1-2 px for 6-10 frames. Camera: lead the move direction, max 2 px/frame.

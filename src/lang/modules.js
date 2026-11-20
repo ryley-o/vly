@@ -755,7 +755,7 @@ const PLATFORMER_SOURCE = `
 // ===== std/platformer: Super Mario Bros. movement, collision and jumping =====
 // Write one function in your game:   func pl_solid(x, y) { return ...; }   1 if the world pixel (x, y) is solid, else 0.
 // Then each frame:   pl_step(dir, run, jump_pressed, jump_held);   and draw a sprite at (pl_x - 2, pl_y) for the default 12 x 16 body.
-// The numbers are SMB1's own (see docs/ref/sidescroller.md): walk 1.5 px/frame, run 2.5, jump 4 blocks with A held, a tap still hops a block.
+// The numbers are SMB1's own (see docs/ref-sidescroller.md): walk 1.5 px/frame, run 2.5, jump 4 blocks with A held, a tap still hops a block.
 // Positions are whole pixels (pl_x, pl_y: the top-left of the body) plus remainders, so a 1,920-pixel world works.
 var pl_x; var pl_y; var pl_fx; var pl_fy;
 var pl_vx;                   // 1/4096 pixel per frame (6144 = 1.5 px/frame)
@@ -860,7 +860,8 @@ func pl_vstep(jp, jh) {
     if (on && !pl_ground) { pl_landed = 1; }
     pl_ground = on;
   }
-  if (pl_ground) { pl_coyote = pl_coyote_max; pl_vy = 0; pl_fy = 0; } else if (pl_coyote > 0) { pl_coyote--; }
+  // pl_coyote_max + 1: the counter drops on the first frame in the air, so pl_coyote_max is the number of airborne frames a jump still works
+  if (pl_ground) { pl_coyote = pl_coyote_max + 1; pl_vy = 0; pl_fy = 0; } else if (pl_coyote > 0) { pl_coyote--; }
   if (jp) { pl_jbuf = pl_buffer_max; } else if (pl_jbuf > 0) { pl_jbuf--; }
   if ((jp || pl_jbuf > 0) && (pl_ground || pl_coyote > 0)) {
     var av = abs(pl_vx);

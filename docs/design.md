@@ -141,7 +141,7 @@ Further reading, if you want the detail: Miyamoto on World 1-1 ([Game Developer]
 - **Keep the HUD in the window layer**, not the background. `scroll()` moves the whole background, so a HUD drawn there
   scrolls away. The window layer sits on top and does not scroll: `lcd(LCD_BG | LCD_WIN | LCD_OBJ)`, `window_pos(0, 128)`
   puts a two-row strip along the bottom, and `wtext`, `wprint_u` and `set_wcell` write to it. Reserve the top or bottom two
-  rows for the HUD and **never let gameplay objects enter that zone**.
+  rows for the HUD and **never let gameplay objects enter that zone**. Two traps seen in real games: sprites are drawn *over* the window layer, so a hero or platform that falls into a pit passes over the HUD (hide or stop drawing a sprite when its y reaches the HUD rows); and colour 0 of a background tile and an unwritten window cell are opaque, so blank HUD cells show the scene behind them until you fill them with an explicit solid tile. A 160 x 144 screen minus a two-row HUD leaves 8 block rows of 16 px (not 9) for play.
 - **One ground truth.** Every surface the player can stand on or drive over is at one height you can name (a row of tiles, or a
   height table). Place decoration relative to it: a puddle, a flower or a fence post sits **on** the ground line, not 8
   pixels above it. If it is decoration, make it visibly different from anything solid (colour, behind-sprite flag, no outline).
@@ -265,6 +265,8 @@ Inside a level, the arrows plus A and B are usually enough (Mario, Tetris and Ki
 - **Taps, holds and releases are three different inputs; test them separately.** If a tap means "go" and a hold means "go fast", a plain tap must not trigger the fast version, and a hold that begins on one screen must not carry into the next. `std/flow` has `bt_tap(b)` (fires on release of a press of 12 frames or fewer), `bt_hold(b, n)` (fires once, after n frames held) and `bt_flush()` (ignore a button already held when the screen changes until it is released): call `bt_update()` first in `frame()`. Write a replay test for each: a tap, a hold, a release, a tap-then-hold, a hold across a screen change, and pause/resume. A touch screen has no key repeat and a thumb that rolls, a keyboard has repeat and ghosting: try both.
 
 ## 6. Game feel: numbers that work
+
+**These are generic starting numbers for any game.** For a Mario-style run-and-jump platformer, do not use them: `vly docs ref-sidescroller` (and `import "std/platformer"`) has the exact Super Mario Bros. numbers, and they differ on purpose (about 40 frames to walking speed, not 8 to 12; two gravities; a 62 px held jump, not 32; no speed cut when A is released). Where this section and a reference guide disagree, the reference guide wins for that genre.
 
 All speeds are in pixels per frame at 60 frames per second. For slow speeds like 0.5 px/frame use fixed point: **8.8** (value `x * 256`, draw with `x >> 8`) works only for positions
 under 128 px, such as a single screen or an object's offset. A **wide world** (a scrolling level, over 128 px) will not fit: keep the position in
