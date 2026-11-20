@@ -73,3 +73,19 @@ test('bot kit: delayArrays makes array reads late too', async () => {
   assert.ok(seen.late < live.v, `delayed ${seen.late} is older than live ${live.v}`);
   await assert.rejects(() => runBot({ rom: b.bytes, ram: b.stats.ram, delayArrays: ['t'], maxFrames: 3, decide: () => 0 }), /not an array/);
 });
+
+test('Machine.clone: a copy runs ahead on other inputs without disturbing the original, and replays identically', async () => {
+  const { Machine } = await import('../src/core/machine.js');
+  const b = await buildText({ text: GAME, filename: 'g.vly', baseDir: '/nonexistent' });
+  const m = new Machine(b.bytes); m.boot();
+  for (let i = 0; i < 20; i++) m.runFrame(0);
+  const hex = (x) => Buffer.from(x).toString('hex');
+  const before = hex(m.stateHash());
+  const c = m.clone();
+  assert.equal(hex(c.stateHash()), before);
+  for (let i = 0; i < 30; i++) c.runFrame(mask('RIGHT'));
+  assert.equal(hex(m.stateHash()), before, 'running the clone leaves the original alone');
+  assert.notEqual(hex(c.stateHash()), before);
+  for (let i = 0; i < 30; i++) m.runFrame(mask('RIGHT'));
+  assert.equal(hex(m.stateHash()), hex(c.stateHash()), 'the same inputs give the same state');
+});

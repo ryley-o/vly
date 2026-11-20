@@ -9,7 +9,7 @@ import { commands, CliError } from './commands.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const BOOLEAN_FLAGS = new Set(['profile', 'tile', 'accept', 
-  'new', 'no-sources', 'no-verify', 'no-publish', 'dry-run', 'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex',
+  'new', 'no-sources', 'no-verify', 'no-publish', 'dry-run', 'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex', 'audio',
 ]);
 const SHORT = { o: 'out', h: 'help', f: 'frames', i: 'input', s: 'screenshot', j: 'json', v: 'version' };
 
@@ -91,7 +91,8 @@ async function main() {
     console.log(pkg.version);
     return;
   }
-  const name = args._.shift();
+  let name = args._.shift();
+  if (name === 'help' && args._[0] && commands[args._[0]]) { name = args._.shift(); args.flags.help = true; }   // "vly help check" = "vly check --help"
   if (!name || name === 'help' || (args.flags.help && !commands[name])) {
     console.log(HELP);
     return;

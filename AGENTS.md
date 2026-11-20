@@ -33,7 +33,7 @@ vly run build/mygame.vlc --frames 120 --input "RIGHT@0-59" --screenshot shot.png
 vly test                                                      # assertions in vly.json
 ```
 
-**Before designing, read `vly docs design`** (its table of reference guides sends you on: `vly docs ref-sidescroller` is the Mario recipe and `import "std/platformer"` for anything that runs and jumps; `vly docs ref-music` for the music) (the quality bar: a good game has a title, pause, game over, sound for every event,
+**Before designing, read `vly docs design`** (its table of reference guides sends you on: `vly docs ref-sidescroller` is the Mario recipe and `import "std/platformer"` for anything that runs and jumps; `vly docs ref-music` for the music, `vly docs ref-genres` for the recipe of your kind of game) (the quality bar: a good game has a title, pause, game over, sound for every event,
 more than one stage, depth; the playbook has numbers, readability rules and a finishing checklist). **Before calling it finished, run
 `vly check`** (quality gates) and fix or explain every WARN. **To hand over, run `vly release`**: it builds, runs your tests and the check, loads an old release's save, records the opening, publishes (only with the person's OK) and verifies the link, and writes an offline copy.
 
@@ -80,7 +80,7 @@ same inputs = same pixels, so tests can check exact hashes.
 
 ## Report what hurt, send fixes
 
-If you built something with VLY-1 and a doc, tool or error message misled you, say so: open an issue or a pull request (`CONTRIBUTING.md`, `docs/agent-trials.md`). Keep a worklog while you work; it is the most useful thing you can hand back.
+If you built something with VLY-1 and a doc, tool or error message misled you, say so: put it in your final report to the person, and if you can, open an issue on https://github.com/ryley-o/vly. Keep a worklog while you work (what you read, what cost you time, what you wished for); it is the most useful thing you can hand back.
 
 ## Working on this repository
 

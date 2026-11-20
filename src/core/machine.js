@@ -363,6 +363,22 @@ export class Machine {
     return sha256(all);
   }
 
+  /**
+   * An independent copy of the machine at this instant (same cartridge, memory, registers, flags, PRNG, frame count).
+   * Run it ahead with other inputs to look before you leap: a planner bot tries several plans on clones and keeps the best.
+   * The copy never calls onSave.
+   */
+  clone() {
+    const m = new Machine(this.rom);
+    m.mem.set(this.mem);
+    m.r.set(this.r);
+    m.pc = this.pc; m.z = this.z; m.n = this.n; m.c = this.c; m.v = this.v;
+    m.prng = this.prng; m.frame = this.frame; m.overran = this.overran;
+    m.lastCycles = this.lastCycles; m.initCycles = this.initCycles; m.initOverran = this.initOverran;
+    m.prevInput = this.prevInput; m.saveRequests = this.saveRequests; m.booted = this.booted;
+    return m;
+  }
+
   /** Copy of the 1,024-byte save region as it is now. */
   saveBytes() { return this.mem.slice(C.SAVE_START, C.SAVE_START + C.SAVE_SIZE); }
 }

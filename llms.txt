@@ -21,6 +21,7 @@ All the docs that matter, as one page: `https://vly-1.vercel.app/llms-full.txt` 
 - [docs/design.md](docs/design.md): the design playbook. Read before designing, and again before calling a game finished
 - [docs/ref-sidescroller.md](docs/ref-sidescroller.md): reference guide for running-and-jumping games: the exact Super Mario Bros. movement numbers, collision, camera, level design, and `import "std/platformer"` (a tested module that does it). Read it before building a platformer
 - [docs/ref-music.md](docs/ref-music.md): reference guide for music: channel roles, what the classics did, public-domain classical pieces to arrange, loop length, mixing for a tiny speaker. Read it before writing music
+- [docs/ref-genres.md](docs/ref-genres.md): reference guide to genres: the recipe, numbers and sample game for a platformer, racer, shooter, puzzle, story, rhythm, virtual pet and versus game. Read the one for your game before you build its core loop.
 - [docs/workflow.md](docs/workflow.md): the build/run/test loop in detail, recorded bots, releases
 - [docs/language.md](docs/language.md): the VLY language, including banks (`bank auto`, `records`)
 - [docs/stdlib.md](docs/stdlib.md): standard library reference

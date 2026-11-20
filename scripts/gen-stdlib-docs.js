@@ -37,7 +37,7 @@ const DOCS = {
   // text
   load_font: 'Copy the 95 built-in glyph tiles into tile RAM starting at tile `first` and remember it for `text()`.',
   put_text: 'Write string `s` into the 32x32 map at `map` (`BG_MAP` or `WIN_MAP`) starting at (`col`, `row`). `\\n` starts a new line.',
-  text: 'Write string `s` into the background map at (`col`, `row`). Needs `load_font` first.',
+  text: 'Write string `s` into the background map at (`col`, `row`). Needs `load_font` first. **Glyph ink is palette colour 3** of the tile\'s palette (colour 0 is the background): put your text colour in colour 3 of that palette.',
   wtext: 'Write string `s` into the window map.',
   utoa: 'Convert an unsigned number to a string in a shared buffer; returns its address (valid until the next call).',
   itoa: 'Convert a signed number to a string in a shared buffer; returns its address.',

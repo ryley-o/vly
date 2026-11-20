@@ -197,3 +197,15 @@ test('vly test --accept takes a changed picture hash, but never when another exp
   assert.match(w.stdout, /WARNING: over 80,000/);
   assert.match(w.stdout, /worst frames: 4 \(/, 'the frame that filled the map is the first one listed (frames count from 0)');
 });
+
+test('vly run --audio prints how long and how loud the sound was; vly help <command> is vly <command> --help', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const cli = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'cli', 'vly.js');
+  const cart = path.join(conf, 'template_pong.vlc');
+  const run = spawnSync(process.execPath, [cli, 'run', cart, '--frames', '120', '--audio'], { encoding: 'utf8' });
+  assert.match(run.stdout, /audio: audible [\d.]+ of 2 s, peak [\d.]+ of full scale/);
+  const a = spawnSync(process.execPath, [cli, 'help', 'release'], { encoding: 'utf8' }).stdout;
+  const b = spawnSync(process.execPath, [cli, 'release', '--help'], { encoding: 'utf8' }).stdout;
+  assert.equal(a, b);
+  assert.match(a, /whole release in one command/);
+});

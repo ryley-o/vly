@@ -85,7 +85,7 @@ Compound assignment on an array element evaluates the index expression twice, so
 
 ## Functions
 
-- Parameters and locals are stack variables. Recursion works; the stack has about 4 KB, so keep recursion shallow.
+- Parameters and locals are stack variables holding **one word each**. There are no local arrays: declare arrays globally (`var cells[64];`), and pass a function an array's *address* (the array name alone) which it reads with `peek(p + i * 2)` and `peek8(p + i)` and writes with `poke(p + i * 2, v)`. Recursion works; the stack has about 4 KB, so keep recursion shallow.
 - Arguments are evaluated left to right. A function with no `return` yields an undefined value; use `return expr;`
   when you need one.
 - `init()` (optional, no parameters) runs once at power-on with a budget of 1,200,000 cycles. `frame()` (required,
@@ -219,7 +219,7 @@ asset music bank auto = incbin("music.bin");
 ```
 asset levels bank auto records 240 = incbin("levels.bin");   // a generator script writes levels.bin: 240 bytes per level
 ...
-n = levels_load(7, grid);        // copy level 7 into RAM at grid (fast: use this at the start of a level)
+n = levels_load(7, grid);        // (the functions take your asset's name: `asset lv ... records` gives lv_load, lv_peek8, lv_peek, lv_COUNT) copy level 7 into RAM at grid (fast: use this at the start of a level)
 t = levels_peek8(i, j);          // byte j of level i, straight from ROM (about 60 cycles; fine for the odd read, not a loop of thousands)
 w = levels_peek(i, j);           // the word at byte j of level i
 levels_COUNT   levels_RECORD   levels_PER_BANK   // constants: records, bytes per record, records per bank

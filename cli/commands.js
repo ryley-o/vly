@@ -14,7 +14,7 @@ import { filmstrip, evenFrames } from '../src/tools/filmstrip.js';
 import { wavFromFloat } from '../src/core/audio.js';
 import { parseUntil } from '../src/tools/names.js';
 import { profileCartridge, profileFrames } from '../src/tools/profile.js';
-import { checkCartridge, monkeyScript } from '../src/tools/check.js';
+import { checkCartridge, monkeyScript, audibility } from '../src/tools/check.js';
 import { compare as compareProject, verdict, loadIndex as loadOriginalityIndex, readProjectFiles } from '../src/tools/originality.js';
 import { parseTilesText, tilesFromRGBA, tilesToRGBA, pngToTilesText } from '../src/tools/tiles.js';
 import { runSpecFile, findSpecFiles } from '../src/tools/testrunner.js';
@@ -196,7 +196,7 @@ export const commands = {
   },
 
   run: {
-    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav]\n  Run a cartridge headlessly. Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
+    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio]\n  Run a cartridge headlessly. Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
     async run(args) {
       const { rom, built } = await loadCart(args._[0]);
       let ram = built?.stats?.ram;
@@ -240,7 +240,7 @@ export const commands = {
       const gifEvery = args.flags.gif ? int(args.flags['gif-every'] ?? 2) : 0;
       let r;
       try {
-        r = runCartridge(rom, { frames, until, input: inputText(args), save, screenshotFrames: [...shotFrames], mem, watch, trace, worst: args.flags.worst ? int(args.flags.worst) : 5, capture: gifEvery ? { every: gifEvery, max: 900 } : undefined, audio: !!args.flags.wav });
+        r = runCartridge(rom, { frames, until, input: inputText(args), save, screenshotFrames: [...shotFrames], mem, watch, trace, worst: args.flags.worst ? int(args.flags.worst) : 5, capture: gifEvery ? { every: gifEvery, max: 900 } : undefined, audio: !!(args.flags.wav || args.flags.audio) });
       } catch (e) { throw new CliError(e.message); }
       const files = [];
       if (args.flags.screenshot) {
@@ -289,8 +289,13 @@ export const commands = {
         worstFrames: r.worstFrames, frameHash: r.frameHash, stateHash: r.stateHash, saveRequests: r.saves.length, files,
         mem: r.mem.map((m, i) => ({ name: mem[i].name, addr: hex(m.addr), bytes: m.bytes, words: m.bytes.length >= 2 ? Array.from({ length: m.bytes.length >> 1 }, (_, k) => m.bytes[k * 2] | (m.bytes[k * 2 + 1] << 8)) : undefined })),
       };
+      if (r.audio) {
+        const au = audibility(r.audio, args.flags.until && r.stoppedAt ? r.stoppedAt : frames);
+        data.audio = { audibleSeconds: Number(au.seconds.toFixed(1)), ofSeconds: Number(au.of.toFixed(1)), peak: Number(au.peak.toFixed(2)) };
+      }
       if (r.init.overran) faultList.unshift(`init() ran out of its ${r.init.budget}-cycle budget and was cut off`);
       let text = `ran ${r.stoppedAt ?? frames} frames: ${faultList.length ? 'FAULTS' : 'ok'}${until ? (r.stoppedAt !== null ? ` (stopped: ${args.flags.until} held)` : ` (${args.flags.until} never held in ${frames} frames)`) : ''}\n`;
+      if (data.audio) text += `audio: audible ${data.audio.audibleSeconds} of ${data.audio.ofSeconds} s, peak ${data.audio.peak} of full scale${data.audio.peak > 0.6 ? '  WARNING: loud on a small speaker (lower master_volume)' : ''}\n`;
       text += `init: ${r.init.cycles} cycles (budget ${r.init.budget})\n`;
       text += `cycles/frame: max ${r.cycles.max}, avg ${r.cycles.avg} (budget ${r.cycles.budget})${r.cycles.max > 80000 ? '  WARNING: over 80,000 in one frame: little headroom' : ''}\n`;
       if (args.flags.worst || r.cycles.max > 80000) text += `worst frames: ${r.worstFrames.map((w) => `${w.frame} (${w.cycles})`).join(', ')}   (see docs/design.md for what is expensive)\n`;
@@ -471,7 +476,8 @@ export const commands = {
       }
       // 4. a previous release's save, then keep playing
       const legacy = [...(cfg.legacySaves || []), ...(fs.existsSync('tests/legacy-saves') ? fs.readdirSync('tests/legacy-saves').filter((f) => f.endsWith('.sav')).map((f) => path.join('tests/legacy-saves', f)) : [])];
-      if (!legacy.length) lines.push('  note  no previous release\'s save to try: put one in tests/legacy-saves/ (a save made by the last release), so "update the game, keep the players\' progress" is tested');
+      const testsLoadSaves = (cfg.tests || []).some((t) => t && t.save);
+      if (!legacy.length && !testsLoadSaves) lines.push('  note  no previous release\'s save to try: put one in tests/legacy-saves/ (a save made by the last release), so "update the game, keep the players\' progress" is tested (or give a vly.json test a "save" file: that counts too)');
       for (const f of [...new Set(legacy)]) {
         try {
           const save = new Uint8Array(fs.readFileSync(f));

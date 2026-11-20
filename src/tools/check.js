@@ -54,7 +54,7 @@ function describeMonkey(seed, frames) {
 }
 const framesList = (a) => (a.length ? `${a.slice(0, 6).join(', ')}${a.length > 6 ? ` and ${a.length - 6} more` : ''}` : 'never');
 
-function audibility(samples, frames) {
+export function audibility(samples, frames) {
   if (!samples) return { seconds: 0, of: frames / 60, peak: 0 };
   let peak = 0, loud = 0;
   for (let i = 0; i + 735 <= samples.length; i += 735) {

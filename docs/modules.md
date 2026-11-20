@@ -8,6 +8,10 @@ import "std/anim";     // animation and timing helpers
 import "std/music";    // a three-voice tracker for background music and jingles (what to write: `vly docs ref-music`)
 ```
 
+**Names a module keeps for itself.** Importing a module reserves these name prefixes, so do not start your own variables or functions with them (the compiler tells you which module owns a name and to rename yours): `ui_ menu_ dlg_ dialog_` (std/ui), `anim_` (std/anim), `mus_ music_ N_ MUS_` (std/music), `spr_` and `spr` (std/sprites), `sfx_ SFX_` (std/sfx), `stream_` (std/stream), `tune_ TUNE_` (std/tunes), `fade_` (std/fade), `bt_ BT_ cf_ confirm_ pg_ grade_ grid_` (std/flow), `pl_` (std/platformer). The standard library keeps `font_base`, `text_pal` and `audio_hold`.
+
+**Variables a module lets you poke** (everything else is private): `fade_bg[32]` and `fade_obj[32]` (the palettes a fade scales: `fade_save()` copies the live palettes there; change a word to change what the fade brings back, then `fade_set(level)` or `fade_to(level, speed)`), `fade_speed` (frames per step), `mus_duty[voice]` (pulse width of a music voice, 0 to 3; also `music_duty(voice, d)`), `mus_muted` (1 silences the music), `audio_hold[channel]` (frames a sound effect owns a channel; music leaves a held channel alone), `text_pal` (palette 0 to 7 that `text()` uses), `font_base` (tile where the glyphs start), `menu_sel` (the highlighted item after `menu_open`).
+
 Built-in modules are written in VLY. Like the standard library, only the functions and variables your program uses are
 included in the cartridge, and you can redefine any of them. They need `load_font()` (text) and, for `std/ui`, one call
 to `ui_init(first_tile)`, which loads 11 small frame and cursor tiles into tile RAM starting at `first_tile`.

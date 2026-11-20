@@ -141,3 +141,40 @@ fs.writeFileSync('tests/after-win.sav', r.save);                  // a finished 
 
 Other tricks that paid off: `vly run ... --watch score,left` shows exactly when things happen (the first kill, the first
 death), and `--filmstrip 12 --filmstrip-out strip.png` shows a whole run in one image.
+
+### A search bot for action games: look ahead on clones (`Machine.clone()`)
+
+A policy bot ("if the foe is left, go left") is enough for puzzles and simple shooters. A **platformer, a racer or anything with timing and phases** needs a bot that *tries things*: copy the machine, run each candidate plan a few dozen frames ahead on the copy, keep the plan that scores best, commit its first few frames on the real machine, repeat. This is the bot that finds what `vly check` cannot: a goal your level generator erased, a platform one pixel too high to reach, a collectible out of jump range, a **soft-lock** (a spot where the player can no longer progress, such as a spring left behind off-screen).
+
+```js
+import { Machine } from './vly/src/core/index.js';
+import { mask } from './vly/src/tools/bot.js';
+const m = new Machine(rom); m.boot();
+const read = (c, n) => c.read16(ram[n].addr);                   // ram: the *.map.json written by vly build
+const plans = [                                                 // each plan is a list of [buttons, frames]
+  [[mask('RIGHT'), 30]], [[mask('RIGHT|A'), 30]], [[mask('RIGHT|A'), 12], [mask('RIGHT'), 18]],
+  [[mask('LEFT'), 10], [mask('RIGHT|A'), 20]],                  // walking backwards, or it can never fetch the spring it needs
+];
+const score = (c) => read(c, 'px') * 4 - read(c, 'py') / 8 + (read(c, 'lives') < lives0 ? -5000 : 0);
+const inputs = [];
+while (read(m, 'state') !== WIN && inputs.length < 20000) {
+  let best = null;
+  for (const plan of plans) {
+    const c = m.clone();                                        // an independent copy: cheap, about 10,000 frames a second
+    for (const [btn, n] of plan) for (let i = 0; i < n; i++) c.runFrame(btn);
+    const s = score(c);
+    if (!best || s > best.s) best = { s, plan };
+  }
+  for (const [btn, n] of best.plan.slice(0, 1)) for (let i = 0; i < Math.min(n, 8); i++) { m.runFrame(btn); inputs.push(btn); }  // commit only the first 8 frames
+}
+```
+
+Write `inputs` out as `BUTTON@START-END` segments (as above), save them as `tests/stageN.input`, and a `vly.json` test replays them. Pitfalls that cost one real build an hour:
+
+- **Commit only the first N frames of the winning plan**, then plan again. A plan that waits (zero frames) and one that runs must start at the same time, or the bot waits forever; every plan needs the same tail policy.
+- **Scores must be continuous.** A score that drops when a boss spawns or when the bot is "near the gem" makes it refuse to cross that line. Reward progress smoothly, penalise death hard.
+- **Include plans that walk backwards** (left for 10 frames, then right). A bot that only goes forward cannot fetch a spring or key behind it, and will call a solvable level a soft-lock.
+- **Waiting plans must not share the running tail,** or "wait" always ties "run" and loses on an arbitrary tie-break.
+- **Goal modes:** pass the target in the score (`--gem 2` in your own script): the same bot can prove every collectible is reachable, not just that the exit is.
+- **A perfect bot proves the level is possible, not that it is fair.** Add a clumsy bot (decides only every 0.3 s, picks a random plan one time in five) and report how many stages it clears; the stages it fails show where a person will struggle.
+- The bot's deaths per stage are your **difficulty curve**: print them. If deaths do not rise from stage 1 to stage 12, the curve is flat.
