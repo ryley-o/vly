@@ -42,7 +42,7 @@ button.k.down { background: var(--btn-down); }
 <div id="msg"><div id="msgtext"></div></div>
 <script>
 // no zoom on a double tap or a pinch: this is a game pad that gets tapped fast
-(function () { var last = 0; document.addEventListener('touchend', function (e) { var t = Date.now(); if (t - last < 350) e.preventDefault(); last = t; }, { passive: false }); ['gesturestart', 'gesturechange', 'gestureend', 'dblclick'].forEach(function (n) { document.addEventListener(n, function (e) { e.preventDefault(); }); }); })();
+(function () { var last = 0; document.addEventListener('touchend', function (e) { var t = Date.now(); if (t - last < 600) e.preventDefault(); last = t; }, { passive: false }); var pad = document.getElementById('pad'); if (pad) { pad.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false }); pad.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false }); } ['gesturestart', 'gesturechange', 'gestureend', 'dblclick'].forEach(function (n) { document.addEventListener(n, function (e) { e.preventDefault(); }); }); })();
 (function () {
   "use strict";
   var WASM = "__WASM_BASE64__";
