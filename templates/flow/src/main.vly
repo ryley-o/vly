@@ -16,14 +16,13 @@ const LEVELS = 12;
 var state;
 var t;                               // frames in this screen
 var has_save;                        // 1 when the save holds progress
-var menu_n;                          // how many items the menu has (1 without a save, 3 with one)
+var menu_n;                          // how many items the menu has (1 without a save, 2 with one)
 var beaten;                          // levels beaten
 var next_level;                      // the first level not beaten yet
 var level;                           // the level being played
 var goal; var now; var turns; var pick;
 var done; var last_grade; var msg_t;
-table menu_all = { "CONTINUE", "NEW GAME", "ERASE DATA" };
-var erase_only;                      // 1 when the confirm box came from ERASE DATA (back to the menu afterwards), 0 from NEW GAME (on to the story)
+table menu_all = { "CONTINUE", "NEW GAME" };
 table menu_new = { "NEW GAME" };
 
 func put_num(col, row, n) {          // a number of up to two digits, drawn with the font
@@ -60,7 +59,7 @@ func go(s) {
   text_pal = 0;
   if (s == S_MENU) {
     refresh();
-    if (has_save) { menu_n = 3; menu_open(BG_MAP, 4, 8, menu_all, 3); } else { menu_n = 1; menu_open(BG_MAP, 4, 9, menu_new, 1); }
+    if (has_save) { menu_n = 2; menu_open(BG_MAP, 4, 9, menu_all, 2); } else { menu_n = 1; menu_open(BG_MAP, 4, 9, menu_new, 1); }
   }
   if (s == S_STORY) {
     centre(5, "YOUR STORY GOES");
@@ -142,9 +141,7 @@ func frame() {
       sfx_play(SFX_COIN);
       var pickd = m;
       if (menu_n == 1) { pickd = 1; }        // with no save the only item is NEW GAME
-      erase_only = 0;
       if (pickd == 0) { go(S_STORY); }
-      else if (pickd == 2) { erase_only = 1; go(S_CONFIRM); confirm_open(BG_MAP, 2, 6, "ERASE ALL DATA?", "GRADES AND LEVELS GO"); }
       else if (has_save) { go(S_CONFIRM); confirm_open(BG_MAP, 2, 6, "ERASE SAVE?", "ALL GRADES GO"); }
       else { go(S_STORY); }
     }
@@ -153,7 +150,7 @@ func frame() {
     var c = confirm_update();
     if (cf_sel != before_cf) { sfx_play(SFX_SELECT); }
     if (c == 0) { sfx_play(SFX_BACK); go(S_MENU); }
-    if (c == 1) { sfx_play(SFX_EXPLODE); save_clear(); pg_save(); refresh(); if (erase_only) { go(S_MENU); } else { go(S_STORY); } }
+    if (c == 1) { sfx_play(SFX_EXPLODE); save_clear(); pg_save(); refresh(); go(S_STORY); }
   } else if (state == S_STORY) {
     blink_a(9, 14);
     if (btnp(BTN_A) || btnp(BTN_START)) { sfx_play(SFX_SELECT); go(S_HOWTO); }
