@@ -93,7 +93,7 @@ test('walking off a ledge: a jump still works for 4 frames (coyote time), not 12
   assert.ok(Math.min(...bad.slice(start).map((r) => r.vy)) >= 0, 'a jump 12 frames late does not');
 });
 
-test('buried in a block that switched on: pushed out to the nearest free spot (up first), never stuck', async () => {
+test('buried on both sides by a block that switched on: floats up one pixel a frame until free, never stuck', async () => {
   // a solid 32x30 block appears around the player on frame 30
   const solid = `(y >= ${FLOOR}) || (frames() > 30 && x >= 10 && x < 42 && y >= 70 && y < 100)`;
   const rows = await play(solid, '', 90, '24, 70');
@@ -178,4 +178,16 @@ func frame() {
   runCartridge(b.bytes, { frames: 40, onFrame: (f, m) => { out = { stomps: m.read16(ram.stomps.addr), hurts: m.read16(ram.hurts.addr) }; } });
   assert.ok(out.stomps >= 2, `both stomped (${out.stomps})`);
   assert.equal(out.hurts, 0, 'and nothing hurt');
+});
+
+test('SMB1 ImpedePlayerMove: a solid touching one side pushes the character one pixel per frame away from it, and zeroes its speed', async () => {
+  // a wall appears on frame 20 over the right 6 pixels of the body (body x 40..52; wall from x 46)
+  const solid = `(y >= ${FLOOR}) || (frames() > 20 && x >= 46 && x < 70 && y < 112)`;
+  const rows = await play(solid, '', 60, '40, 96');
+  const at = (f) => rows[f].x;
+  assert.equal(at(19), 40);
+  assert.equal(at(21) - at(20), -1, 'one pixel left in the first frame');
+  assert.equal(at(22) - at(21), -1, 'and one more the next');
+  assert.ok(at(50) <= 34 && at(50) >= 30, `free after about 6 pixels (${at(50)})`);
+  assert.equal(rows[50].vx, 0);
 });

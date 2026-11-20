@@ -892,8 +892,7 @@ func pl_hit() {
   while (r < pl_h - 1) { if (pl_row(pl_y + r, pl_x, pl_w)) { return 1; } r += 8; }
   return pl_row(pl_y + pl_h - 1, pl_x, pl_w);
 }
-// Buried in something solid: move to the nearest free spot (SMB1 pushes the character out sideways; a switch block that turns solid
-// should never trap you), looking up first, then right, then left, one pixel further each time. Called by pl_step.
+// Last resort when pl_unstick cannot float up: the nearest free spot, looking up first, then right, then left, one pixel further each time.
 func pl_eject() {
   var x0 = pl_x; var y0 = pl_y;
   var d = 1;
@@ -905,6 +904,18 @@ func pl_eject() {
   }
   pl_x = x0; pl_y = y0;
   return 0;
+}
+
+// Squeezed into something solid, SMB1 style: ImpedePlayerMove moves the character 1 pixel per frame sideways, away from the side whose probe
+// touched a solid, and zeroes its speed; it never teleports. SMB1 never puts a block on Mario, so a character buried on BOTH sides is our case:
+// float up 1 pixel per frame (and if the ceiling is in the way, fall back to the nearest free spot, pl_eject). Called by pl_step.
+func pl_unstick() {
+  var l = pl_col(pl_x + 1, pl_y, pl_h);
+  var r = pl_col(pl_x + pl_w - 2, pl_y, pl_h);
+  if (l && !r) { pl_x++; if (pl_vx < 0) { pl_vx = 0; pl_fx = 0; } return; }
+  if (r && !l) { pl_x--; if (pl_vx > 0) { pl_vx = 0; pl_fx = 0; } return; }
+  if (!pl_row(pl_y - 1, pl_x, pl_w)) { pl_y--; pl_vy = 0; pl_fy = 0; return; }
+  pl_eject();
 }
 
 // The camera, the way SMB1 does it: it follows the character only when the character is more than pl_cam_line pixels in from the left
@@ -946,7 +957,7 @@ func pl_step(dir, run, jump_pressed, jump_held) {
   pl_bump = 0;
   if (pl_inv > 0) { pl_inv--; }
   if (pl_stomp_t > 0) { pl_stomp_t--; }
-  if (pl_hit()) { pl_eject(); }
+  if (pl_hit()) { pl_unstick(); }
   pl_hstep(dir, run);
   pl_vstep(jump_pressed, jump_held);
 }
