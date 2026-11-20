@@ -26,6 +26,7 @@ palette in `text_pal` (default 0). Coordinates are in 8x8 cells.
 | `ui_init(first)` | load the UI tiles at tile `first` (call once, after `load_font`) |
 | `ui_box(map, col, row, w, h)` | draw a framed blank box, `w` x `h` cells including the frame |
 | `ui_clear(map, col, row, w, h)` | blank a rectangle |
+| `ui_centre(w)` | the column that centres something `w` cells wide on the 20-cell screen: use it for menus, grids and titles instead of a hand-picked margin |
 | `menu_open(map, col, row, items, count)` | draw a menu; `items` is a word table of strings: `table items = {"FIGHT", "ITEM"};` |
 | `menu_update()` | call every frame: returns `-1` (nothing yet), the chosen index when A is pressed, or `-2` when B is pressed. UP/DOWN move the cursor and wrap |
 | `menu_close()` | erase the menu |
@@ -105,7 +106,9 @@ func init() { pl_init(24, 96); }
 func frame() { pl_step(btn(BTN_RIGHT) - btn(BTN_LEFT), btn(BTN_B), btnp(BTN_A), btn(BTN_A)); }
 ```
 
-Walk 1.5 px/frame, run 2.5 (B), 40 frames to top speed, skid, a 10-frame run timer, a jump that is a hop when tapped and 4 to 5 blocks when held, speed kept in the air, 12 x 16 body, one pixel at a time, slides round block corners, coyote time and a jump buffer. Read `pl_x, pl_y, pl_vx, pl_vy, pl_face, pl_ground`; check `pl_jumped, pl_landed, pl_bump (pl_bx, pl_by)` for sounds and block hits; call `pl_bounce()` after stomping an enemy; tune with `pl_coyote_max`, `pl_buffer_max`, `pl_nudge`, `pl_inset`, `pl_w`, `pl_h`. The numbers, why they feel right, collision, camera and level design are in `vly docs ref-sidescroller`.
+Walk 1.5 px/frame, run 2.5 (B), 40 frames to top speed, skid, a 10-frame run timer, a jump that is a hop when tapped and 4 to 5 blocks when held, speed kept in the air, 12 x 16 body, one pixel at a time, slides round block corners, coyote time and a jump buffer. Read `pl_x, pl_y, pl_vx, pl_vy, pl_face, pl_ground`; check `pl_jumped, pl_landed, pl_bump (pl_bx, pl_by)` for sounds and block hits; call `pl_bounce()` after stomping an enemy; `pl_camera(world_width)` after `pl_step` is the Mario camera (see below); a character buried in something solid (a switch block that just turned on) is pushed to the nearest free spot by `pl_step` itself (`pl_hit()`, `pl_eject()`); tune with `pl_coyote_max`, `pl_buffer_max`, `pl_nudge`, `pl_inset`, `pl_w`, `pl_h`. The numbers, why they feel right, collision, camera and level design are in `vly docs ref-sidescroller`.
+
+**The camera:** call `pl_camera(world_width_in_pixels)` once per frame right after `pl_step`, then draw the player at `pl_x - pl_cam` and scroll the background by `pl_cam` (`stream_scroll(pl_cam)`) in the same frame. It is SMB1's camera: it moves only when the character is past `pl_cam_line` (70 px) from the left edge, moves exactly as far as the character moved (whole pixels, so the sprite does not wobble: an eased or delayed camera is what makes scrolling look jerky), never scrolls back, stops at the end of the world, and keeps the character from walking off the left of the screen.
 
 ## Tilemaps: levels as ASCII art
 

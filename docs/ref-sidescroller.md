@@ -102,10 +102,14 @@ The screen is 160 x 144: **10 x 9 blocks of 16 pixels** (SMB has 16 x 15). Keep 
 
 ## 7. The camera and the screen
 
-- **Scroll when the character passes about 40% of the screen width** (x = 64 of 160), moving the camera exactly as far as the character moves past it, so the player always sees at least 6 blocks ahead at run speed (the run covers 2.5 px/frame: 6 blocks is 38 frames of warning).
-- **Never scroll back** in a stage (SMB's choice): backtracking is not a feature, it makes the left edge a wall, and it saves you from streaming content twice. If you want backtracking, say so in the plan.
-- **Vertical:** lock to the ground row unless the character is above row 3 or below row 7, then follow smoothly. Do not shake the camera on every jump.
-- **Boss rooms:** lock the camera, show the arena before the fight, give a checkpoint just before.
+**Use `pl_camera(world_width)` (after `pl_step`, every frame): it is SMB1's camera, tested.** What it does, and why each part matters:
+
+- **Scroll only when the character passes a line about 44% in from the left (SMB1: 112 of 256; here 70 of 160 px)**, and move exactly as far as the character moved that frame. The character then stays at the same screen position while the world slides under it, so nothing wobbles. A camera that eases toward the player, lags behind, or moves in fractions of the character's speed is what players call *jerky*: the character's pixel position steps while the camera glides, and the sprite shimmers against the background. Same whole pixels, same frame, for both.
+- **Order inside a frame:** read input, `pl_step`, move enemies, `pl_camera`, then draw sprites at `x - pl_cam` and scroll the background by `pl_cam` (`stream_scroll(pl_cam)`). Never draw with last frame's camera and this frame's player.
+- **Never scroll back** (SMB1's choice): the left edge of the screen is a wall (`pl_camera` pushes the character off it). Backtracking is not a feature, and it means you never stream content twice. If you want backtracking, say so in the plan.
+- **At the end of the world** the camera stops and the character walks to the flag.
+- **Vertical:** SMB1 never scrolls vertically; its stages are one screen tall (15 blocks). With 9 blocks of height, keep each stage within one screen of height where you can; if a stage climbs, lock the camera to the ground row and follow only when the character is above row 3 or below row 7, in whole pixels, with no easing. Do not shake the camera on every jump.
+- **Boss rooms:** stop the camera (the arena is one screen), show it before the fight, give a checkpoint just before.
 - Use `std/stream` for levels wider than the screen (one column of tiles at a time) and `asset levels bank auto records ...` for many stages (`vly docs language`).
 
 ## 8. Prove the feel (do this before you build levels)
@@ -142,10 +146,25 @@ Rules to design by (they come from Miyamoto's and Hayashida's own descriptions o
 11. **One signature per stage:** each stage has one new idea (a hazard, a mechanic or a set-piece) and one memorable place. A boss is a test of the idea the stage taught.
 12. **Length:** 60 to 120 seconds of play per stage for a first-time player (see "Depth and length" in the playbook), more stages beat longer ones, and the last stage is not the hardest by raw difficulty only: it uses everything.
 
-13. **The ground is a landscape, not a floor.** A bot-proven level can still be a long flat strip with things standing on it, which reads as empty. Change the ground height (a step up, a dip, a raised block island, a ceiling) at least every 2 screens; keep no stretch of dead flat floor longer than about 12 tiles without a block row, a coin arc, a slope of steps or a pipe; give every stage at least two heights to run on and one place where the player chooses between a high safe route and a low risky one. Vertical variety is what makes a stage feel designed (and it makes the jump heights matter).
+13. **Vary the ground.** A stage reads as designed when the ground changes: a step up, a dip, a raised block island, a low ceiling, a second height with a choice between a high safe route and a low risky one. A long stretch of bare flat floor with things standing on it reads as empty; fill it with a block row, a coin arc, steps or a pipe. (Players who played Fox Shift, a bot-proven 12-stage game, found its ground and level layout reasonable, so this is a guide, not a hard limit.)
 14. **A level is a path with a path for the eye.** Pull the player forward with a line of coins, a light, a distant landmark in the parallax; end the stage with a visible goal and a short fanfare.
 
 Layout checklist before you call a level done: play it with the delayed bot; read it as a row of 10-block screens and ask each one "what is new here, what is the challenge, where is the rest"; count the first time each hazard appears and check it is safe; find the longest stretch with nothing to do and cut or fill it; list the ground height per column (a `tools/` script over your level data) and check it changes at least every 2 screens; prove with a **search bot** that every collectible is reachable and the level has no soft-lock (`vly docs workflow`, "A search bot for action games").
+
+## 10. What real players noticed (a checklist; each one cost a game its feel)
+
+These come from people playing agent-built platformers. Test each one yourself, with a bot or a scripted input, before you hand the game over.
+
+1. **Checkpoints need breathing room.** A respawn must never put the character beside something that attacks. At every checkpoint: no enemy or hazard within 64 px (4 blocks) ahead or 32 px behind at the moment of respawn (move it, or start it asleep until the character moves), and about 90 frames of blinking invulnerability. *Test:* for each checkpoint, respawn and press nothing for 60 frames: no damage.
+2. **Nothing falls forever.** Any enemy, item or projectile that falls below the bottom of the world is removed (or, for the player, loses a life). Compare with signed arithmetic (`y > WORLD_BOTTOM`), because a y that goes below 0 on this 16-bit machine wraps to 65,000 and the thing shoots back to the top. *Test:* put an enemy over a pit and run 300 frames: it is gone.
+3. **A boss fight is one on one.** On entering the boss arena: lock the camera, remove every other enemy, stop the stage's spawners and projectiles, and only bring in minions on purpose, with a visible cue. Enemies that walk in from the left edge during a boss fight are a bug. *Test:* at the first frame of the fight and 600 frames later, count active enemies: only the boss (plus the minions you scripted).
+4. **Silence on every state change.** A boss's death sound that keeps playing into the menu and the next stage means a tone was left on. When the state changes (death, clear, menu, pause), call `sfx_stop()` and make jingles finite (`MUS_END`). *Test:* `vly run --audio` after the clear screen: the sound has stopped within 2 seconds.
+5. **Never stuck in a block.** A switch or timed block that turns solid on the character, a moving platform, a bad spawn: `pl_step` already pushes the character out to the nearest free pixel (`pl_eject`). If you write your own movement, do the same: look up first, then right, then left, one pixel further each time, until free. *Test:* switch the block on while standing in it: the character is free within a frame.
+6. **Run is B.** The people who play platformers want B to run, as in Mario. If your game needs a second action (a shift, a shot), make it automatic or contextual, use down plus A, or tie it to a pickup; if it must have its own button and you give up B for it, say so in the how-to page and make sure the game is still comfortable at walking speed.
+7. **Slide round corners.** Jumping up under the edge of a block must slide the character round it, not stop the jump (SMB1's behaviour; `pl_nudge` pixels). Tested in `std/platformer`: use it.
+8. **The front end is the common one.** A saved game gives CONTINUE, NEW GAME, ERASE DATA on the title, with NEW GAME and ERASE DATA each asking KEEP or ERASE (KEEP selected). No save: NEW GAME alone. Start from `vly new mygame --template flow`, which has exactly this and tests for it.
+9. **Length.** 24 or more stages in 6 to 8 worlds is a full game (SMB1 has 32 in 8). 12 stages is a demo to anyone who played the classics.
+10. **Centre what you draw.** Grids, menus and titles are centred with `ui_centre(width)`; a block that sits a cell or two left looks wrong.
 
 ## Sources and honesty
 

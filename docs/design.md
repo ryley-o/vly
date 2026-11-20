@@ -43,8 +43,8 @@ The table's "3 or more" is a floor. The NES games people still play had **8 stag
 and an overworld (Zelda)**, and took one to ten hours. The 1 MB cartridge allows that; a stage costs a few hundred bytes of level data plus the code that is reused. Our own sample
 games stop at three stages because they were built to show *techniques*; **do not copy that length**. Plan for it:
 
-- **Targets for a full game**: an action or platform game has **8 or more stages in 3 or 4 worlds** (each world a new look, palette, music track and *one new mechanic* introduced safely, used
-  in combination, then tested by a boss); a first playthrough takes **30 to 60 minutes** for a person (a bot that knows the level takes a third of that); a racing game has 12 or more tracks in
+- **Targets for a full game**: an action or platform game has **24 or more stages in 6 to 8 worlds** (Super Mario Bros. has 32 stages in 8 worlds, and a person who plays the classics found a 12-stage game too short). A world is 3 or 4 stages and a boss or castle, with a new look, palette, music track and *one new mechanic* introduced safely, used
+  in combination, then tested by the boss; a first playthrough takes **45 to 90 minutes** for a person (a bot that knows the level takes a third of that); a racing game has 12 or more tracks in
   cups; a puzzle game 40 or more levels (100 to 200 on a rising curve, or generated, is better); an adventure 6 or more areas. A small game (an arcade score-chaser) is fine at one screen, but then it needs **escalation** (new rules every minute), not stages.
 - **Plan the content in a table before coding** (one row per stage: name, theme, new mechanic or enemy, length in screens, boss or gimmick, music, secret). The table is what
   keeps stage 6 from being stage 2 with a new palette. Introduce each mechanic in a safe spot, repeat it with a twist, then combine it with an earlier one.
@@ -223,8 +223,8 @@ People like to see, not read (an AI reads every word; a player glances). Design 
 **The flow** (every game with progress):
 
 1. The console's boot logo (not yours). Then the game's **splash**: its art and name, a few seconds, any button skips.
-2. **Menu**: if a save with progress exists, **CONTINUE is first and selected**, then NEW GAME. On a first run there is only NEW GAME.
-3. **NEW GAME with a save asks first**: a box that names exactly what will be erased ("ERASE SAVE? ALL GRADES GO"), with **KEEP selected by default** and ERASE second. B cancels. Never erase on a single press.
+2. **Menu**: if a save with progress exists, the menu is exactly **CONTINUE (first and selected), NEW GAME, ERASE DATA**, in that order, every game. On a first run there is only NEW GAME. (Players who found only NEW GAME and no way to erase were confused: always offer the erase, always in the same words.)
+3. **NEW GAME with a save, and ERASE DATA, ask first**: a box that names exactly what will be erased ("ERASE SAVE? ALL GRADES GO"), with **KEEP selected by default** and ERASE second. B cancels. Never erase on a single press. ERASE DATA then returns to the menu; NEW GAME goes on to the story. Never let a NEW GAME silently resume old progress.
 4. The **opening story**: a few short lines (or pictures) that give the player a reason to care. Always after the menu, both for CONTINUE and NEW GAME.
 5. The **how-to page**: shown every time at startup, because it is the one page that has to explain symbols. Pictograms, not paragraphs: a frame with the D-pad cross and "MOVE", a frame with "A" and "PICK", a frame with "B" and "BACK", plus whatever symbols the puzzle uses (draw each and say what it does). This is the only place where words explain pictures.
 6. The **hub**: a level-select grid (below). Then the level.
@@ -234,7 +234,7 @@ Inside a level, the arrows plus A and B are usually enough (Mario, Tetris and Ki
 
 **Layout rules** (the screen is 20 x 18 cells; everything snaps to the 8-pixel grid):
 
-- **One alignment per screen**: centred or left-justified, never a mix. Titles centred, lists left-justified in a column, numbers right-aligned in a fixed width. Use the same margins on every screen.
+- **One alignment per screen**: centred or left-justified, never a mix. Centre blocks with `ui_centre(width)` (a grid or menu that hugs the left edge looks like a mistake: a 4-cell-wide menu starts at column 8, not 4). Titles centred, lists left-justified in a column, numbers right-aligned in a fixed width. Use the same margins on every screen.
 - **Group, then space**: related things sit together (an icon next to its label, a score next to its heading); a blank row separates groups. Do not scatter items across the screen.
 - **The same thing in the same place** on every screen (title on row 0 or 2, the prompt at the bottom). Do not move the cursor column between menus.
 - **Show, don't tell**: a lock icon says "locked", a grade letter says how well you did, a blinking A frame says "press A", a coloured frame says "here". Prefer a picture, a number, a colour or motion to a sentence. At most three short lines of text on any screen.

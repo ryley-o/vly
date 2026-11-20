@@ -92,3 +92,32 @@ test('walking off a ledge: a jump still works for 4 frames (coyote time), not 12
   const bad = await play(ledge, `RIGHT@0-200,A@${start + 12}-${start + 13}`, start + 30, '20, 96');
   assert.ok(Math.min(...bad.slice(start).map((r) => r.vy)) >= 0, 'a jump 12 frames late does not');
 });
+
+test('buried in a block that switched on: pushed out to the nearest free spot (up first), never stuck', async () => {
+  // a solid 32x30 block appears around the player on frame 30
+  const solid = `(y >= ${FLOOR}) || (frames() > 30 && x >= 10 && x < 42 && y >= 70 && y < 100)`;
+  const rows = await play(solid, '', 90, '24, 70');
+  const f = rows[80];
+  assert.ok(!(f.x + 12 > 10 && f.x < 42 && f.y + 16 > 70 && f.y < 100), `free of the block, at ${f.x},${f.y}`);
+  // and it can move again afterwards
+  const rows2 = await play(solid, 'RIGHT@40-120', 130, '24, 70');
+  assert.ok(rows2[125].x > rows2[45].x, 'free to walk away');
+});
+
+test('camera: follows only past the line, exactly as far as the character moved, never back, stops at the world end', async () => {
+  const text = `import "std/platformer";
+func pl_solid(x, y) { return y >= 112; }
+var sx;
+func init() { pl_init(20, 96); }
+func frame() { pl_step(btn(BTN_RIGHT) - btn(BTN_LEFT), btn(BTN_B), btnp(BTN_A), btn(BTN_A)); pl_camera(400); sx = pl_x - pl_cam; }`;
+  const b = await buildText({ text, filename: 'main.vly', baseDir: '/x' });
+  const ram = b.stats.ram; const rows = [];
+  runCartridge(b.bytes, { frames: 700, input: 'RIGHT+B@0-299,LEFT@300-420,RIGHT@421-700', onFrame: (f, m) => rows.push({ x: m.read16(ram.pl_x.addr), cam: m.read16(ram.pl_cam.addr), sx: m.read16(ram.sx.addr) }) });
+  assert.equal(rows[5].cam, 0, 'no scrolling before the line');
+  const scrolling = rows.slice(60, 120);
+  assert.ok(scrolling.every((r) => r.sx === 70), 'once past the line the character stays at the line: the camera moves 1:1 with it');
+  for (let i = 1; i < rows.length; i++) assert.ok(rows[i].cam >= rows[i - 1].cam, 'the camera never goes back');
+  assert.equal(rows[699].cam, 240, 'it stops at the end of the world (400 - 160)');
+  const left = rows[420];
+  assert.ok(left.x >= left.cam, 'cannot walk off the left of the screen');
+});

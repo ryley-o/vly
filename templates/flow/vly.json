@@ -41,7 +41,7 @@
       }
     },
     {
-      "name": "with a save, CONTINUE is first; NEW GAME asks before erasing and B keeps everything",
+      "name": "with a save the menu is CONTINUE, NEW GAME, ERASE DATA; NEW GAME asks before erasing and B keeps everything",
       "frames": 300,
       "save": "tests/saves/two-beaten.sav",
       "input": "DOWN@130, A@150, B@190",
@@ -49,7 +49,7 @@
         "words": {
           "state": 1,
           "has_save": 1,
-          "menu_n": 2,
+          "menu_n": 3,
           "beaten": 2
         }
       }
@@ -75,6 +75,20 @@
         "words": {
           "state": 1,
           "beaten": 2
+        }
+      }
+    },
+    {
+      "name": "ERASE DATA asks, ERASE wipes everything and returns to the menu (no new game starts)",
+      "frames": 300,
+      "save": "tests/saves/two-beaten.sav",
+      "input": "DOWN@130, DOWN@140, A@150, RIGHT@170, A@190",
+      "expect": {
+        "words": {
+          "state": 1,
+          "beaten": 0,
+          "has_save": 0,
+          "menu_n": 1
         }
       }
     },

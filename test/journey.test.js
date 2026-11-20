@@ -18,7 +18,7 @@ test('journey: vly new --template flow, then vly release --no-publish ends "rele
   const game = path.join(dir, 'quilt');
   const t = run(game, 'test');
   assert.equal(t.status, 0, t.stdout);
-  assert.match(t.stdout, /8 passed, 0 failed/);
+  assert.match(t.stdout, /9 passed, 0 failed/);
   const r = run(game, 'release', '--no-publish');
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /released and verified/);

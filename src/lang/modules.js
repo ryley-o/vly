@@ -138,6 +138,8 @@ func ui_clear(map, col, row, w, h) {
     for (var x = 0; x < w; x++) { poke(map + (((row + y) << 5) + col + x) * 2, font_base); }
   }
 }
+// The column that centres something w cells wide on the 20-cell screen (a menu, a grid, a title). Use it instead of a hand-picked margin.
+func ui_centre(w) { return (20 - w) / 2; }
 func ui_strlen(s) {
   var n = 0;
   while (peek8(s + n) != 0) { n++; }
@@ -773,7 +775,7 @@ var pl_bx; var pl_by;
 var pl_jumped;               // 1 on the frame a jump started (play the sound)
 var pl_landed;               // 1 on the frame the feet touched down (play the thud, puff the dust)
 
-func pl_init(x, y) { pl_x = x; pl_y = y; pl_fx = 0; pl_fy = 0; pl_vx = 0; pl_vy = 0; pl_ground = 0; pl_rt = 0; pl_coyote = 0; pl_jbuf = 0; pl_gu = 32; pl_gd = 112; }
+func pl_init(x, y) { pl_cam = x - pl_cam_line; if (pl_cam < 0) { pl_cam = 0; } pl_x = x; pl_y = y; pl_fx = 0; pl_fy = 0; pl_vx = 0; pl_vy = 0; pl_ground = 0; pl_rt = 0; pl_coyote = 0; pl_jbuf = 0; pl_gu = 32; pl_gd = 112; }
 
 func pl_col(x, y0, h) {      // anything solid on the vertical line x, from y0 down h pixels (every 8 px, and the last)
   var r = 0;
@@ -884,9 +886,44 @@ func pl_vstep(jp, jh) {
   }
 }
 
+// Is any part of the body inside something solid? (a block that switched on, a platform that moved, a spawn point in a wall)
+func pl_hit() {
+  var r = 0;
+  while (r < pl_h - 1) { if (pl_row(pl_y + r, pl_x, pl_w)) { return 1; } r += 8; }
+  return pl_row(pl_y + pl_h - 1, pl_x, pl_w);
+}
+// Buried in something solid: move to the nearest free spot (SMB1 pushes the character out sideways; a switch block that turns solid
+// should never trap you), looking up first, then right, then left, one pixel further each time. Called by pl_step.
+func pl_eject() {
+  var x0 = pl_x; var y0 = pl_y;
+  var d = 1;
+  while (d <= 32) {
+    pl_x = x0; pl_y = y0 - d; if (!pl_hit()) { pl_vy = 0; pl_fy = 0; return 1; }
+    pl_y = y0; pl_x = x0 + d; if (!pl_hit()) { pl_vx = 0; pl_fx = 0; return 1; }
+    pl_x = x0 - d; if (!pl_hit()) { pl_vx = 0; pl_fx = 0; return 1; }
+    d++;
+  }
+  pl_x = x0; pl_y = y0;
+  return 0;
+}
+
+// The camera, the way SMB1 does it: it follows the character only when the character is more than pl_cam_line pixels in from the left
+// edge of the screen, moves exactly as far as the character moved that frame (whole pixels, no easing, so the sprite never wobbles),
+// never scrolls back, and stops at the end of the world; the character cannot walk off the left of the screen.
+// Call it once per frame right after pl_step, then draw everything with the same pl_cam.
+var pl_cam; var pl_cam_line = 70;
+func pl_camera(world_w) {
+  if (pl_x - pl_cam > pl_cam_line) { pl_cam = pl_x - pl_cam_line; }
+  if (pl_cam > world_w - 160) { pl_cam = world_w - 160; }
+  if (pl_cam < 0) { pl_cam = 0; }
+  if (pl_x < pl_cam) { pl_x = pl_cam; pl_vx = 0; pl_fx = 0; }
+  if (pl_x > world_w - pl_w) { pl_x = world_w - pl_w; pl_vx = 0; pl_fx = 0; }
+}
+
 // One frame of Mario: dir -1, 0 or 1 (the D-pad), run (B held), jump_pressed (A went down this frame), jump_held (A is down).
 func pl_step(dir, run, jump_pressed, jump_held) {
   pl_bump = 0;
+  if (pl_hit()) { pl_eject(); }
   pl_hstep(dir, run);
   pl_vstep(jump_pressed, jump_held);
 }
