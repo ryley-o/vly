@@ -505,10 +505,10 @@ export const commands = {
       // 5b. what the player experiences: the opening 30 seconds, with sound, as a picture and a WAV (tests/opening.input, if you have one, drives it)
       try {
         fs.mkdirSync('release', { recursive: true });
-        const flags = { frames: '1800', gif: 'release/opening.gif', 'gif-every': '4', wav: 'release/opening.wav', scale: '2' };
+        const flags = { frames: '1800', gif: 'release/opening.gif', 'gif-every': '4', wav: 'release/opening.wav', scale: '2', filmstrip: '8', 'filmstrip-out': 'release/opening.png' };
         if (fs.existsSync('tests/opening.input')) flags['input-file'] = 'tests/opening.input';
         await commands.run.run({ _: [outPath], flags });
-        lines.push(`  ok    the opening 30 seconds recorded: release/opening.gif and release/opening.wav (look at it and listen: title, art, instructions, the pauses between screens)${flags['input-file'] ? '' : '; add tests/opening.input to press the buttons a new player would'}`);
+        lines.push(`  ok    the opening 30 seconds recorded: release/opening.gif, release/opening.png (8 frames as one picture: look at this one) and release/opening.wav (look and listen: title, art, instructions, the pauses between screens)${flags['input-file'] ? '' : '; add tests/opening.input to press the buttons a new player would'}`);
       } catch (e) { lines.push(`  note  could not record the opening: ${e.message.split('\n')[0]}`); }
       // 6. publish and verify, 7. offline copy
       let play = null;
