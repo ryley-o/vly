@@ -114,3 +114,13 @@ test('the layout is the same every build', async () => {
   assert.deepEqual(Array.from(x.bytes), Array.from(y.bytes));
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// A bank a few bytes over must be reported as "bank N holds ..." (so the compiler retries with more spare room), not as
+// "internal compiler error ... straddles": the measuring pass used to trip over labels the always-visible part defines too.
+import { fullBankError } from '../src/lang/index.js';
+test('an overfull bank is explained even when the always-visible part defines asset labels', () => {
+  const asm = `.org 0\na_gfx:\n  NOP\n__flat_end:\n.bank 2\n__bank_2:\nfb_big:\n  LDI r0, a_gfx\n${'  NOP\n'.repeat(8195)}fbe_big:\n__bank_2_end:\n`;
+  const err = fullBankError(asm, 'main.vly');
+  assert.ok(err, 'an error is produced');
+  assert.match(err.message, /bank 2 holds \d+ bytes, but a bank is 8192/);
+});

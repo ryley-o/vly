@@ -35,11 +35,12 @@ function measureFlat(asm) {
 }
 
 /** If one explicit bank holds more than 8 KB, say which and what is in it. */
-function fullBankError(asm, file) {
+export function fullBankError(asm, file) {
   const parts = asm.split(/\n(?=\.bank \d+\n)/);
   for (const part of parts.slice(1)) {
     const n = Number(/^\.bank (\d+)/.exec(part)[1]);
-    const others = [...asm.matchAll(/^((?:a|fb)_\w+):/gm)].map((m) => m[1]).filter((l) => !new RegExp(`^${l}:`, 'm').test(part));
+    // labels defined elsewhere (in another bank): stand-ins so references resolve; not those the flat part or this bank define
+    const others = [...new Set([...asm.matchAll(/^((?:a|fb)_\w+):/gm)].map((m) => m[1]))].filter((l) => !new RegExp(`^${l}:`, 'm').test(part) && !new RegExp(`^${l}:`, 'm').test(parts[0]));
     let probe = null;
     try { probe = assemble(`${parts[0]}\n${others.map((l) => `${l}:`).join('\n')}\n${part.replace(/^\.bank \d+\n/, '')}\n`, { filename: 'generated.asm', measure: true }); } catch { continue; }
     const a0 = probe.symbols[`__bank_${n}`], a1 = probe.symbols[`__bank_${n}_end`];
@@ -149,7 +150,8 @@ function compileWithSlack(source, opts, slack) {
     const full = /bank boundary|\.bank \d+ is behind/.test(asmError.message) ? fullBankError(c.asm, file) : null;
     if (full) throw full;
     const m = measureFlat(c.asm);
-    if (m && m.flatBytes > FIXED && (c.stats.usesBanks || plan)) throw explain(m, FIXED);
+    const lim = c.stats.usesBanks || plan ? FIXED : FLAT;
+    if (m && m.flatBytes > lim) throw explain(m, lim);
     const err = new Error(`internal compiler error (generated assembly failed to assemble); please report this.\n${asmError.message}`);
     err.asm = c.asm;
     throw err;
