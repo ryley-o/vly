@@ -1,11 +1,24 @@
 # Reference: side-scrolling platformers (the Mario recipe)
 
-Read this when your game has a character that runs and jumps through a level that scrolls. It is a reference guide to the design playbook (`vly docs design`):
+Read this when your game has a character that runs and jumps through a level that scrolls (start with section 0: borrow the feel, not the look). It is a reference guide to the design playbook (`vly docs design`):
 the playbook says *that* controls must feel good; this says *exactly how* the best one did it, gives you the numbers, and gives you a module that already does it.
 
 **Quality bar:** the character should feel like Mario in World 1-1 within ten seconds of picking up the pad: it speeds up and slows down with weight, a tap hops and a held button soars, running
 is a choice you make with B, you can steer a little in the air but not change your mind, you slide round a block's corner instead of bonking, and a jump over a pit is yours to judge.
 If a play-tester says it feels "floaty", "sticky", "slippery" or "stiff", it is wrong and you fix it before you build levels on it.
+
+## 0. Borrow Mario's feel, not Mario's look
+
+**The movement, collision, camera and forgiveness in this guide are the foundation: copy them closely.** That is the part that took Nintendo years to get right, and players feel it in ten seconds. Everything the player *sees and is told* is yours to invent, and a game that only re-dresses Super Mario Bros. is a re-skin, however good it plays:
+
+- **Do not copy the furniture.** No brick blocks with `?` boxes that give a mushroom, no walking mushroom enemy that you stomp, no green pipes, no flagpole, no plumber, no princess. Those are Mario's identity. Using them without adding anything makes a clone; a player who sees them thinks "this is Mario, but worse".
+- **Be original in at least one way that changes how the game plays,** not only how it looks. Mix Mario's feel with a mechanic of your own: a world that flips between two states (day and night), a tool the character carries (a lantern that reveals hidden platforms, a grapple, a rope), a surface that changes the movement (ice, mud, wind, a conveyor), a rhythm to the level (platforms that move to the music), a way to turn enemies into something useful. Then design the levels so they need it, and teach it in safety (section 9).
+- **Invent a theme, a cast and a world.** Choose a place and a mood that nobody else has (a clockwork city, a deep-sea lighthouse, a city of paper, a night market, a desert of glass) and give every stage a reason to exist in the story. The enemies, the blocks, the pickups, the checkpoint and the goal all take their look and their names from that world (a lantern is a checkpoint; a candle flame is the hit point; a crab is the walker you stomp).
+- **A story, even a small one.** Who is the character, what do they want, who or what is in the way, what changes by the end? Two or three lines at the start, a line per world, and an ending that pays it off. The story chooses the art and the music; it should not be pasted on afterwards.
+- **Your own sprites and palettes.** Draw the character, the enemies and the tiles for this world. A distinct palette per world and a signature colour for the hero make a game recognisable in a screenshot. If a sprite could have come from a Nintendo game, redraw it.
+- **Write it down:** in `DESIGN.md`, a line each for *what is borrowed from Mario's feel*, *what is the game's own mechanic*, *the theme and story*, and *three things in this game that are not in Mario*. `vly check` and `vly release` print the `DESIGN.md` back, and a reader should be able to tell the game from a screenshot.
+
+The idea to hold on to: **Mario is the engine, not the paint job.** Play like Mario; look, sound, mean and surprise like yourself.
 
 ## 1. The fast path: `import "std/platformer"`
 

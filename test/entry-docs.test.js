@@ -24,6 +24,7 @@ const FACTS = [
   ['vly release does the whole job', /vly release/, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],
   ['one menu pattern: UP/DOWN, A or START, B back', /UP\/DOWN[^.]*A or START[^.]*B/, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],
   ['vly check is the quality gate', /vly check/, ENTRY],
+  ['copy a classic\'s feel, never its look', /feel[^.]*(never|not)[^.]*look|feel, not (its|the) look/i, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],
   ['reference guides exist (ref-sidescroller, ref-music)', /ref-sidescroller[\s\S]*ref-music|ref-music[\s\S]*ref-sidescroller/, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],
 ];
 
