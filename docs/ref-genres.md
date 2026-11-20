@@ -3,7 +3,7 @@
 Read the recipe for your genre before you design it, and the others for ideas worth stealing. It is a reference guide to the design playbook (`vly docs design`): the playbook says what every game needs; this says what each kind of game needs on this machine. For a side-scroller also read `vly docs ref-sidescroller` (the Mario recipe).
 
 
-**Platformer.** Variable-height jump (numbers in section 6), coyote time, one-way platforms, enemies that patrol and
+**Platformer.** Use `vly docs ref-sidescroller` and `import "std/platformer"` for the movement (the exact Super Mario Bros. numbers, tested), and read its section 0: borrow the feel, never the look. Variable-height jump, coyote time, one-way platforms, enemies that patrol and
 can be stomped, a checkpoint every 20 seconds, 3 or more stages, collectibles. The `platformer` template has physics and tilemaps.
 
 **Racer (side view).** `games/hill-racer` is the worked example of everything in this playbook (read its source and tests). Terrain as a height function of x so the ground can be drawn and driven on; the vehicle follows the
@@ -44,7 +44,7 @@ each lock (20 to 60 seconds for a person) when you compare with the "10+ minutes
 **Long scrolling platformer (stages wider than a screen).** What worked in `games/ninja-chef` (three stages of 240 tiles, bosses, checkpoints):
 store each stage as **one byte per tile in a banked `asset`** (or, for many levels, `asset levels bank auto records 240 = incbin("levels.bin");` and `levels_load(i, grid)`: the compiler spreads them over banks, see `vly docs language`) written by a small generator script (`tools/mklevels.mjs`: ASCII rows in, `.bin` out), because a `tilemap`
 costs 2 bytes per cell in the always-visible 16 KB; copy the stage into RAM (or stream a column at a time as the camera moves) and test collisions against that. Keep the
-hero in whole pixels plus a sub-pixel remainder (a 1,920 px world does not fit in 8.8). Hand-tuned feel, measured with `--watch py,vx`: gravity 64, jump -1024,
+hero in whole pixels plus a sub-pixel remainder (a 1,920 px world does not fit in 8.8). (Older hand-tuned feel from that game, kept for comparison; **`ref-sidescroller` and `std/platformer` supersede it, use those numbers instead**.) Measured with `--watch py,vx`: gravity 64, jump -1024,
 walk 384, terminal 1152 gave a 30 px held jump (14 frames to the peak, 30 airborne), a 10 px tap, full speed in 9 frames and a stop in 6; a 4-tile gap is the longest
 you can fairly ask for. A pit costs a heart and puts the hero back on the last safe ground (never an instant game over); checkpoint flags save the spot. Give each stage a
 boss arena where the camera locks, a card before it and a cooking, tally or reward screen after it. **Test it with the bot kit and a delay**: a bot that sees the

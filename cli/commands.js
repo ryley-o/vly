@@ -196,7 +196,7 @@ export const commands = {
   },
 
   run: {
-    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio]\n  Run a cartridge headlessly. Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
+    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio] [--set var=value,...]\n  Run a cartridge headlessly. --set starts from a chosen state (variables set after init, before frame 1; needs the source or a build with its .map.json). Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
     async run(args) {
       const { rom, built } = await loadCart(args._[0]);
       let ram = built?.stats?.ram;
@@ -226,6 +226,15 @@ export const commands = {
       } catch (e) { throw new CliError(e.message); }
       let save = null;
       if (args.flags.save) save = new Uint8Array(fs.readFileSync(args.flags.save));
+      let pokes = [];
+      try {
+        if (args.flags.set) pokes = String(args.flags.set).split(',').map((kv) => {
+          const [name, val] = kv.split('=');
+          if (val === undefined || val === '') throw new Error(`--set wants name=value pairs, like --set level=7,lives=3 (got "${kv}")`);
+          const base = name.replace(/\[.*$/, '');
+          return { addr: resolveAddr(name, ram || {}), value: int(val), bytes: ram?.[base]?.type === 'byte[]' ? 1 : 2 };
+        });
+      } catch (e) { throw new CliError(e.message); }
       let watch = [];
       try {
         if (args.flags.watch) watch = String(args.flags.watch).split(',').map((n) => ({ name: n, addr: resolveAddr(n, ram || {}), bytes: ram?.[n.replace(/\[.*$/, '')]?.type === 'byte[]' ? 1 : 2 }));
@@ -240,7 +249,7 @@ export const commands = {
       const gifEvery = args.flags.gif ? int(args.flags['gif-every'] ?? 2) : 0;
       let r;
       try {
-        r = runCartridge(rom, { frames, until, input: inputText(args), save, screenshotFrames: [...shotFrames], mem, watch, trace, worst: args.flags.worst ? int(args.flags.worst) : 5, capture: gifEvery ? { every: gifEvery, max: 900 } : undefined, audio: !!(args.flags.wav || args.flags.audio) });
+        r = runCartridge(rom, { frames, until, input: inputText(args), save, screenshotFrames: [...shotFrames], mem, watch, trace, pokes, worst: args.flags.worst ? int(args.flags.worst) : 5, capture: gifEvery ? { every: gifEvery, max: 900 } : undefined, audio: !!(args.flags.wav || args.flags.audio) });
       } catch (e) { throw new CliError(e.message); }
       const files = [];
       if (args.flags.screenshot) {

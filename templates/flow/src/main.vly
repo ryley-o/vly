@@ -7,7 +7,7 @@
 import "std/flow";
 import "std/tunes";                   // music; it imports std/music and std/sfx, so sfx_play() works too
 
-tileset art = "../assets/gfx.tiles";
+tileset art bank auto = "../assets/gfx.tiles";   // art lives in a ROM bank, which the compiler chooses (a real game's art outgrows the 16 KB the CPU always sees)
 
 const T = 100;                       // the pictograms live at tile 100..; the UI frame tiles at 60..
 const S_SPLASH = 0; const S_MENU = 1; const S_STORY = 2; const S_HOWTO = 3; const S_GRID = 4; const S_PLAY = 5; const S_CONFIRM = 6;
@@ -115,6 +115,7 @@ func draw_play() {
 func init() {
   load_font(0);
   ui_init(60);
+  select_bank(bankof(art));
   load_tiles(art, T, art_COUNT);
   bg_pal(0, rgb(1, 2, 5), rgb(6, 8, 12), rgb(11, 13, 15), rgb(15, 15, 15));
   bg_pal(1, rgb(1, 2, 5), rgb(8, 7, 2), rgb(14, 12, 3), rgb(15, 15, 6));

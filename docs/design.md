@@ -190,7 +190,8 @@ Further reading, if you want the detail: Miyamoto on World 1-1 ([Game Developer]
   | 64 `sprite` calls | 9,000 |
   | 100 `rand` calls | 7,000 |
   | `text()` of 23 characters | 2,600 (about 110 cycles a character) |
-  | one `fade_set` / `fade_update` step (64 colours) | 15,000 |
+  | one `fade_set` / `fade_update` step (64 colours) | 15,000 to 31,000 (31,000 measured in a real game with 16 palettes: give a fade step a quiet frame) |
+  | `save_valid()` | 20,000 (check it once and keep the answer, not every frame) |
   | `hide_all_sprites()` | 4,000 |
   | `load_tiles` of 64 tiles | 500 |
 

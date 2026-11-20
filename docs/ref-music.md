@@ -13,7 +13,7 @@ Four channels: **0 and 1 pulse** (a square wave with four duty widths: thin and 
 | 0 pulse | **lead**: the tune someone hums | keep it between `N_C4` and `N_C6`; duty 1 or 2 |
 | 1 pulse | **harmony, arpeggio or echo** | it yields to sound effects, so never put the only melody here |
 | 2 triangle | **bass** | stay between `N_A2` and `N_C4`: a 40 mm speaker has almost nothing below about 110 Hz |
-| 3 noise | **drums** | short bursts: kick (low, 2 frames), snare (mid, 3 frames), hat (high, 1 frame, quiet) |
+| 3 noise | **drums** | short bursts: kick (low, 2 frames), snare (mid, 3 frames), hat (high, 1 frame, quiet). On the noise channel `hz` is the *rate* of the random noise: low rates are a rumble, high rates a hiss. Starting points (check the pitch by rendering a WAV, we have not listened): kick `tone(3, 150, 12, 0)`, snare `tone(3, 1000, 10, 0)`, hat `tone(3, 6000, 5, 0)` |
 
 `music_tempo(n)` is frames per step. Treat a step as a sixteenth note: **BPM = 900 / n** (tempo 9 is 100 BPM, 8 is 112, 6 is 150, 5 is 180).
 Length in seconds = bars x 16 steps x n / 60 (4/4 time). A 16-bar tune at tempo 8 lasts 34 s; a 32-bar tune at tempo 9 lasts 77 s.

@@ -91,7 +91,7 @@ Compound assignment on an array element evaluates the index expression twice, so
 - `init()` (optional, no parameters) runs once at power-on with a budget of 1,200,000 cycles. `frame()` (required,
   no parameters) runs once per frame with a budget of 120,000 cycles. If a routine exceeds its budget it is cut off
   and `vly run` / `vly test` report an OVERRUN fault.
-- You may redefine any standard library function; your definition wins.
+- You may redefine any function of the standard library (the ones in `vly docs stdlib`); your definition wins. The functions and variables of the modules you import (`std/music`, `std/platformer` and the rest) have reserved name prefixes and cannot be redefined: the compiler says which module owns the name. To change what a module does, write your own function with a different name and call that instead.
 - Only functions reachable from `init()` and `frame()` are included in the cartridge (others get a warning).
 
 ## Intrinsics (built in)

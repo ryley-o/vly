@@ -20,6 +20,7 @@ import { FONT } from '../core/font.js';
  * @param {Array<{name: string, addr: number, bytes?: number}>} [o.watch] variables to record changes of
  * @param {{frame: number|'init', limit?: number}} [o.trace] record the instructions executed in one frame (or init)
  * @param {{every?: number, max?: number, scaleless?: boolean}} [o.capture] collect RGBA frames every N frames (for GIFs)
+ * @param {{addr: number, value: number, bytes?: number}[]} [o.pokes] variables to set after init, before the first frame
  * @param {boolean} [o.audio] also render the audio (mono floats at 44.1 kHz)
  * @param {{addr: number, bytes: number, test: (v: number) => boolean}} [o.until] stop early, after the first frame where this holds
  */
@@ -58,6 +59,7 @@ export function runCartridge(rom, o = {}) {
   if (o.trace && o.trace.frame === 'init') traceOn('init');
   m.boot();
   m.tracer = null;
+  for (const p of o.pokes || []) { if (p.bytes === 1) m.mem[p.addr] = p.value & 0xff; else { m.mem[p.addr] = p.value & 0xff; m.mem[p.addr + 1] = (p.value >> 8) & 0xff; } }   // start from a chosen state: set variables after init
   sample(-1);
   if (capEvery) frames_out.push(m.renderRGBA());
   if (want.has(0)) shots.set(0, m.renderRGBA());

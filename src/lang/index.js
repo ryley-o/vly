@@ -121,14 +121,22 @@ function compileWithSlack(source, opts, slack) {
     const stay = Object.entries(m.sizes).filter(([k]) => meta[k] && meta[k].bank === null).sort((x, y) => y[1] - x[1]).slice(0, 8)
       .map(([k, v]) => `${k} ${v}${meta[k].std ? ' (standard library)' : meta[k].pin ? ` (${meta[k].pin})` : v > BANK ? ' (bigger than one 8192-byte bank: split it into smaller functions)' : ''}`).join(', ');
     const flatAssets = (c.stats.assets || []).filter((a) => a.bank == null).sort((x, y) => y.bytes - x.bytes).slice(0, 5);
-    const assetNote = flatAssets.length ? ` Unbanked art and data in that region, biggest first: ${flatAssets.map((a) => `${a.name} ${a.bytes}`).join(', ')}. This is usually the real cause: give each a bank (tileset ${flatAssets[0].name} bank auto = "...tiles"; then select_bank(bankof(${flatAssets[0].name})) before loading it; or asset ${flatAssets[0].name} bank auto = incbin("...")).` : '';
+    const flatAssetBytes = flatAssets.reduce((x, a) => x + a.bytes, 0);
+    const first = flatAssets[0];
+    const bankHow = first ? `give each a bank: tileset ${first.name} bank auto = "...tiles"; and select_bank(bankof(${first.name})); before load_tiles (or asset ${first.name} bank auto = incbin("...") for other data)` : '';
+    const assetList = flatAssets.map((a) => `${a.name} ${a.bytes}`).join(', ');
     const code = Object.entries(m.sizes).filter(([k]) => !meta[k] || meta[k].bank === null).reduce((x, [, v]) => x + v, 0);
+    // When art and data are a big share of the region they are the real cause, so say so first
+    const lead = first && flatAssetBytes * 4 >= limit
+      ? `Your unbanked art and data fill ${flatAssetBytes} bytes of it (biggest first: ${assetList}). That is the cause: ${bankHow}. `
+      : '';
+    const tail = first && !lead ? ` Unbanked art and data in that region, biggest first: ${assetList}; ${bankHow}.` : '';
     return new CompileError({
       file, line: 1, col: 1,
-      message: `the part of the program that must always be visible takes ${m.flatBytes} bytes, but that region is ${limit} (over by ${m.flatBytes - limit}). ` +
+      message: `the part of the program that must always be visible takes ${m.flatBytes} bytes, but that region is ${limit} (over by ${m.flatBytes - limit}). ` + lead +
         `It holds tables, strings and unbanked assets (${Math.max(0, m.flatBytes - 16 - code)} bytes here) and every function the compiler cannot move into a bank by itself (${code} bytes). ` +
         `Move art and maps to a bank (tileset art bank auto = "art.tiles"; lets the compiler choose the bank), shorten text, or split the functions named below so the bulk of them can move. ` +
-        `Biggest functions still in the region (bytes): ${stay}.` + assetNote,
+        `Biggest functions still in the region (bytes): ${stay}.` + tail,
     });
   };
 

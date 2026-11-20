@@ -209,3 +209,14 @@ test('vly run --audio prints how long and how loud the sound was; vly help <comm
   assert.equal(a, b);
   assert.match(a, /whole release in one command/);
 });
+
+test('vly run --set starts from a chosen state: variables are set after init, before the first frame', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-set-'));
+  fs.writeFileSync(path.join(dir, 'main.vly'), 'var level; var lives = 3; var seen;\nfunc frame() { seen = level * 10 + lives; }\n');
+  const cli = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'cli', 'vly.js');
+  const out = spawnSync(process.execPath, [cli, 'run', 'main.vly', '--frames', '3', '--set', 'level=7,lives=2', '--mem', 'seen', '--json'], { cwd: dir, encoding: 'utf8' });
+  const j = JSON.parse(out.stdout); const d = j.data || j;
+  assert.equal(d.mem[0].words[0], 72, JSON.stringify(d.mem));
+  fs.rmSync(dir, { recursive: true, force: true });
+});

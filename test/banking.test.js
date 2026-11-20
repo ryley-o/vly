@@ -130,7 +130,7 @@ test('too much unbanked art: the error names the assets that fill the always-vis
   fs.writeFileSync(path.join(dir, 'big.bin'), Buffer.alloc(20000, 7));
   fs.writeFileSync(path.join(dir, 'small.bin'), Buffer.alloc(100, 3));
   fs.writeFileSync(path.join(dir, 'main.vly'), 'asset sheet = incbin("big.bin");\nasset other bank 3 = incbin("small.bin");\nvar n;\nfunc frame() { n += peek8(sheet) + bank_peek8(bankof(other), other); }\n');
-  await assert.rejects(() => buildFile(path.join(dir, 'main.vly')), (e) => /Unbanked art and data[^.]*biggest first: sheet 20000/.test(e.message) && /bank auto/.test(e.message));
+  await assert.rejects(() => buildFile(path.join(dir, 'main.vly')), (e) => /over by \d+\)\. Your unbanked art and data fill 20000 bytes of it \(biggest first: sheet 20000\)\. That is the cause: give each a bank/.test(e.message) && /bank auto/.test(e.message));
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
