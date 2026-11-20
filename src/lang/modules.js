@@ -911,8 +911,8 @@ func pl_eject() {
 // touched a solid, and zeroes its speed; it never teleports. SMB1 never puts a block on Mario, so a character buried on BOTH sides is our case:
 // float up 1 pixel per frame (and if the ceiling is in the way, fall back to the nearest free spot, pl_eject). Called by pl_step.
 func pl_unstick() {
-  var l = pl_col(pl_x + 1, pl_y, pl_h);
-  var r = pl_col(pl_x + pl_w - 2, pl_y, pl_h);
+  var l = pl_col(pl_x, pl_y, pl_h);                  // the outermost columns of the body: any overlap at all is seen
+  var r = pl_col(pl_x + pl_w - 1, pl_y, pl_h);
   if (l && !r) { pl_x++; if (pl_vx < 0) { pl_vx = 0; pl_fx = 0; } return; }
   if (r && !l) { pl_x--; if (pl_vx > 0) { pl_vx = 0; pl_fx = 0; } return; }
   if (!pl_row(pl_y - 1, pl_x, pl_w)) { pl_y--; pl_vy = 0; pl_fy = 0; return; }

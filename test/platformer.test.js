@@ -199,3 +199,13 @@ test('coyote time is exactly pl_coyote_max (4) frames: counting the frame the fe
   assert.equal(await jumped(3), true, 'on the 4th frame (start+3)');
   assert.equal(await jumped(6), false, 'two frames beyond the window');
 });
+
+test('falling with one pixel of the body inside a ledge (found by a bot in a real game): pushed out sideways, lands, and can jump, never hovering', async () => {
+  // a 12-pixel high block x 51..80 on the floor; the body (x 40..51) comes down with only its rightmost column over the block's top edge
+  const solid = `(y >= ${FLOOR}) || (x >= 51 && x < 80 && y >= 100)`;
+  const rows = await play(solid, 'A@100-101', 160, '40, 60');
+  const last = rows[90];
+  assert.equal(last.ground, 1, `standing by frame 90 (y ${last.y})`);
+  assert.ok(last.x <= 40, 'pushed clear of the block, not floating over it');
+  assert.ok(Math.min(...rows.slice(100).map((r) => r.vy)) < -900, 'and can jump');
+});
