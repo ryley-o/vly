@@ -490,8 +490,10 @@ export const commands = {
         } catch { /* advice only */ }
       } catch (e) { step(false, 'build', e.message.split('\n')[0]); return { text: lines.join('\n'), ok: false, exitCode: 1 }; }
       // 2. tests
+      let testsPassed = false;
       if (fs.existsSync('vly.json') && (cfg.tests || []).length) {
         const t = await commands.test.run({ _: [], flags: {} });
+        testsPassed = !!t.ok;
         step(t.ok, 'tests', `${t.data.pass} passed, ${t.data.fail} failed`);
         if (!t.ok) lines.push(t.text.split('\n').filter((l) => /^FAIL|^ {6}/.test(l)).slice(0, 12).join('\n'));
       } else step(true, 'tests', 'none in vly.json (add some: every behaviour needs one)');
@@ -501,6 +503,18 @@ export const commands = {
         const r = checkCartridge(rom, { frames: 3600, ...project });
         step(r.ok, 'quality check', r.summary);
         for (const c of r.checks.filter((c) => c.status === 'fail' || c.status === 'warn')) lines.push(`        ${c.status.toUpperCase()}  ${c.id}: ${c.message}`);
+        // the real route: "releaseReplays" in vly.json lists recorded paths (a string, or { input, save, name }); each is checked for faults, cycles, sprites and text overlap
+        for (const rp of cfg.releaseReplays || []) {
+          const spec = typeof rp === 'string' ? { input: rp } : rp;
+          const name = spec.name || spec.input;
+          try {
+            const script = fs.readFileSync(path.resolve(spec.input), 'utf8');
+            const save = spec.save ? new Uint8Array(fs.readFileSync(path.resolve(spec.save))) : null;
+            const rr = checkCartridge(rom, { frames: 600, script, save, ...project });
+            step(rr.ok, `replay ${name}${spec.save ? ` (from ${spec.save})` : ''}`, rr.summary);
+            for (const c of rr.checks.filter((c) => c.status === 'fail' || c.status === 'warn')) lines.push(`        ${c.status.toUpperCase()}  ${c.id}: ${c.message}`);
+          } catch (e) { step(false, `replay ${name}`, e.message.split('\n')[0]); }
+        }
       }
       // 4. a previous release's save, then keep playing
       const legacy = [...(cfg.legacySaves || []), ...(fs.existsSync('tests/legacy-saves') ? fs.readdirSync('tests/legacy-saves').filter((f) => f.endsWith('.sav')).map((f) => path.join('tests/legacy-saves', f)) : [])];
@@ -518,7 +532,9 @@ export const commands = {
           step(saw && !faults.length, `old save ${f}`, !saw ? 'the machine did not load this save' : faults.length ? `faults after loading it: ${faults.join(', ')}` : 'loaded, and the game ran on from it');
           // does the game actually use it? (a game that ignores or rejects the save looks the same as a fresh start)
           const withSave = runCartridge(rom, { frames: 60, input: '', save }), fresh = runCartridge(rom, { frames: 60, input: '' });
-          if (withSave.frameHash === fresh.frameHash) lines.push(`        note  the first screen looks the same with this save as without: if the game should show its progress, add a vly.json test that loads it ("save": "${f}") and checks a value`);
+          const cover = (cfg.tests || []).find((t) => t && t.save && path.resolve(String(t.save)) === path.resolve(f));
+          if (withSave.frameHash === fresh.frameHash && cover) lines.push(`        ${testsPassed ? 'ok   ' : 'note '} the first screen looks the same with this save (the game may keep its splash until START); the test "${cover.name || cover.save}" loads it and checks the game ${testsPassed ? '(passed)' : '(the tests did not all pass)'}`);
+          else if (withSave.frameHash === fresh.frameHash) lines.push(`        note  the first screen looks the same with this save as without: if the game should show its progress, add a vly.json test that loads it ("save": "${f}") and checks a value`);
         } catch (e) { step(false, `old save ${f}`, e.message); }
       }
       // 5. the project's own report (difficulty, par, routes: whatever the genre needs)

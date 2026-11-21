@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { buildFile } from '../src/tools/build.js';
 import { runCartridge } from '../src/tools/run.js';
+import { compileToCartridge } from '../src/lang/index.js';
 
 function project(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-bank-'));
@@ -154,4 +155,16 @@ func frame() { music_update(); }
   assert.deepEqual(r.faults, { DIV0: 0, RO_WRITE: 0, ILLEGAL: 0, OVERRUN: 0 });
   assert.ok(r.audio.some((v) => Math.abs(v) > 0.02), 'the music is audible');
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('the always-visible overflow error lists every pinned function with its reason and the line that pins it', () => {
+  let src = 'var acc;\n';
+  for (let i = 0; i < 90; i++) { let body = ''; for (let k = 0; k < 40; k++) body += `  acc += peek8(p + ${k}) + ${k};\n`; src += `func rd${i}(p) {\n${body}  return acc;\n}\n`; }
+  src += 'func init() { var s = 0;\n'; for (let i = 0; i < 90; i++) src += `  s += rd${i}(0x2000);\n`; src += '}\nfunc frame() {}\n';
+  let msg = '';
+  try { compileToCartridge(src, { filename: 'm.vly' }); } catch (e) { msg = String(e.message); }
+  assert.match(msg, /must always be visible/);
+  assert.match(msg, /cannot move, biggest first[^]*rd0 \d+ bytes, reads memory through a computed address[^;]* at m\.vly:3/, msg.slice(0, 900));
+  assert.match(msg, /and \d+ more/, 'the list is capped, with a count of the rest');
+  assert.match(msg, /small helper/, 'says what to do');
 });

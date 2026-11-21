@@ -83,3 +83,25 @@ test('vly release --no-sources publishes the cartridge only; without the flag th
   assert.equal(b.status, 0, b.out);
   assert.ok(seen[1].files && seen[1].files['src/main.vly'], 'sources go along by default');
 });
+
+test('vly release: checks each route in releaseReplays (with an optional save) and recognises a passing migration test', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-release-rp-'));
+  fs.mkdirSync(path.join(dir, 'src')); fs.mkdirSync(path.join(dir, 'tests', 'legacy-saves'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'src', 'main.vly'), GAME);
+  fs.writeFileSync(path.join(dir, 'tests', 'win.input'), 'START@10,START@40');
+  const b = await buildText({ text: GAME, filename: 'main.vly', baseDir: '/nonexistent' });
+  const r = runCartridge(b.bytes, { frames: 120, input: 'START@10,START@40' });
+  fs.writeFileSync(path.join(dir, 'tests', 'legacy-saves', 'v1.sav'), r.saves[r.saves.length - 1].bytes);
+  fs.writeFileSync(path.join(dir, 'vly.json'), JSON.stringify({ name: 'yard', id: 'yard', entry: 'src/main.vly', out: 'build/yard.vlc',
+    tests: [{ name: 'it runs', frames: 30, expect: { words: { n: 30 } } }, { name: 'continue restores', save: 'tests/legacy-saves/v1.sav', frames: 30, expect: { words: { best: 2 } } }],
+    releaseReplays: ['tests/win.input', { input: 'tests/win.input', save: 'tests/legacy-saves/v1.sav', name: 'from the old save' }] }));
+  const out = spawnSync('node', [path.join(root, 'cli', 'vly.js'), 'release', '--no-publish'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(out.status, 0, out.stdout + out.stderr);
+  assert.match(out.stdout, /ok\s+replay tests\/win\.input: /);
+  assert.match(out.stdout, /ok\s+replay from the old save \(from tests\/legacy-saves\/v1\.sav\): /);
+  assert.doesNotMatch(out.stdout, /add a vly\.json test that loads it/, 'the migration test covers the save');
+  fs.writeFileSync(path.join(dir, 'vly.json'), JSON.stringify({ name: 'yard', id: 'yard', entry: 'src/main.vly', out: 'build/yard.vlc', tests: [{ name: 'it runs', frames: 30, expect: { words: { n: 30 } } }], releaseReplays: ['tests/missing.input'] }));
+  const bad = spawnSync('node', [path.join(root, 'cli', 'vly.js'), 'release', '--no-publish'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(bad.status, 1);
+  assert.match(bad.stdout, /FAIL\s+replay tests\/missing\.input/);
+});

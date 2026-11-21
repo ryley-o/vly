@@ -467,12 +467,12 @@ class FnGen {
   checkBank(sym, e) {
     if (sym.bank == null) return;
     const mine = this.fn.bank ?? null;
-    if (mine === null) { this.pinTo(`uses '${sym.name}', which is in bank ${sym.bank}`); return; }
+    if (mine === null) { this.pinTo(`uses '${sym.name}', which is in bank ${sym.bank}`, e); return; }
     if (sym.bank !== mine) {
       this.ctx.fail(e, `'${sym.name}' is in bank ${sym.bank} but ${this.fn.name}() runs in bank ${mine}, and only one bank is visible at a time. Put them in the same bank, or read '${sym.name}' from a function that is not banked.`);
     }
   }
-  pinTo(reason) { if (!this.pin) this.pin = reason; }
+  pinTo(reason, at) { if (!this.pin) { this.pin = reason; this.pinAt = at && at.line ? { file: at.file, line: at.line } : null; } }
 
   loadId(reg, e) {
     const s = this.resolve(e);
@@ -707,7 +707,7 @@ class FnGen {
     if (e.name === 'asm' && !this.ctx.syms.has('asm')) {
       // Inline assembly: asm("LDI r1, 5\nADD r0, r1"). Registers r0-r3 are scratch; keep r14/r15 intact.
       if (e.args.length !== 1 || e.args[0].k !== 'str') this.ctx.fail(e, 'asm() takes one string literal of assembly text (separate lines with \\n)');
-      this.pinTo('contains inline assembly');
+      this.pinTo('contains inline assembly', e);
       for (const line of e.args[0].v.split('\n')) { if (line.trim()) this.lines.push('  ' + line.trim()); }
       return;
     }
@@ -748,7 +748,7 @@ class FnGen {
       case 'peek': case 'peek8': {
         const pc = this.constOf(a[0]);
         if (pc !== null) { this.emit(`${name === 'peek' ? 'LDX' : 'LDBX'} r0, [r13+${u16(pc)}]`); return; }
-        this.pinTo('reads memory through a computed address (it might point into a bank)');
+        this.pinTo('reads memory through a computed address (it might point into a bank)', e);
         this.genExpr(a[0]);
         this.emit(name === 'peek' ? 'LD r0, [r0]' : 'LDB r0, [r0]');
         return;
@@ -766,7 +766,7 @@ class FnGen {
         return;
       }
       case 'copy':
-        if (this.constOf(a[1]) === null) this.pinTo('copies from a computed address (it might point into a bank)');
+        if (this.constOf(a[1]) === null) this.pinTo('copies from a computed address (it might point into a bank)', e);
         this.loadArgsToRegs(a, ['r0', 'r1', 'r2']); this.emit('MCPY'); return;
       case 'fill': this.loadArgsToRegs(a, ['r0', 'r1', 'r2']); this.emit('MSET'); return;
       case 'rnd': this.emit('RND r0'); return;
@@ -774,7 +774,7 @@ class FnGen {
       case 'select_bank':
         if (this.fn.bank != null) this.ctx.fail(e, `select_bank() cannot be used inside ${this.fn.name}(), which itself runs from bank ${this.fn.bank}: switching banks would pull the code out from under it. Call a function that is not banked to do it.`);
         this.switches = true;
-        this.pinTo('calls select_bank()');
+        this.pinTo('calls select_bank()', e);
         this.genExpr(a[0]); this.emit('STBX [r13+0xB322], r0'); return;
       case 'halt': this.emit('HALT'); return;
       case 'fmul': this.genOperands(a[0], a[1]); this.emit('FMUL r0, r1'); return;
@@ -903,7 +903,7 @@ class FnGen {
     }
     if (this.fn.bank != null) epi.push(`fbe_${this.fn.name}:`);
     if (this.fn.wrap) epi.push(`fxe_${this.fn.name}:`);
-    return { bank: this.fn.bank ?? null, auto: !!this.fn.auto, wrap: !!this.fn.wrap, pin: this.pin, switches: this.switches, name: this.fn.name, lines: [...pro, ...this.lines, ...epi], callees: this.callees, uses: this.uses, helpers: this.helpers, std: this.std, node: this.fn };
+    return { bank: this.fn.bank ?? null, auto: !!this.fn.auto, wrap: !!this.fn.wrap, pin: this.pin, pinAt: this.pinAt || null, switches: this.switches, name: this.fn.name, lines: [...pro, ...this.lines, ...epi], callees: this.callees, uses: this.uses, helpers: this.helpers, std: this.std, node: this.fn };
   }
 }
 
@@ -1145,7 +1145,7 @@ export function compile(source, opts = {}) {
   const stats = {
     // Does anything ever change the bank window? If not, the first 24 KB behave as one flat region.
     usesBanks: bankedFns.length > 0 || banked.length > 0 || reachRecs.some((r) => r.switches),
-    fnMeta: Object.fromEntries(reachRecs.map((r) => [r.name, { std: !!r.std, pin: r.pin, bank: r.bank, auto: r.auto }])),
+    fnMeta: Object.fromEntries(reachRecs.map((r) => [r.name, { std: !!r.std, pin: r.pin, pinAt: r.pinAt || null, at: r.node && r.node.line ? { file: r.node.file, line: r.node.line } : null, bank: r.bank, auto: r.auto }])),
     ramUsed: ram - RAM_START,
     functions: order.map((n) => n),
     unused: warnings.length,
