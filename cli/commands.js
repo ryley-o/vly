@@ -199,7 +199,7 @@ export const commands = {
   },
 
   run: {
-    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio] [--set var=value,...]\n  Run a cartridge headlessly. --set starts from a chosen state (variables set after init, before frame 1; needs the source or a build with its .map.json). Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
+    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--oam] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio] [--set var=value,...]\n  Run a cartridge headlessly. --set starts from a chosen state (variables set after init, before frame 1; needs the source or a build with its .map.json). Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
     async run(args) {
       const { rom, built } = await loadCart(args._[0]);
       let ram = built?.stats?.ram;
@@ -350,6 +350,18 @@ export const commands = {
         for (const f of pr.functions) text += `  ${String(f.cycles_per_frame).padStart(7)}  ${String(f.percent).padStart(5)}%  ${f.name}\n`;
       }
       for (const f of files) text += `wrote ${f}\n`;
+      if (args.flags.oam) {                                  // every sprite on screen: slot, position, tile, palette, size, flips (a LOWER slot draws on top)
+        const sizes = ['8x8', '8x16', '16x16', '32x32'];
+        const sprites = [];
+        for (let i = 0; i < 64; i++) {
+          const a = C.OAM + i * 8, x = (r.machine.read16(a) << 16) >> 16, y = (r.machine.read16(a + 2) << 16) >> 16, tile = r.machine.read16(a + 4) & 0x1ff, at = r.machine.read16(a + 6);
+          if (x <= -32 || x >= 160 || y <= -32 || y >= 144) continue;       // not on the screen
+          sprites.push({ slot: i, x, y, tile, palette: at & 7, behind: !!(at & 8), flipX: !!(at & 16), flipY: !!(at & 32), size: sizes[(at >> 6) & 3] });
+        }
+        data.oam = sprites;
+        text += `sprites on screen (${sprites.length} of 64; a LOWER slot draws on top of a higher one):\n`;
+        for (const sp of sprites) text += `  slot ${String(sp.slot).padStart(2)}  x ${String(sp.x).padStart(4)} y ${String(sp.y).padStart(4)}  tile ${String(sp.tile).padStart(3)}  pal ${sp.palette}  ${sp.size}${sp.behind ? '  behind-bg' : ''}${sp.flipX ? '  flipX' : ''}${sp.flipY ? '  flipY' : ''}\n`;
+      }
       if (args.flags.ascii) {
         const final = r.machine.renderRGBA();
         text += asciiScreen(final) + '\n';
@@ -472,6 +484,10 @@ export const commands = {
         const r = await commands.build.run({ _: [], flags: {} });
         outPath = r.data.out; rom = new Uint8Array(fs.readFileSync(outPath));
         step(true, 'build', `${rom.length} bytes (${r.data.size.percent}% of 1 MB)`);
+        try {                                                   // a leftover cartridge with another name is how a stale build gets run by mistake
+          const dir = path.dirname(outPath), stale = fs.readdirSync(dir).filter((f) => f.endsWith('.vlc') && path.join(dir, f) !== outPath && path.resolve(dir, f) !== path.resolve(outPath));
+          if (stale.length) lines.push(`  note  ${dir}/ also holds ${stale.join(', ')}: an older cartridge under another name (the one released is ${path.basename(outPath)}); delete it so nobody runs it by mistake`);
+        } catch { /* advice only */ }
       } catch (e) { step(false, 'build', e.message.split('\n')[0]); return { text: lines.join('\n'), ok: false, exitCode: 1 }; }
       // 2. tests
       if (fs.existsSync('vly.json') && (cfg.tests || []).length) {
@@ -519,6 +535,7 @@ export const commands = {
         fs.mkdirSync('release', { recursive: true });
         const flags = { frames: '1800', gif: 'release/opening.gif', 'gif-every': '4', wav: 'release/opening.wav', scale: '2', filmstrip: '8', 'filmstrip-out': 'release/opening.png' };
         if (fs.existsSync('tests/opening.input')) flags['input-file'] = 'tests/opening.input';
+        else if (fs.existsSync('tests/win.input')) { flags['input-file'] = 'tests/win.input'; lines.push('  note  no tests/opening.input, so the opening is recorded from tests/win.input (the first 30 seconds of your winning path); write tests/opening.input to choose what players see first'); }
         await commands.run.run({ _: [outPath], flags });
         lines.push(`  ok    the opening 30 seconds recorded: release/opening.gif, release/opening.png (8 frames as one picture: look at this one) and release/opening.wav (look and listen: title, art, instructions, the pauses between screens)${flags['input-file'] ? '' : '; add tests/opening.input to press the buttons a new player would'}`);
       } catch (e) { lines.push(`  note  could not record the opening: ${e.message.split('\n')[0]}`); }

@@ -49,6 +49,7 @@ vly run game.vly --frames 120 --input "RIGHT@0-59, A@60" --screenshot shot.png -
 | `--shots 0,30,60 --out-dir d` | write several frames (0 = after init) as `frame_NNNN.png` |
 | `--mem a,b:len` | read memory at the end: addresses (`0xB400:16`) or variable names (`score`, `grid[3]`) |
 | `--ascii` | print a low-resolution ASCII picture of the final screen |
+| `--oam` | list every sprite on the final screen: slot, x, y, tile, palette, size, flips (a LOWER slot draws on top of a higher one: use it to see what is hiding what) |
 | `--filmstrip N --filmstrip-out strip.png` | ONE image with N evenly spaced frames, each labelled with its frame number: the fastest way to see how a game evolves |
 | `--watch score,x,grid[3]` | a timeline of every change to those variables, with the frame it happened in (frame -1 is after `init`) |
 | `--trace FRAME[:LIMIT]` or `--trace init:LIMIT` | the first instructions executed in that frame, with function names, instruction text and registers |

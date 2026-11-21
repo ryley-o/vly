@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { encodeGif, decodeGif } from '../src/tools/gif.js';
 import { filmstrip, evenFrames } from '../src/tools/filmstrip.js';
 import { runCartridge } from '../src/tools/run.js';
+import { buildText } from '../src/tools/build.js';
 import { upscale } from '../src/tools/png.js';
 import { commands } from '../cli/commands.js';
 import { handleMessage } from '../src/mcp/server.js';
@@ -218,5 +219,16 @@ test('vly run --set starts from a chosen state: variables are set after init, be
   const out = spawnSync(process.execPath, [cli, 'run', 'main.vly', '--frames', '3', '--set', 'level=7,lives=2', '--mem', 'seen', '--json'], { cwd: dir, encoding: 'utf8' });
   const j = JSON.parse(out.stdout); const d = j.data || j;
   assert.equal(d.mem[0].words[0], 72, JSON.stringify(d.mem));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('vly run --oam lists the sprites on screen with their slots (a lower slot draws on top)', async () => {
+  const text = `func init() { load_font(0); lcd(LCD_OBJ); hide_all_sprites(); }
+func frame() { sprite(3, 20, 30, 65, 0); sprite(1, 22, 32, 66, 1); }`;
+  const b = await buildText({ text, filename: 'main.vly', baseDir: '/x' });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-oam-')); const f = path.join(dir, 'g.vlc'); fs.writeFileSync(f, b.bytes);
+  const r = await commands.run.run({ _: [f], flags: { frames: '3', oam: true } });
+  assert.match(r.text, /sprites on screen \(2 of 64; a LOWER slot draws on top/);
+  assert.deepEqual(r.data.oam.map((s) => [s.slot, s.x, s.y, s.tile]), [[1, 22, 32, 66], [3, 20, 30, 65]]);
   fs.rmSync(dir, { recursive: true, force: true });
 });

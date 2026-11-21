@@ -13,15 +13,24 @@
 // solve(level, allowed) must say whether the level can be solved with ONLY the allowed mechanics, the fewest turns (or moves, seconds,
 // whatever your grade uses) it takes, and optionally how many plausible wrong routes there are (a measure of how easy it is to go astray).
 
-export function analyzeCampaign({ levels, mechanics, solve, intended = {} }) {
+//
+// A rule can also RESTRICT instead of enable (a star that must never touch ink, a one-square goal): removing it makes the level EASIER, not
+// unsolvable. List such rules in `restricting: ['keeper']`; for those, "needs" means "bites": taking the rule away changes the fewest moves, the
+// number of wrong routes or whether the level is solvable at all. Every row also has `bites` for every rule.
+export function analyzeCampaign({ levels, mechanics, solve, intended = {}, restricting = [] }) {
   const n = Array.isArray(levels) ? levels.length : levels;
   const rows = [];
   for (let i = 0; i < n; i++) {
     const level = Array.isArray(levels) ? levels[i] : i;
     const full = solve(level, mechanics);
-    const needs = [];
-    if (full.solvable) for (const m of mechanics) { if (!solve(level, mechanics.filter((x) => x !== m)).solvable) needs.push(m); }
-    rows.push({ level: i, solvable: !!full.solvable, optimal: full.optimal ?? null, wrongRoutes: full.wrongRoutes ?? null, needs });
+    const needs = [], bites = [];
+    if (full.solvable) for (const m of mechanics) {
+      const without = solve(level, mechanics.filter((x) => x !== m));
+      const bit = !without.solvable || (without.optimal ?? null) !== (full.optimal ?? null) || (without.wrongRoutes ?? null) !== (full.wrongRoutes ?? null);
+      if (bit) bites.push(m);
+      if (restricting.includes(m) ? bit : !without.solvable) needs.push(m);
+    }
+    rows.push({ level: i, solvable: !!full.solvable, optimal: full.optimal ?? null, wrongRoutes: full.wrongRoutes ?? null, needs, bites });
   }
   const firstNeeding = {};
   for (const m of mechanics) { const r = rows.find((x) => x.needs.includes(m)); firstNeeding[m] = r ? r.level : null; }

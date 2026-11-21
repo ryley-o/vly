@@ -25,6 +25,7 @@ All the docs that matter, as one page: `https://vly-1.vercel.app/llms-full.txt` 
 - [docs/ref-originality.md](docs/ref-originality.md): reference guide to inventing an idea that is yours: a process with random constraints against the first-idea trap, elegance tests, being original in several facets, levels that come from the mechanic. Read it before you choose the game.
 - [docs/ref-levels.md](docs/ref-levels.md): reference guide to levels that are fun: every jump needs a consequence, the four beats, pacing, enemy arrangements, terrain; `vly levels` finds dead screens and flat runs.
 - [docs/ref-powerups.md](docs/ref-powerups.md): reference guide to power-ups and abilities: why Mario's mushroom and star work, how they really work, a process for inventing your own.
+- [docs/ref-puzzles.md](docs/ref-puzzles.md): reference guide to puzzle games: a rule that is a picture, a solver and backwards generation, proving every rule bites, par and random-win-rate curves, undo and hints, readability.
 - [docs/ref-worlds.md](docs/ref-worlds.md): reference guide to the shape of a game (ten structures beyond the linear scroller), exploring, endings, and atmosphere on a four-colour screen.
 - [docs/workflow.md](docs/workflow.md): the build/run/test loop in detail, recorded bots, releases
 - [docs/language.md](docs/language.md): the VLY language, including banks (`bank auto`, `records`)

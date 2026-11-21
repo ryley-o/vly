@@ -27,3 +27,16 @@ test('campaign: unsolvable levels and a difficulty that stops rising are reporte
   assert.match(text, /UNSOLVABLE/);
   assert.match(text, /problems:/);
 });
+
+test('campaign: a restricting rule bites when taking it away changes the moves or the wrong routes, not only solvability', () => {
+  // rule "star" restricts: without it the level is shorter. rule "fold" enables: without it the level cannot be solved.
+  const solve = (level, allowed) => {
+    if (!allowed.includes('fold')) return { solvable: false };
+    return { solvable: true, optimal: allowed.includes('star') && level >= 1 ? 4 : 2, wrongRoutes: 1 };
+  };
+  const r = analyzeCampaign({ levels: 3, mechanics: ['fold', 'star'], solve, restricting: ['star'], intended: { 1: ['star'], 0: ['star'] } });
+  assert.deepEqual(r.rows[1].bites.sort(), ['fold', 'star']);
+  assert.deepEqual(r.rows[0].bites, ['fold'], 'level 0 is not changed by the star');
+  assert.equal(r.firstNeeding.star, 1, 'the star first matters on level 2');
+  assert.ok(r.problems.some((p) => p.kind === 'mechanic-not-required' && /level 1 /.test(p.message)), 'level 1 claims the star but it does not bite');
+});
