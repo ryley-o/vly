@@ -171,7 +171,7 @@ export const commands = {
       fs.writeFileSync(mapFile, JSON.stringify({ size: b.bytes.length, ram: b.stats?.ram || {}, functions: fnInfo }, null, 2));
       const symbols = Object.fromEntries(Object.entries(b.symbols || {}).filter(([k, s]) => s.kind === 'label' && !/^L\d+$/.test(k) && !k.endsWith('__ret')).map(([k, s]) => [k, s.addr]));
       const data = { out, map: mapFile, size: sizeReport(b.bytes.length), warnings: b.warnings || [], problems, kind: b.kind, ram: b.stats?.ram, functionBytes: b.stats?.functionBytes, flatBytes: b.stats?.flatBytes, flatLimit: b.stats?.flatLimit, bankBytes: b.stats?.bankBytes, autoBanked: b.stats?.autoBanked, assets: b.stats?.assets, ...(args.flags.symbols ? { symbols } : {}) };
-      let text = `built ${out} (${b.bytes.length} bytes, ${data.size.banks} bank${data.size.banks === 1 ? '' : 's'}, ${data.size.percent}% of 1 MB)`;
+      let text = `built ${out}${cfg?.out && !args.flags.out ? ' (the "out" in vly.json; run THIS file, not an older build/<name>.vlc)' : ''} (${b.bytes.length} bytes, ${data.size.banks} bank${data.size.banks === 1 ? '' : 's'}, ${data.size.percent}% of 1 MB)`;
       if (b.stats?.flatBytes) {
         // how close the program is to the limits that matter
         const lim = b.stats.flatLimit || 24576;
@@ -673,12 +673,16 @@ export const commands = {
   },
 
   levels: {
-    help: 'vly levels <map.txt ...> [--window N] [--max-flat-run N] [--json]\n  Is this level interesting? Profile an ASCII level map (rows top to bottom, # solid, ^ hazard, a-z enemy types, o pickup, S spring, C checkpoint, G goal, . empty; a column with no floor is a pit):\n  dead screens, long flat empty runs, ground variety, repeated enemies, a new hazard introduced with company, jumps with no consequence, intensity rising and falling. It lists what to look at; it cannot say a level is fun (see docs ref-levels).',
+    help: 'vly levels <map.txt ...> [--window N] [--max-flat-run N] [--max-gap N] [--max-step N] [--enemies abc] [--ignore xyz] [--json]\n  Is this level interesting? Profile an ASCII level map (rows top to bottom, # solid, ^ hazard, a-z enemy types, o pickup, S spring, C checkpoint, G goal, . empty; a column with no floor is a pit):\n  dead screens, long flat empty runs, ground variety, repeated enemies, a new hazard introduced with company, jumps with no consequence, intensity rising and falling. Also a static reachability check: a pit wider than --max-gap (default 7) or a wall taller than --max-step (default 4) is reported before any bot runs. Lines starting with ; or // are comments. --enemies abc says which letters are enemies (default: every a-z), --ignore xyz treats decoration letters as empty. It lists what to look at; it cannot say a level is fun (see docs ref-levels).',
     async run(args) {
       if (!args._.length) throw new CliError('give one or more level map text files (ASCII: rows top to bottom, # solid, ^ hazard, a-z enemies, o pickups, . empty)');
       const opts = {};
       if (args.flags.window) opts.window = int(args.flags.window);
       if (args.flags['max-flat-run']) opts.maxFlatRun = int(args.flags['max-flat-run']);
+      if (args.flags['max-gap']) opts.maxGap = int(args.flags['max-gap']);
+      if (args.flags['max-step']) opts.maxStep = int(args.flags['max-step']);
+      if (typeof args.flags.enemies === 'string') opts.enemies = args.flags.enemies;
+      if (typeof args.flags.ignore === 'string') opts.ignore = args.flags.ignore;
       const results = args._.map((f) => {
         if (!fs.existsSync(f)) throw new CliError(`no such file: ${f}`);
         return { file: f, ...analyzeLevel(fs.readFileSync(f, 'utf8'), opts) };

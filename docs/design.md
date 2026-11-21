@@ -227,6 +227,8 @@ A game is a state machine. Name the states and handle each in one place:
 People like to see, not read (an AI reads every word; a player glances). Design every screen so it can be understood in a second without reading, and make the whole game follow **one pattern** so nothing needs explaining.
 `templates/flow` is a small working project of all of this (menus, confirm, how-to page, level grid, grades, saves, with replay tests): copy its front end, then make the game itself your own. `std/flow` has the parts.
 
+**Reset the world when you change screens.** A menu, a game-over or a story card drawn after a scrolling stage must first `scroll(0, 0)`, clear the map and hide the sprites; otherwise the text appears shifted (in one trial the game-over title lost its first letters off the left edge). Take a screenshot of **every** screen (title, how-to, grid, story card, pause, game over, ending) after playing a stage, not only from a cold start, and read the text on it.
+
 **The flow** (every game with progress):
 
 1. The console's boot logo (not yours). Then the game's **splash**: its art and name, a few seconds, any button skips.

@@ -10,7 +10,7 @@ Every command accepts `--json` and then prints one JSON object with `"ok": true|
 |---|---|
 | `vly new <dir> [--template blank\|flow\|hello\|game\|pong\|battle\|platformer\|puzzle\|shooter]` | create a project: `blank` (the default) is a title screen and nothing else, `flow` is the menu, save, how-to page and level grid every game needs, the others are games to learn techniques from |
 | `vly build [entry] [-o out.vlc] [--asm] [--symbols]` | compile `.vly` / assemble `.asm`; writes the cartridge and `<out>.map.json` (RAM map, function sizes); `--asm` also writes the generated assembly |
-| `vly levels <map.txt ...>` | profile ASCII level maps: dead screens, long flat empty runs, ground variety, repeated enemies, a new hazard introduced with company, jumps with no consequence, the intensity curve; it lists what to look at (`vly docs ref-levels`) |
+| `vly levels <map.txt ...>` | profile ASCII level maps: dead screens, long flat empty runs, ground variety, repeated enemies, a new hazard introduced with company, jumps with no consequence, the intensity curve; it also checks statically that the level can be passed (a pit wider than `--max-gap`, a wall taller than `--max-step`); `--enemies abc` / `--ignore xyz` say which letters are enemies or scenery, `;` lines are comments; it lists what to look at (`vly docs ref-levels`) |
 | `vly run <cart or source> [options]` | run headlessly and report; see below |
 | `vly test [paths] [--update]` | run test specs (`vly.json` `"tests"`, `*.test.json`) |
 | `vly info <cart>` | header, size, SHA-256 |

@@ -83,3 +83,27 @@ test('docs/ref-powerups.md: the implementation sketch builds with std/platformer
   assert.deepEqual(r.faults, { DIV0: 0, RO_WRITE: 0, ILLEGAL: 0, OVERRUN: 0 });
   assert.deepEqual(out, { form: 0, dead: 0 }, 'grown twice, then hit once: shrinks to small and lives');
 });
+
+test('vly levels: static reachability finds a pit too wide and a wall too tall, ignores comment lines and decoration letters', () => {
+  const rows = [
+    '; this is a comment, not a row',
+    '..........................................................',
+    '..........................................................',
+    '................................................#.........',
+    '................................................#.........',
+    '................................................#.........',
+    '................................................#.........',
+    '@.......................................x.......#........G',
+    '######..........########################################.',
+    '######..........########################################.',
+  ];
+  const r = analyzeLevel(rows);
+  assert.equal(r.rows, 9, 'the comment line is not a row');
+  assert.ok(r.unreachable.some((w) => /pit 10 columns wide/.test(w)), r.unreachable.join('\n'));
+  assert.ok(r.unreachable.some((w) => /wall 5 rows high/.test(w)), r.unreachable.join('\n'));
+  assert.ok(r.warnings.includes(r.unreachable[0]), 'reported first among the warnings');
+  const ok = analyzeLevel(rows, { maxGap: 12, maxStep: 6, ignore: 'x' });
+  assert.equal(ok.unreachable.length, 0);
+  assert.equal(ok.enemies, 0, 'x ignored as decoration');
+  assert.equal(analyzeLevel(rows, { enemies: 'z' }).enemies, 0, 'only z is an enemy');
+});

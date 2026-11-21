@@ -12,6 +12,12 @@
 //     live: ['x', 'y'],                                         // optional: these variables are read live (a player knows where they are)
 //   });
 //   fs.writeFileSync('tests/win.input', r.input);  fs.writeFileSync('tests/after-win.sav', r.save);
+//
+// Do not let a bot run silently for minutes. Give it a progress measure and a budget, and it stops and says why:
+//   progress: (read) => read('pl_x'),     // a number that should keep growing while the bot makes headway (x, stage, score)
+//   stuckFrames: 600,                     // stop when `progress` has not beaten its best for this many frames (default 900 when progress is given)
+//   maxMillis: 120000,                    // stop after this much wall time (default 300000)
+// The result then has `stuck` ({ frame, best, why }) or `timedOut`, and reachedDone is false: read it as "a level bug or a bot limit?" (see docs workflow).
 import { Machine } from '../core/machine.js';
 import * as C from '../core/constants.js';
 import { buildFile } from './build.js';
@@ -65,7 +71,14 @@ export async function runBot(o) {
   const presses = [];
   let last = 0, doneAt = -1, f = 0;
   const max = o.maxFrames ?? 30000;
+  const t0 = Date.now(), budget = o.maxMillis ?? 300000, stuckLimit = o.stuckFrames ?? 900;
+  let best = -Infinity, bestAt = 0, stuck = null, timedOut = false;
   for (; f < max; f++) {
+    if (o.progress && doneAt < 0) {
+      const p = o.progress(liveRead);
+      if (p > best) { best = p; bestAt = f; } else if (f - bestAt >= stuckLimit) { stuck = { frame: f, best, why: `progress has not improved for ${stuckLimit} frames (best ${best})` }; break; }
+    }
+    if ((f & 255) === 0 && Date.now() - t0 > budget) { timedOut = true; break; }
     history.push(snap());
     if (history.length > maxDelay + 2) history.shift();
     const buttons = o.decide(f, read, { machine: m, ram, flush: () => { history.length = 0; } }) | 0;
@@ -77,5 +90,5 @@ export async function runBot(o) {
   presses.push({ mask: 0, from: f });
   const segs = [];
   for (let i = 0; i < presses.length - 1; i++) if (presses[i].mask) segs.push(`${NAMES.filter((_, k) => presses[i].mask & (1 << k)).join('+')}@${presses[i].from}-${presses[i + 1].from - 1}`);
-  return { frames: f, reachedDone: doneAt >= 0, doneAt, input: `# recorded by runBot\n${segs.join(',\n')}\n`, save: lastSave, machine: m, read: liveRead };
+  return { frames: f, reachedDone: doneAt >= 0, doneAt, stuck, timedOut, input: `# recorded by runBot\n${segs.join(',\n')}\n`, save: lastSave, machine: m, read: liveRead };
 }

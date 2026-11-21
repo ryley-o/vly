@@ -361,3 +361,16 @@ test('strings asset: errors are explained (empty file, too big for one bank)', (
   assert.throws(() => compileToCartridge('strings s bank 3 = "s.txt";\nfunc frame() {}', { filename: 'm.vly', readFile: () => '' }), /no lines/);
   assert.throws(() => compileToCartridge('strings s bank 3 = "s.txt";\nfunc frame() {}', { filename: 'm.vly', readFile: () => 'x'.repeat(9000) + '\n' }), /one 8 KB bank.*several strings files/);
 });
+
+test('std/fade: fade_bg_set changes a colour while faded and it shows when the screen fades back (fade_save would have restored the old one)', () => {
+  const src = `import "std/fade";
+var n;
+func init() { lcd(LCD_BG); bg_pal(0, rgb(15, 8, 4), 0, 0, 0); fade_save(); fade_set(0); }
+func frame() { n++; if (n == 3) { fade_bg_set(0, rgb(2, 4, 6)); fade_to(4, 1); } fade_update(); }`;
+  const m = new Machine(compileToCartridge(src, { filename: 'f.vly' }).bytes);
+  m.boot();
+  for (let i = 0; i < 3; i++) m.runFrame(0);
+  assert.equal(m.read16(C.BG_PAL), 0x011, 'the new colour at fade level 1 (dark), not the old one');
+  for (let i = 0; i < 12; i++) m.runFrame(0);
+  assert.equal(m.read16(C.BG_PAL), 0x246, 'the NEW colour appears, not the old one');
+});

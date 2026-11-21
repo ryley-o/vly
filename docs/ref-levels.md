@@ -74,13 +74,20 @@ Count your "pure neutral hops" (a step up or a platform with none of those withi
 `vly levels stage1.txt stage2.txt` reads ASCII level maps (rows from top to bottom; `#` solid, `^` hazard, `a`-`z` enemy types, `o` pickup, `S` spring, `C` checkpoint, `G` goal, `@` start, `.` empty; a column with no floor is a pit) and prints a profile:
 
 - dead screens (ten columns where nothing happens);
+- **can the player get through at all** (a static check, before any bot runs): a pit wider than `--max-gap` (default 7 columns, the running jump) or a wall taller than `--max-step` (default 4 rows) is reported first;
 - the longest run of flat, empty ground (more than 12 columns is flagged);
 - how much of the level leaves the baseline ground, and long stretches with no height change;
 - the same enemy encountered more than twice in a row, and a new enemy or hazard that first appears with other dangers beside it;
 - raised steps and platforms with nothing at stake around them ("neutral hops");
 - the intensity of each screen and runs of busy or same-intensity screens.
 
+Your map will have letters that are scenery or switches, not enemies: pass `--enemies abc` (only these letters are enemies) or `--ignore xyz` (treat these as empty), and start comment lines with `;` or `//`. Without that the profile of a decorated map is nonsense.
+
 The thresholds are **our estimates** (we found no authoritative events-per-screen number), so treat each flag as a question: *is this on purpose?* A flat run before a boss can be a deliberate rest. **A clean profile does not prove a level is fun,** and researchers who generate levels warn against trusting metrics without playtests; use it to find the dull parts, then play it. For your own thresholds, call `analyzeLevel(text, { maxFlatRun: 8, window: 10 })` from `src/tools/levelprofile.js` in a script.
+
+### Things that must stay on one screen (the camera never scrolls back)
+
+The camera in `std/platformer` follows the player forward and **never scrolls back**, as in Super Mario Bros. A puzzle that links two places (a pressure plate and its gate, a switch and its door, a hat parked here and a bridge there) only works if both can be on screen at once, or the player can see the result of what they did. In our trials, three levels were unwinnable for this reason: a plate 12 blocks behind its gate. Keep linked things within about 8 columns (a little under a screen), put the effect on screen when the cause happens, or let the camera show the far thing for a moment (a camera reveal, `vly docs ref-worlds`, section 4). `vly levels` cannot see your puzzle links; check them by hand and by a bot.
 
 ## 8. Common failures of generated levels, and the fix
 

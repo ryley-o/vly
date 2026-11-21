@@ -89,3 +89,13 @@ test('Machine.clone: a copy runs ahead on other inputs without disturbing the or
   for (let i = 0; i < 30; i++) m.runFrame(mask('RIGHT'));
   assert.equal(hex(m.stateHash()), hex(c.stateHash()), 'the same inputs give the same state');
 });
+
+test('bot kit: a bot that makes no progress stops and says so, instead of burning its whole budget', async () => {
+  const b = await buildText({ text: GAME, filename: 'g.vly', baseDir: '/nonexistent' });
+  const r = await runBot({ rom: b.bytes, ram: b.stats.ram, decide: () => 0, progress: (read) => read('x'), stuckFrames: 200, maxFrames: 30000 });
+  assert.equal(r.reachedDone, false);
+  assert.ok(r.stuck && /has not improved for 200 frames/.test(r.stuck.why), JSON.stringify(r.stuck));
+  assert.ok(r.frames < 400, 'stopped early: ' + r.frames);
+  const t = await runBot({ rom: b.bytes, ram: b.stats.ram, decide: () => 0, maxMillis: 0, maxFrames: 30000 });
+  assert.equal(t.timedOut, true);
+});

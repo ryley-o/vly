@@ -551,8 +551,11 @@ const FADE_SOURCE = `
 //   fade_set(0); fade_to(4, 6);                                       // start black and fade in, one step every 6 frames
 //   fade_to(0, 6);                                                    // fade out ...
 //   func frame() { fade_update(); if (!fade_busy()) { change_screen(); fade_to(4, 6); } }
-// fade_set(n) jumps straight to a level and stays there (it also sets the target). Call fade_save() again whenever you change palettes on
-// purpose: it is safe while faded (it restores the real colours first, so it can never store black). About 15,000 cycles a step.
+// fade_set(n) jumps straight to a level and stays there (it also sets the target). To change colours while the screen is faded or fading,
+// write them with fade_bg_set(i, colour) / fade_obj_set(i, colour) (i is the palette entry 0-31; they update the remembered colour and show it
+// at the current level). Do NOT write bg_pal/obj_pal and then call fade_save() while faded: fade_save restores the OLD colours first (so it can
+// never store black), and your new palettes are lost. About 15,000 cycles a step; changing a whole screen's palettes with the two set
+// functions and one fade_to costs far less than fade_save plus fade_set.
 var fade_bg[32]; var fade_obj[32];
 var fade_level = 4; var fade_target = 4; var fade_wait; var fade_speed = 6; var fade_saved;
 func fade_save() {
@@ -572,6 +575,8 @@ func fade_apply(n) {
   for (var i = 0; i < 32; i++) { poke(BG_PAL + i * 2, fade_scale(fade_bg[i], n)); poke(OBJ_PAL + i * 2, fade_scale(fade_obj[i], n)); }
 }
 func fade_set(n) { fade_apply(n); fade_target = n; }
+func fade_bg_set(i, c) { fade_bg[i] = c; poke(BG_PAL + i * 2, fade_scale(c, fade_level)); }
+func fade_obj_set(i, c) { fade_obj[i] = c; poke(OBJ_PAL + i * 2, fade_scale(c, fade_level)); }
 func fade_to(target, frames_per_step) { fade_target = target; fade_speed = frames_per_step; fade_wait = 0; }
 func fade_busy() { return fade_level != fade_target; }
 func fade_update() {

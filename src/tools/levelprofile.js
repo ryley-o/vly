@@ -24,17 +24,22 @@ const DEFAULTS = {
   maxSameEnemyRun: 2,         // consecutive encounters with the same enemy type
   introGap: 5,                // a first appearance should have no other event within this many columns
   maxNeutralShare: 0.5,       // share of raised steps and platforms with nothing at stake around them
+  maxGap: 7,                  // widest pit (columns) a player can clear with a running jump (138 px is 8 blocks of 16 px; 7 leaves margin)
+  maxStep: 4,                 // tallest step or wall (rows) a player can jump onto (SMB1 reaches about 4 blocks)
+  enemies: '',                // letters that are enemies; empty = every lowercase letter except the pickup letters
+  ignore: '',                 // letters to treat as empty decoration (so a-z scenery does not count as enemies)
 };
 
 export function analyzeLevel(text, options = {}) {
   const o = { ...DEFAULTS, ...options };
-  const rows = (Array.isArray(text) ? text : String(text).split('\n')).map((r) => r.replace(/\r$/, ''));
+  // lines that start with ; or // are comments, not rows of the map
+  const rows = (Array.isArray(text) ? text : String(text).split('\n')).map((r) => r.replace(/\r$/, '')).filter((r) => !/^\s*(;|\/\/)/.test(r));
   while (rows.length && rows[rows.length - 1].trim() === '') rows.pop();
   const width = Math.max(0, ...rows.map((r) => r.length));
   const H = rows.length;
-  const cell = (r, c) => (rows[r] && rows[r][c]) || '.';
+  const cell = (r, c) => { const ch = (rows[r] && rows[r][c]) || '.'; return o.ignore.includes(ch) ? '.' : ch; };
   const isSolid = (ch) => o.solid.includes(ch);
-  const isEnemy = (ch) => /[a-z]/.test(ch) && !o.pickup.includes(ch);
+  const isEnemy = (ch) => (o.enemies ? o.enemies.includes(ch) : /[a-z]/.test(ch)) && !o.pickup.includes(ch);
   const cols = [];
   for (let c = 0; c < width; c++) {
     const bottom = cell(H - 1, c);
@@ -133,6 +138,21 @@ export function analyzeLevel(text, options = {}) {
   for (let i = 2; i < windows.length; i++) if (windows[i].intensity === 3 && windows[i - 1].intensity === 3 && windows[i - 2].intensity === 3) warnings.push(`columns ${windows[i - 2].from}-${windows[i].from + W - 1}: three very busy screens in a row; give the player a rest`);
   for (let i = 3; i < windows.length; i++) if ([1, 2, 3].every((k) => windows[i - k].intensity === windows[i].intensity)) { warnings.push(`columns ${windows[i - 3].from}-${windows[i].from + W - 1}: four screens in a row with the same intensity (${windows[i].intensity} of 3); vary the pacing: rise, peak, rest`); break; }
 
+  // can the player get through at all? (a static check with the jump numbers; the camera never scrolls back, so also keep anything
+  // a puzzle links, such as a plate and its gate, within about one screen of each other: see docs ref-levels)
+  const reach = [];
+  for (let i = 0; i < width; i++) {
+    if (cols[i].pit && !(i > 0 && cols[i - 1].pit)) {
+      let j = i; while (j + 1 < width && cols[j + 1].pit) j++;
+      const span = j - i + 1;
+      if (span > o.maxGap && j + 1 < width) reach.push(`columns ${i}-${j}: a pit ${span} columns wide; the longest jump clears about ${o.maxGap} (use a platform, a spring or a bridge)`);
+      i = j;
+    } else if (i > 0 && !cols[i].pit && !cols[i - 1].pit && cols[i - 1].top - cols[i].top > o.maxStep) {
+      const up = cols[i - 1].top - cols[i].top;
+      reach.push(`column ${i}: a wall ${up} rows high; the highest jump reaches about ${o.maxStep} (add a step, a platform or a spring, unless one already helps beside it)`);
+    }
+  }
+  for (const w of reach) warnings.unshift(w);
   const pits = cols.filter((x, i) => x.pit && !(i > 0 && cols[i - 1].pit)).length;
   const types = [...new Set(cols.flatMap((x) => x.enemies))];
   return {
@@ -140,7 +160,7 @@ export function analyzeLevel(text, options = {}) {
     pits, enemies: cols.reduce((a, x) => a + x.enemies.length, 0), enemyTypes: types, hazards: cols.reduce((a, x) => a + x.hazards, 0), pickups: cols.reduce((a, x) => a + (x.pickups ? 1 : 0), 0),
     offBaselineShare: Number(off.toFixed(2)), longestEmptyFlatRun: longest.len, neutralHops: { neutral, of: obstacles },
     intensityByScreen: windows.map((w) => w.intensity).join(''), eventsByScreen: windows.map((w) => w.events),
-    warnings,
+    warnings, unreachable: reach,
   };
 }
 

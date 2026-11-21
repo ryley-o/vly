@@ -4,7 +4,7 @@ Read the recipe for your genre before you design it, and the others for ideas wo
 
 
 **Platformer.** Use `vly docs ref-sidescroller` and `import "std/platformer"` for the movement (the exact Super Mario Bros. numbers, tested), and read its section 0: borrow the feel, never the look. Variable-height jump, coyote time, one-way platforms, enemies that patrol and
-can be stomped, a checkpoint every 20 seconds, 3 or more stages, collectibles. The `platformer` template has physics and tilemaps.
+can be stomped, a checkpoint every 20 seconds, 3 or more stages, collectibles. (The `platformer` template is older hand-tuned physics: use `std/platformer`, and start from an empty project.)
 
 **Racer (side view).** `games/hill-racer` is the worked example of everything in this playbook (read its source and tests). Terrain as a height function of x so the ground can be drawn and driven on; the vehicle follows the
 ground slope; ramps carry slope into the jump; lap and best-time as the score; rivals with rubber-banding; boost with an
