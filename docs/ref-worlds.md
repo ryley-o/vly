@@ -60,6 +60,18 @@ Cheap, concrete techniques (sources at the end; the machine facts are this conso
 - **One distinctive silhouette per thing.** Enemies, pickups and hazards recognisable at a glance in four colours (`vly docs design`, section 2).
 - **One place that is the point.** Choose the single most beautiful place in the game and spend your effort there: its own palette, its own tune, its own weather, a quiet moment, something to find.
 
+## 4b. Building an explorable world on this hardware (patterns, from a trial that worked)
+
+A trial game (a salt-marsh island of 16 rooms where one world state, the tide, was the whole lock) went from idea to a proven, beautiful, finishable game quickly. What made that possible is worth copying as a *shape*, not as a design:
+
+- **Make the lock a state of the world, not only an item.** "Open when the tide is low" or "when the lamp is lit" gives one map several different maps and teaches itself by sight: a player can see a lock before they can open it. Items and abilities still work; a world state can also be undone, which makes going back a decision.
+- **Keep the world as data and generate the rest.** Room tiles, doors, pickups and gate rules in one table or text file; a small script turns it into the cartridge's data. A height field plus a rule ("height minus tide decides dry, mud, shallow, deep") can draw and collide a whole map from one number per cell. Do not hand-place what a rule can compute.
+- **Slide between rooms** (a screen-sized map per room, scroll or flip to the next when the player walks off an edge, as `games/lantern` does) and keep the room count in the budget: rooms times bytes per room, plus the gate and item bits in the 1 KB save.
+- **Write a solver before you polish.** A short breadth-first search over (position, world state, tools held) using the same passability rules as the game tells you what each ability unlocks and which items are unreachable. It finds the "this shell can never be collected" bugs in seconds. Then let a bot play the real cartridge from the title to the ending, and record it as a replay test. (An exploration game has no reaction timing, so a reaction-delayed bot says little about difficulty; what it proves is that the world can be finished.)
+- **Show the player what they have seen.** A partial chart that fills in as rooms are visited does the work of a map on a tiny screen.
+- **Let the sound follow the rule.** Music layers that join with the world state (a lead alone at one state, bass at another, an arpeggio at a third) make the rule audible. Start layers on the same step as the lead so they stay in time.
+- **Look at every room in every state.** A contact sheet (all rooms at all world states in one picture) is the cheap way to find the unreadable ones.
+
 ## 5. Endings and replay
 
 Alternatives to "checkpoint, last boss, credits":

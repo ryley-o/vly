@@ -111,8 +111,10 @@ async function verifyPublished(site, j, rom) {
         const rev = r.headers.get('x-revision');
         if (rev && String(j.revision) !== rev) bad(`the server serves revision ${rev}, not ${j.revision}`); else good(`revision ${j.revision} is what players get`);
         if (sha256Hex(got) !== sha256Hex(rom)) bad('the cartridge players get is not the one that was uploaded'); else good('the cartridge is byte-identical to the one built here');
-        const idle = runCartridge(got, { frames: 120, input: '' }), started = runCartridge(got, { frames: 120, input: 'START@20' });
-        if (idle.frameHash === started.frameHash && idle.stateHash === started.stateHash) lines.push('  note  pressing START changed nothing on the title (the game may start another way)'); else good('START does something');
+        // a title may ignore input for its first moments or start on A: try a few presses before saying nothing happened
+        const idle = runCartridge(got, { frames: 240, input: '' });
+        const reacts = ['START@20', 'START@100', 'A@100'].some((inp) => { const r2 = runCartridge(got, { frames: 240, input: inp }); return r2.frameHash !== idle.frameHash || r2.stateHash !== idle.stateHash; });
+        if (!reacts) lines.push('  note  pressing START or A (at frame 20 and at frame 100) changed nothing on the title: the game may start another way, or the title may need longer before it takes input'); else good('START does something');
       }
       break;
     } catch (e) { if (attempt === 2) bad(`could not verify (${e.cause?.code || e.message})`); }
@@ -312,7 +314,7 @@ export const commands = {
       if ((args.flags.worst || r.cycles.max > 80000) && built?.symbols) {      // with the source we can say WHICH code spent them
         const shown = r.worstFrames.slice(0, 3);
         try {
-          for (const p of profileFrames(rom, built.symbols, shown.map((w) => w.frame), { input: inputText(args), save })) text += `  frame ${p.frame}: ${p.functions.map((f) => `${f.name} ${f.cycles}`).join(', ')}\n`;
+          for (const p of profileFrames(rom, built.symbols, shown.map((w) => w.frame), { input: inputText(args), save })) text += `  frame ${p.frame} (${p.cycles} cycles in all; each function's OWN cycles, not counting what it calls): ${p.functions.map((f) => `${f.name} ${f.cycles}`).join(', ')}\n`;
         } catch { /* the frame list is advice; never fail the run for it */ }
       }
       text += `faults: ${faultList.length ? faultList.join(', ') : 'none'}\n`;

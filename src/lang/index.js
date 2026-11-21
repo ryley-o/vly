@@ -127,6 +127,8 @@ function compileWithSlack(source, opts, slack) {
     const assetList = flatAssets.map((a) => `${a.name} ${a.bytes}`).join(', ');
     const code = Object.entries(m.sizes).filter(([k]) => !meta[k] || meta[k].bank === null).reduce((x, [, v]) => x + v, 0);
     // When art and data are a big share of the region they are the real cause, so say so first
+    const ptrPinned = Object.entries(m.sizes).filter(([k]) => meta[k] && meta[k].bank === null && /computed address/.test(meta[k].pin || '')).length;
+    const ptrHint = ptrPinned ? ` ${ptrPinned} of these stay only because they read through a computed address (peek8(p + i), peek(p + i), copy from a pointer): the compiler cannot know it will not point into a bank. Reading a named array or table by index (tab[i], arr[i]) does not pin a function, so index those instead and the function can move.` : '';
     const lead = first && flatAssetBytes * 4 >= limit
       ? `Your unbanked art and data fill ${flatAssetBytes} bytes of it (biggest first: ${assetList}). That is the cause: ${bankHow}. `
       : '';
@@ -136,7 +138,7 @@ function compileWithSlack(source, opts, slack) {
       message: `the part of the program that must always be visible takes ${m.flatBytes} bytes, but that region is ${limit} (over by ${m.flatBytes - limit}). ` + lead +
         `It holds tables, strings and unbanked assets (${Math.max(0, m.flatBytes - 16 - code)} bytes here) and every function the compiler cannot move into a bank by itself (${code} bytes). ` +
         `Move art and maps to a bank (tileset art bank auto = "art.tiles"; lets the compiler choose the bank), shorten text, or split the functions named below so the bulk of them can move. ` +
-        `Biggest functions still in the region (bytes): ${stay}.` + tail,
+        `Biggest functions still in the region (bytes): ${stay}.` + ptrHint + tail,
     });
   };
 

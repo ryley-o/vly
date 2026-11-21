@@ -205,7 +205,7 @@ A cartridge is up to 1 MB, but the CPU has a 16-bit address space, so it sees th
   `moved to banks to make room: hero_step (2), critters_update (2)`.
 - What must stay in the always-visible 16 KB: tables, strings, unbanked art and maps, the standard library, and any
   function the compiler cannot move safely (one that calls `select_bank()`, names an asset that lives in a bank, reads
-  through a computed address with `peek`/`copy`, or contains `asm`). If that does not fit, the error lists the biggest
+  through a computed address with `peek`/`copy`, or contains `asm`). **The usual surprise is the computed address**: a function that does `peek8(p + i)` or `peek(p + i * 2)` with a pointer it was given stays put, because the compiler cannot know the pointer will not land in a bank. Reading a named array or table by index (`tab[i]`, `arr[i]`) does not pin a function, so prefer those, or keep such readers small. If that does not fit, the error lists the biggest
   functions and why each one has to stay.
 
 **Let the compiler choose the bank: `bank auto`.** Write `bank auto` instead of a number and the compiler packs your assets into banks itself (largest first, several small ones to a bank, never in a bank you named yourself). Read them from anywhere with `bank_peek8(bankof(x), x + i)`, or `str_get(NAME, NAME_BANK, ...)` for strings. Nothing is wasted in the cartridge but the room left in the last bank, and `vly build` prints what went where. Assets without `bank` stay in the always-visible 16 KB, which is the fastest to read (no bank switch), so keep small things you touch every frame there.
