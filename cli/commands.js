@@ -458,7 +458,7 @@ export const commands = {
   },
 
   release: {
-    help: 'vly release [--title "Name"] [--site URL] [--no-publish] [--html out.html]\n  The whole release in one command, stopping at the first failure: build, run the tests, quality check, load every previous release\'s save and keep playing,\n  print the project\'s own report (tests/report.mjs, if any), publish and verify the play link (unless --no-publish), and write an offline copy with a stable save key.\n  Previous releases\' saves: files in tests/legacy-saves/*.sav, or "legacySaves" in vly.json.',
+    help: 'vly release [--title "Name"] [--site URL] [--no-publish] [--no-sources] [--html out.html]\n  The whole release in one command, stopping at the first failure: build, run the tests, quality check, load every previous release\'s save and keep playing,\n  print the project\'s own report (tests/report.mjs, if any), publish and verify the play link (unless --no-publish; --no-sources uploads the cartridge only, not your text sources), and write an offline copy with a stable save key.\n  Previous releases\' saves: files in tests/legacy-saves/*.sav, or "legacySaves" in vly.json.',
     async run(args) {
       const cfg = loadProjectConfig() || {};
       const lines = []; let failed = false;
@@ -524,7 +524,7 @@ export const commands = {
       let play = null;
       if (!args.flags['no-publish']) {
         try {
-          const r = await commands.publish.run({ _: [outPath], flags: { title: args.flags.title, site: args.flags.site, 'no-sources': false } });
+          const r = await commands.publish.run({ _: [outPath], flags: { title: args.flags.title, site: args.flags.site, 'no-sources': !!args.flags['no-sources'] } });
           lines.push(r.text.split('\n').map((l) => '  ' + l).join('\n')); play = r.data.play_url;
         } catch (e) { lines.push(`  FAIL  publish: ${e.message.split('\n').slice(0, 6).join('\n        ')}`); failed = true; }
       }

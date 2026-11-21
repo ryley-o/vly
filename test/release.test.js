@@ -53,3 +53,33 @@ test('vly release: stops at a failing step, tries an old save, runs the report, 
   assert.match(bad.stdout, /FAIL\s+old save tests\/legacy-saves\/short\.sav: not a 1024-byte save/);
   assert.match(bad.stdout, /not released/);
 });
+
+test('vly release --no-sources publishes the cartridge only; without the flag the text sources go along', async (t) => {
+  const http = await import('node:http');
+  const seen = []; let stored = null;
+  const server = http.createServer((req, res) => {
+    let b = ''; req.on('data', (d) => { b += d; });
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url.startsWith('/g/')) { res.setHeader('content-type', 'text/html'); return res.end('<html>play</html>'); }
+      if (req.method === 'GET' && req.url.startsWith('/api/cart')) { res.setHeader('x-revision', '1'); return res.end(Buffer.from(stored)); }
+      const j = JSON.parse(b); seen.push(j); stored = Buffer.from(j.cartridge_base64, 'base64');
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ ok: true, game_id: 'gx', title: j.title, revision: 1, play_url: `${site}/g/gx`, buy_url: 'http://x/buy', expires_at: '2030-01-01T00:00:00Z', edit_token: 't' }));
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r)); t.after(() => server.close());
+  var site = `http://127.0.0.1:${server.address().port}`;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-release-ns-'));
+  fs.mkdirSync(path.join(dir, 'src'));
+  fs.writeFileSync(path.join(dir, 'src', 'main.vly'), GAME);
+  fs.writeFileSync(path.join(dir, 'vly.json'), JSON.stringify({ name: 'yard', id: 'yard', entry: 'src/main.vly', out: 'build/yard.vlc', tests: [{ name: 'it runs', frames: 30, expect: { words: { n: 30 } } }] }));
+  const { spawn } = await import('node:child_process');
+  const go = (...a) => new Promise((resolve) => { const p = spawn('node', [path.join(root, 'cli', 'vly.js'), 'release', '--site', site, ...a], { cwd: dir }); let out = ''; p.stdout.on('data', (d) => { out += d; }); p.stderr.on('data', (d) => { out += d; }); p.on('close', (status) => resolve({ status, out })); });
+  const a = await go('--no-sources', '--new');
+  assert.equal(a.status, 0, a.out);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].files, undefined, 'no sources with --no-sources');
+  const b = await go('--new');
+  assert.equal(b.status, 0, b.out);
+  assert.ok(seen[1].files && seen[1].files['src/main.vly'], 'sources go along by default');
+});

@@ -1,5 +1,7 @@
 // {{name}}: a platformer. D-pad moves, A jumps (hold for a higher jump). Collect coins, stomp enemies by landing on
 // them, avoid spikes and pits, reach the flag. Three levels drawn as ASCII art in assets/*.map.
+// NOTE: this is an older, hand-tuned controller kept to teach tilemaps, spawn markers and patrolling enemies. For how the character MOVES and how enemy
+// contact works (stomps, forgiveness, camera), `import "std/platformer"` and read `vly docs ref-sidescroller`; do not copy this controller's numbers.
 // Shows: tilemaps with spawn markers, pixel-stepped tile collision, fixed-point physics (1/16 pixel), coyote time and
 // jump buffering, sprite animation, patrolling enemies, a window-layer HUD, sound, and saved progress.
 

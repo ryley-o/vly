@@ -87,7 +87,15 @@ The thresholds are **our estimates** (we found no authoritative events-per-scree
 
 ### Things that must stay on one screen (the camera never scrolls back)
 
-The camera in `std/platformer` follows the player forward and **never scrolls back**, as in Super Mario Bros. A puzzle that links two places (a pressure plate and its gate, a switch and its door, a hat parked here and a bridge there) only works if both can be on screen at once, or the player can see the result of what they did. In our trials, three levels were unwinnable for this reason: a plate 12 blocks behind its gate. Keep linked things within about 8 columns (a little under a screen), put the effect on screen when the cause happens, or let the camera show the far thing for a moment (a camera reveal, `vly docs ref-worlds`, section 4). `vly levels` cannot see your puzzle links; check them by hand and by a bot.
+The camera in `std/platformer` follows the player forward and **never scrolls back**, as in Super Mario Bros. A puzzle that links two places (a pressure plate and its gate, a switch and its door, a hat parked here and a bridge there) only works if both can be on screen at once, or the player can see the result of what they did. In our trials, three levels were unwinnable for this reason: a plate 12 blocks behind its gate. Patterns that work: keep linked things within roughly a screen of each other, show the effect on screen when the cause happens, or let the camera visit the far thing for a moment (a camera reveal, `vly docs ref-worlds`, section 4). Whatever you choose, test that a player who has not read your design can see what they changed. `vly levels` cannot see your puzzle links; check them by hand and by a bot.
+
+### Each mechanic should change a decision
+
+When you plan a stage, write down **the decision the mechanic creates for the player** (a column in the `DESIGN.md` content table: "stage, new thing, the decision it creates"). A mechanic that changes no decision is decoration: in one trial a pond taught cast power before it affected anything, and a tap and a timed hook were enough there; the extra range only earned its place later, when a far pool changed the timing and what could be caught, and a tractor was introduced on routes with a heavy load to haul. Introduce a mechanic where it is first needed, in its simplest form, and add depth only when a later place gives it something to decide.
+
+### What a fall repeats
+
+A checkpoint is a statement about how much play a fall costs. Count it: after dying, how much *meaningful* play does the player repeat, and how much of that is just walking? A good place is just before a decision, after the player has secured something that matters (a rescue, a delivery, a key), and with breathing room at the respawn. Consider carrying what was secured across a fall; one midpoint flag was enough for a trial game's routes once rescues and deliveries survived a death.
 
 ## 8. Common failures of generated levels, and the fix
 

@@ -143,6 +143,26 @@ The screen is 160 x 144: **10 x 9 blocks of 16 pixels** (SMB has 16 x 15). Keep 
 - **Boss rooms:** stop the camera (the arena is one screen), show it before the fight, give a checkpoint just before.
 - Use `std/stream` for levels wider than the screen (one column of tiles at a time) and `asset levels bank auto records ...` for many stages (`vly docs language`).
 
+### Seeing where you will land (descending, and the HUD)
+
+A level can be completely winnable and still unfair to a first-time player if they cannot see where a drop ends. Patterns that work: a camera that sits a little lower when the ground falls away, so the next surface is on screen before the player commits; two or three visible terraces on a long descent instead of one blind drop; hazards near a landing placed where the player can see them from the lip. Patterns to avoid: a landing that is hidden behind the HUD or a foreground tile, a blind drop that is only fair after dying once, scenery that looks like floor. **The check is cheap: take a screenshot with the character standing at the lip of each big drop, with the real HUD and scenery in place, and ask "could a stranger see where they would land and what is near it?"** (One trial's first hill hid its landing below the HUD; a lower camera and two terraces fixed it.)
+
+### A movement test room (before you build levels)
+
+Build one small room that is only for the character: a flat floor, a wall, a gap, a step, a one-block seam, a platform that moves, and whatever your extra verbs act on. Then write a short replay for each situation that tends to feel wrong, run it with `--watch` on position and speed, and look at the numbers and the filmstrip:
+
+- **a tiny tap** (one or two frames of a direction): the character should move a visible but small amount, not nothing and not a lurch;
+- **a full-speed stop and a reversal**: how many frames does the skid take, and does the character end up where you would expect?
+- **an air correction**: steer in mid-air, and release the jump early;
+- **a narrow seam**: running across the join of two different surfaces (a raft against a bank, two tiles of different height, a moving platform at the edge of the ground), where a character that catches on a one-pixel lip feels broken;
+- **your extra verbs**: if B is both "run" and a contextual action (fish, ride, throw, push), decide how they share the button and test the overlap. Patterns that work: an action that only fires when its target is in reach, a tap for the action and a hold for the run, or an action that wins only while the player stands still. Test pressing B at the wrong moment (running past the pond, standing on the tractor) as carefully as the right one.
+
+If the room feels right, the levels inherit it. If you fix a feel problem in the levels instead, you will fix it a dozen times.
+
+### Things that carry other things (rafts, lifts, conveyors)
+
+Anything that moves and carries riders is easy to get subtly wrong, and the failure is visible: riders that trail behind a lift, hover, or slide off. A pattern that works: pick **one update order** and keep it everywhere: (1) move the platform, (2) move every rider by the platform's own movement this frame (not by where the platform was), (3) run the riders' own movement and collision, (4) draw. For a group (a farmer with chicks following, a train of pickups), store each follower's position **relative to the deck** while it is aboard, and convert back to world positions when it steps off; a follower that replays old world positions will trail a lift's old height or cross in front of the player. Write a replay for each of: boarding, the platform reversing, hopping in place, and stepping off at each end, and look for riders that flicker, sink or vanish. The same room can show an enemy that turns at a ledge, faces the way it is moving, and can be stomped from above, while a graze from the side or behind it leaves the player safe (`5b`).
+
 ## 8. Prove the feel (do this before you build levels)
 
 In an empty test room (a flat floor and one wall), with a script of `RIGHT@...,A@...` input and `vly run ... --watch pl_x,pl_y,pl_vx`, check and write down as tests:
