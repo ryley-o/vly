@@ -142,6 +142,8 @@ Further reading, if you want the detail: Miyamoto on World 1-1 ([Game Developer]
 
 ## 2. The canvas: 160 x 144 pixels, readable at a glance
 
+*A quick test at the native size, with the HUD visible: point to the next safe landing and the nearest hazard. If background art could be mistaken for a platform, give solid terrain the strongest edges and make scenery softer (`vly docs ref-sidescroller`, "Seeing where you will land").*
+
 - The screen is 20 x 18 tiles of 8 x 8 pixels. A sprite smaller than 8 x 8 is hard to read; a hero is usually 8 x 16 or 16 x 16.
 - **Four colours per tile or sprite** (colour 0 is transparent for sprites). Use contrast, not detail: dark outline, one mid
   tone, one highlight. Keep the 8 + 8 palettes organised: palette 0 for the world, others for variety (one per enemy type,

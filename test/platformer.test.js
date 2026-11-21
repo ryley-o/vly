@@ -209,3 +209,31 @@ test('falling with one pixel of the body inside a ledge (found by a bot in a rea
   assert.ok(last.x <= 40, 'pushed clear of the block, not floating over it');
   assert.ok(Math.min(...rows.slice(100).map((r) => r.vy)) < -900, 'and can jump');
 });
+
+// ---- the stomp matrix: the contact cases worth replaying whenever you change an enemy or the character box ----
+test('stomp matrix: descending contact at the centre and both shoulders and late always stomps; a grounded side hit, a rising hit hurt; a graze is nothing; a second enemy right after a stomp is a stomp', async () => {
+  // enemy 12 x 12 at (60, 100); the character is 12 x 16 (so its feet are at pl_y + 16)
+  const probe = async (x, y, vy, extra = '') => {
+    const text = `import "std/platformer";
+func pl_solid(x, y) { return 0; }
+var res; var res2;
+func init() { pl_init(${x}, ${y}); pl_vy = ${vy}; ${extra} res = pl_enemy(60, 100, 12, 12); res2 = pl_enemy(66, 100, 12, 12); }
+func frame() {}`;
+    const b = await buildText({ text, filename: 'main.vly', baseDir: '/x' });
+    const r = runCartridge(b.bytes, { frames: 1, mem: [{ addr: b.stats.ram.res.addr, len: 4 }] });
+    return [r.mem[0].bytes[0], r.mem[0].bytes[2]];
+  };
+  assert.equal((await probe(60, 88, 300))[0], 1, 'descending onto the centre');
+  assert.equal((await probe(52, 88, 300))[0], 1, 'descending onto the left shoulder');
+  assert.equal((await probe(68, 88, 300))[0], 1, 'descending onto the right shoulder');
+  assert.equal((await probe(60, 95, 300))[0], 1, 'a late descent, feet already deep in it');
+  assert.equal((await probe(60, 90, 0))[0], 1, 'standing on its head (feet in its top half)');
+  assert.equal((await probe(52, 96, 0))[0], 2, 'a grounded side hit hurts');
+  assert.equal((await probe(60, 100, -300))[0], 2, 'a rising hit hurts');
+  assert.equal((await probe(47, 96, 0))[0], 0, 'a graze with the box edges is nothing');
+  assert.equal((await probe(60, 100, -300, 'pl_inv = 100;'))[0], 0, 'blinking after a hit: contact does nothing');
+  const two = await probe(62, 88, 300);
+  assert.deepEqual(two, [1, 1], 'two enemies overlapping under a descent: both read as stomps');
+  const after = await probe(60, 100, -300, 'pl_stomp_t = 6;');
+  assert.equal(after[0], 1, 'right after a stomp (the stomp timer), the next contact is a stomp too');
+});
