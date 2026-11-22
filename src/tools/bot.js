@@ -15,12 +15,14 @@
 //
 // Do not let a bot run silently for minutes. Give it a progress measure and a budget, and it stops and says why:
 //   progress: (read) => read('pl_x'),     // a number that should keep growing while the bot makes headway (x, stage, score)
+//   opening: { input: 'RIGHT@0-40,UP+B@50', frames: 60 },   // optional: presses you wrote by hand for the first `frames` frames, then the policy takes over
 //   stuckFrames: 600,                     // stop when `progress` has not beaten its best for this many frames (default 900 when progress is given)
 //   maxMillis: 120000,                    // stop after this much wall time (default 300000)
 // The result then has `stuck` ({ frame, best, why }) or `timedOut`, and reachedDone is false: read it as "a level bug or a bot limit?" (see docs workflow).
 import { Machine } from '../core/machine.js';
 import * as C from '../core/constants.js';
 import { buildFile } from './build.js';
+import { parseInputSpec } from './input.js';
 
 const NAMES = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'A', 'B', 'START', 'SELECT'];
 /** mask('A+RIGHT') -> the button bits, to return from decide(). */
@@ -81,7 +83,8 @@ export async function runBot(o) {
     if ((f & 255) === 0 && Date.now() - t0 > budget) { timedOut = true; break; }
     history.push(snap());
     if (history.length > maxDelay + 2) history.shift();
-    const buttons = o.decide(f, read, { machine: m, ram, flush: () => { history.length = 0; } }) | 0;
+    const openFn = o.opening ? (o._openFn ??= parseInputSpec(o.opening.input || '')) : null;
+    const buttons = (openFn && f < (o.opening.frames ?? 0) ? openFn(f) : o.decide(f, read, { machine: m, ram, flush: () => { history.length = 0; } })) | 0;
     m.runFrame(buttons);
     if (buttons !== last) { presses.push({ mask: buttons, from: f }); last = buttons; }
     if (o.done && doneAt < 0 && o.done(liveRead)) doneAt = f;

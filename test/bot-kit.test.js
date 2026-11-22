@@ -99,3 +99,11 @@ test('bot kit: a bot that makes no progress stops and says so, instead of burnin
   const t = await runBot({ rom: b.bytes, ram: b.stats.ram, decide: () => 0, maxMillis: 0, maxFrames: 30000 });
   assert.equal(t.timedOut, true);
 });
+
+test('bot kit: a hand-written opening plays first, then the policy takes over; tests can start from a chosen state with "set"', async () => {
+  const b = await buildText({ text: GAME, filename: 'g.vly', baseDir: '/nonexistent' });
+  const seen = [];
+  const r = await runBot({ rom: b.bytes, ram: b.stats.ram, opening: { input: 'LEFT@0-19', frames: 20 }, decide: (f) => { seen.push(f); return 0; }, maxFrames: 40 });
+  assert.equal(seen[0], 20, 'the policy is first asked at frame 20');
+  assert.ok(r.input.includes('LEFT@0-19'), r.input);
+});

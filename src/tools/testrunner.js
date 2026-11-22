@@ -47,7 +47,9 @@ export async function runSpecFile(specPath, { update = false, accept = false } =
       let save = null;
       if (t.save) save = new Uint8Array(fs.readFileSync(path.resolve(dir, t.save)));
       const input = [t.input || '', t.inputFile ? fs.readFileSync(path.resolve(dir, t.inputFile), 'utf8') : ''].filter(Boolean).join('\n');
-      res = runCartridge(rom, { frames: t.frames ?? 60, input, save });
+      // "set": { "level": 7, "lives": 3 } starts the test from a chosen state (variables are set after init, before the first frame)
+      const pokes = Object.entries(t.set || {}).map(([name, val]) => { const base = name.replace(/\[.*$/, ''); return { addr: resolveAddr(name, ram), value: Number(val) | 0, bytes: ram?.[base]?.type === 'byte[]' ? 1 : 2 }; });
+      res = runCartridge(rom, { frames: t.frames ?? 60, input, save, pokes });
       res._input = input; res._save = save;
     } catch (e) {
       results.push({ name: t.name, ok: false, failures: [`error: ${e.message}`] });

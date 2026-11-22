@@ -100,6 +100,7 @@ A test runs the program for `frames` with `input`, then checks `expect`:
 - Faults (div by zero, bad opcode, ROM writes, overruns, init over budget) fail a test unless `"allowFaults": true`. The failure says where it happened, as in the next section.
 - `"watch": ["state", "level"]` (top level of `vly.json`): the variables to show first when something faults.
 - `"save": "file.sav"` starts the test from a save file.
+- `"set": { "level": 7, "lives": 3 }` starts the test from a chosen state: those variables are set after `init()`, before the first frame (the same as `vly run --set`). Use it to reach a scene without walking the menus, so one menu change does not break every test.
 - `"inputFile": "tests/clear.input"` reads the input script from a file (in addition to `input`): newlines separate segments and `#` starts a comment. Use it for long inputs recorded by a bot (see `vly docs workflow`).
 
 ## Files

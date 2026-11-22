@@ -232,3 +232,16 @@ func frame() { sprite(3, 20, 30, 65, 0); sprite(1, 22, 32, 66, 1); }`;
   assert.deepEqual(r.data.oam.map((s) => [s.slot, s.x, s.y, s.tile]), [[1, 22, 32, 66], [3, 20, 30, 65]]);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('vly.json tests can start from a chosen state with "set"', async () => {
+  const { runSpecFile } = await import('../src/tools/testrunner.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-set-'));
+  fs.mkdirSync(path.join(dir, 'src'));
+  fs.writeFileSync(path.join(dir, 'src', 'main.vly'), 'var level; var shown;\nfunc init() { load_font(0); lcd(LCD_BG); }\nfunc frame() { shown = level * 2; }');
+  fs.writeFileSync(path.join(dir, 'vly.json'), JSON.stringify({ name: 't', entry: 'src/main.vly', tests: [
+    { name: 'starts at level 7', frames: 3, set: { level: 7 }, expect: { words: { shown: 14 } } },
+    { name: 'default is zero', frames: 3, expect: { words: { shown: 0 } } }] }));
+  const r = await runSpecFile(path.join(dir, 'vly.json'));
+  assert.equal(r.failed ?? r.results?.filter((x) => !x.ok).length, 0, JSON.stringify(r.results || r).slice(0, 400));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
