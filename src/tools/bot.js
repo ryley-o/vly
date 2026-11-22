@@ -95,3 +95,36 @@ export async function runBot(o) {
   for (let i = 0; i < presses.length - 1; i++) if (presses[i].mask) segs.push(`${NAMES.filter((_, k) => presses[i].mask & (1 << k)).join('+')}@${presses[i].from}-${presses[i + 1].from - 1}`);
   return { frames: f, reachedDone: doneAt >= 0, doneAt, stuck, timedOut, input: `# recorded by runBot\n${segs.join(',\n')}\n`, save: lastSave, machine: m, read: liveRead };
 }
+
+/**
+ * Make a policy play like a person with imperfect timing: every NEW button press the policy makes is delayed by `delay + noise` frames
+ * (noise is uniform in [-jitter, +jitter], never earlier than the policy asked), holds follow the policy, releases are immediate.
+ * Run the same policy at several `jitter` values (0, 1, 2, 3, 5 frames is roughly 0 to 80 ms) and report the score of each: a game where the
+ * best player and a sloppy one score alike has no skill in it; a game where only jitter 0 survives is too hard.
+ *   const policy = humanize((f, read) => ..., { delay: 0, jitter: 2, seed: 7 });
+ *   const r = await runBot({ source, decide: policy, ... });
+ */
+export function humanize(decide, { delay = 0, jitter = 0, seed = 1 } = {}) {
+  let s = seed >>> 0 || 1;
+  const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+  let prev = 0;
+  const items = [];                             // a press that has not finished: { bit, at, len, released, until }
+  return (f, read, api) => {
+    const want = decide(f, read, api) | 0;
+    const pressed = want & ~prev;
+    for (let bit = 1; bit < 256; bit <<= 1) if (pressed & bit) items.push({ bit, at: f + Math.max(0, Math.round(delay + (rnd() * 2 - 1) * jitter)), len: 0, released: false, until: Infinity });
+    let out = 0;
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      if (!it.released) { if (want & it.bit) it.len++; else it.released = true; }
+      if (it.released && it.started) { items.splice(i, 1); continue; }         // released after it appeared: release at once
+      if (f < it.at) continue;                                                 // not yet visible
+      if (it.released && it.until === Infinity) it.until = f + Math.max(1, it.len);   // released before it appeared: a tap, as long as the policy's, delayed
+      if (it.released && f >= it.until) { items.splice(i, 1); continue; }
+      it.started = !it.released;
+      out |= it.bit;
+    }
+    prev = want;
+    return out;
+  };
+}

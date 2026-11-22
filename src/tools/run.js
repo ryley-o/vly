@@ -6,6 +6,7 @@ import * as C from '../core/constants.js';
 import { parseInputSpec } from './input.js';
 import { decode } from '../asm/disasm.js';
 import { Synth } from '../core/audio.js';
+import { AUDIO } from '../core/constants.js';
 import { FONT } from '../core/font.js';
 
 /**
@@ -56,6 +57,16 @@ export function runCartridge(rom, o = {}) {
   const capEvery = o.capture?.every ?? 0;
   const synth = o.audio ? new Synth(m.mem, 44100) : null;
   const audioChunks = [];
+  // notes: per channel, runs of frames with the channel on, audible and at (about) one pitch; a new pitch starts a new note
+  const notes = [], openNote = [null, null, null, null];
+  const trackNotes = (f) => {
+    for (let c = 0; c < 4; c++) {
+      const a = AUDIO + c * 4, hz = m.mem[a] | (m.mem[a + 1] << 8), vol = m.mem[a + 2] & 15, on = (m.mem[a + 3] & 0x80) !== 0 && vol > 0 && (hz > 0 || c === 3);
+      const cur = openNote[c];
+      if (on && cur && Math.abs(hz - cur.hz) <= Math.max(2, cur.hz * 0.02)) { cur.frames++; cur.maxVol = Math.max(cur.maxVol, vol); }
+      else { openNote[c] = null; if (on) { const n = { ch: c, frame: f, hz, frames: 1, maxVol: vol }; notes.push(n); openNote[c] = n; } }
+    }
+  };
   if (o.trace && o.trace.frame === 'init') traceOn('init');
   m.boot();
   m.tracer = null;
@@ -75,7 +86,7 @@ export function runCartridge(rom, o = {}) {
     m.tracer = null;
     sample(f);
     if (capEvery && (f + 1) % capEvery === 0 && frames_out.length < (o.capture.max ?? 600)) frames_out.push(m.renderRGBA());
-    if (synth) audioChunks.push(synth.render(735));
+    if (synth) { audioChunks.push(synth.render(735)); trackNotes(f); }
     maxCycles = Math.max(maxCycles, r.cycles);
     frameCycles.push(r.cycles);
     totalCycles += r.cycles;
@@ -120,6 +131,7 @@ export function runCartridge(rom, o = {}) {
     changes,
     trace: traceLines,
     capturedFrames: frames_out,
+    notes: synth ? notes : null,
     audio: synth ? (() => { const out = new Float32Array(audioChunks.length * 735); audioChunks.forEach((c, i) => out.set(c, i * 735)); return out; })() : null,
   };
 }

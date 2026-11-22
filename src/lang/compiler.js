@@ -704,6 +704,10 @@ class FnGen {
   }
 
   genCall(e) {
+    if (e.name === 'wtext' && e.args && e.args[2] && e.args[2].k === 'str') {             // the window layer is 20 columns wide: warn about text that runs off the right edge
+      const col = this.constOf(e.args[0]), len = Math.max(...String(e.args[2].v).split('\n').map((l) => l.length));
+      if (len > 20 || (col !== null && col >= 0 && col + len > 20)) this.ctx.warnings.push(`${e.file}:${e.line}: wtext() writes ${len} characters${col !== null ? ` at column ${col}` : ''}, but the window is 20 columns wide: ${col !== null && len <= 20 ? col + len - 20 : len - 20} character(s) fall off the right edge`);
+    }
     if (e.name === 'asm' && !this.ctx.syms.has('asm')) {
       // Inline assembly: asm("LDI r1, 5\nADD r0, r1"). Registers r0-r3 are scratch; keep r14/r15 intact.
       if (e.args.length !== 1 || e.args[0].k !== 'str') this.ctx.fail(e, 'asm() takes one string literal of assembly text (separate lines with \\n)');

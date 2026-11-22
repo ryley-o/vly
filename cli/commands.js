@@ -180,6 +180,7 @@ export const commands = {
         const moved = Object.entries(b.stats.autoBanked || {});
         const banks = Object.entries(b.stats.bankBytes || {}).map(([n, v]) => `bank ${n}: ${v}/8192`).join(', ');
         text += `\n${lim === 16384 ? 'always-visible region' : 'flat region'}: ${b.stats.flatBytes}/${lim} bytes (${Math.round(b.stats.flatBytes / lim * 100)}%)${banks ? '; ' + banks : ''}`;
+        if (b.stats.flatBytes / lim >= 0.95) text += `\nnote: the always-visible region is ${Math.round(b.stats.flatBytes / lim * 100)}% full. That is fine while the compiler can move code into banks, but give art and data a bank (\`tileset x bank auto = ...\`) and keep per-frame code small so new features do not run out of room.`;
         if (moved.length) text += `\nmoved to banks to make room: ${moved.map(([n, bk]) => `${n} (${bk})`).join(', ')}`;
         // what takes the space: the biggest assets (and where they live), then the biggest functions
         const assets = [...(b.stats.assets || [])].sort((x, y) => y.bytes - x.bytes).slice(0, 8);
@@ -199,7 +200,7 @@ export const commands = {
   },
 
   run: {
-    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--oam] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio] [--set var=value,...]\n  Run a cartridge headlessly. --set starts from a chosen state (variables set after init, before frame 1; needs the source or a build with its .map.json). Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
+    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--oam] [--notes [N]] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio] [--set var=value,...]\n  Run a cartridge headlessly. --set starts from a chosen state (variables set after init, before frame 1; needs the source or a build with its .map.json). Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
     async run(args) {
       const { rom, built } = await loadCart(args._[0]);
       let ram = built?.stats?.ram;
@@ -252,7 +253,7 @@ export const commands = {
       const gifEvery = args.flags.gif ? int(args.flags['gif-every'] ?? 2) : 0;
       let r;
       try {
-        r = runCartridge(rom, { frames, until, input: inputText(args), save, screenshotFrames: [...shotFrames], mem, watch, trace, pokes, worst: args.flags.worst ? int(args.flags.worst) : 5, capture: gifEvery ? { every: gifEvery, max: 900 } : undefined, audio: !!(args.flags.wav || args.flags.audio) });
+        r = runCartridge(rom, { frames, until, input: inputText(args), save, screenshotFrames: [...shotFrames], mem, watch, trace, pokes, worst: args.flags.worst ? int(args.flags.worst) : 5, capture: gifEvery ? { every: gifEvery, max: 900 } : undefined, audio: !!(args.flags.wav || args.flags.audio || args.flags.notes) });
       } catch (e) { throw new CliError(e.message); }
       const files = [];
       if (args.flags.screenshot) {
@@ -350,6 +351,19 @@ export const commands = {
         for (const f of pr.functions) text += `  ${String(f.cycles_per_frame).padStart(7)}  ${String(f.percent).padStart(5)}%  ${f.name}\n`;
       }
       for (const f of files) text += `wrote ${f}\n`;
+      if (r.notes && args.flags.notes) {                    // what was played, per channel, in words: pitch names, start times, lengths
+        const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const name = (hz) => { if (hz < 20) return String(hz) + 'Hz'; const n = Math.round(69 + 12 * Math.log2(hz / 440)); return NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); };
+        const limit = typeof args.flags.notes === 'string' ? int(args.flags.notes) : 24;
+        data.notes = r.notes.map((n) => ({ channel: n.ch, start_s: Number((n.frame / 60).toFixed(2)), seconds: Number((n.frames / 60).toFixed(2)), hz: n.hz, note: n.ch === 3 ? 'noise' : name(n.hz), volume: n.maxVol }));
+        text += `notes (channel 0-1 pulse, 2 triangle, 3 noise; the first ${limit} per channel; start s, length s, pitch):\n`;
+        for (let c = 0; c < 4; c++) {
+          const ns = data.notes.filter((n) => n.channel === c);
+          if (!ns.length) { text += `  ch${c}: silent\n`; continue; }
+          const hzs = ns.filter((n) => n.hz > 0).map((n) => n.hz);
+          text += `  ch${c}: ${ns.length} notes${hzs.length ? `, from ${name(Math.min(...hzs))} to ${name(Math.max(...hzs))} (${Math.min(...hzs)} to ${Math.max(...hzs)} Hz)` : ''}\n    ${ns.slice(0, limit).map((n) => `${n.start_s}s ${n.note}x${n.seconds}`).join('  ')}${ns.length > limit ? '  ...' : ''}\n`;
+        }
+      }
       if (args.flags.oam) {                                  // every sprite on screen: slot, position, tile, palette, size, flips (a LOWER slot draws on top)
         const sizes = ['8x8', '8x16', '16x16', '32x32'];
         const sprites = [];

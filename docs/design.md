@@ -17,11 +17,12 @@ This playbook says what a good game needs. The reference guides say exactly how,
 | **any game, before you choose the idea** | `vly docs ref-originality` | how to invent a mechanic that is simple, elegant and tied to the story: a process with random constraints to escape the first-idea trap, ten elegance tests, being original in several facets at once, and making the levels come from the mechanic |
 | levels (every game with stages) | `vly docs ref-levels` | what makes levels fun: every jump needs a consequence, the four beats, pacing and rest, enemy arrangements, terrain and verticality, a working method, and `vly levels` to find dead screens, flat runs, repeated enemies and jumps with no consequence |
 | power-ups and abilities | `vly docs ref-powerups` | why Mario's mushroom, flower and star are elegant, how they really work (read from the code), a process for inventing your own with a cost and a visible state, and a small implementation |
+| an arcade or score-chase game (runs, par, fairness, skill ladder, what brings players back) | `vly docs ref-arcade` | how a 64-stage arcade game was built and measured: one verb with one choice, stages generated around a safe path, a ladder of bots (oracle, human-like noise, naive), instant retry, felt events, unlocks and grades |
 | a puzzle game (a rule, solver-first levels, difficulty curve, teaching by requirement) | `vly docs ref-puzzles` | how a 63-level puzzle was made and proved: a rule that is a picture, a solver and backwards generation, proving every rule bites, par and random-win-rate curves, undo, hints, readability |
 | the shape of the game, exploring, atmosphere | `vly docs ref-worlds` | ten structures beyond "scroll right, checkpoints, ending", how to choose one from the story, what makes exploring satisfying, and cheap ways to make a four-colour screen beautiful |
 | any game | `vly docs ref-genres` | the recipe per genre: platformer, racer, shooter, puzzle, story, rhythm, virtual pet, versus; the sample game to read for each |
 
-**Read `ref-originality` first, then the others as they apply.** More deep guides (shooter, racer, rhythm, pet) are added as those genres are tested (puzzle has one: `ref-puzzles`); until then `ref-genres` is the guide.
+**Read `ref-originality` first, then the others as they apply.** More deep guides (shooter, racer, rhythm, pet) are added as those genres are tested (puzzle has one: `ref-puzzles`; arcade has one: `ref-arcade`); until then `ref-genres` is the guide.
 
 ## 0. The quality bar
 

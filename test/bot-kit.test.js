@@ -107,3 +107,15 @@ test('bot kit: a hand-written opening plays first, then the policy takes over; t
   assert.equal(seen[0], 20, 'the policy is first asked at frame 20');
   assert.ok(r.input.includes('LEFT@0-19'), r.input);
 });
+
+test('humanize: presses appear late by the delay, holds follow, releases are immediate', async () => {
+  const { humanize } = await import('../src/tools/bot.js');
+  const policy = humanize((f) => (f >= 10 && f < 20 ? 16 : 0), { delay: 3, jitter: 0 });
+  const out = Array.from({ length: 30 }, (_, f) => policy(f, () => 0, {}));
+  assert.deepEqual(out.map((m, f) => (m ? f : -1)).filter((f) => f >= 0), [13, 14, 15, 16, 17, 18, 19], 'the press shows 3 frames late and ends with the policy');
+  const tap = humanize((f) => (f === 10 ? 16 : 0), { delay: 4 });
+  const tapped = Array.from({ length: 20 }, (_, f) => (tap(f, () => 0, {}) ? f : -1)).filter((f) => f >= 0);
+  assert.deepEqual(tapped, [14], 'a one-frame tap is not lost: it appears 4 frames later, still one frame long');
+  const a = humanize((f) => (f === 10 ? 16 : 0), { jitter: 3, seed: 5 }), b = humanize((f) => (f === 10 ? 16 : 0), { jitter: 3, seed: 5 });
+  assert.deepEqual(Array.from({ length: 20 }, (_, f) => a(f, () => 0, {})), Array.from({ length: 20 }, (_, f) => b(f, () => 0, {})), 'the same seed gives the same player');
+});

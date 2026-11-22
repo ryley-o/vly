@@ -245,3 +245,17 @@ test('vly.json tests can start from a chosen state with "set"', async () => {
   assert.equal(r.failed ?? r.results?.filter((x) => !x.ok).length, 0, JSON.stringify(r.results || r).slice(0, 400));
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('vly run --notes lists the notes each channel played, with pitch names', async () => {
+  const text = `var n;
+func init() { load_font(0); lcd(LCD_BG); }
+func frame() { n++; if (n == 5) { tone(0, 440, 12, 0); } if (n == 40) { tone(0, 880, 12, 0); } }`;
+  const b = await buildText({ text, filename: 'main.vly', baseDir: '/x' });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-notes-')); const f = path.join(dir, 'g.vlc'); fs.writeFileSync(f, b.bytes);
+  const r = await commands.run.run({ _: [f], flags: { frames: '90', notes: true } });
+  const ch0 = r.data.notes.filter((n) => n.channel === 0);
+  assert.deepEqual(ch0.map((n) => n.note), ['A4', 'A5'], JSON.stringify(r.data.notes));
+  assert.match(r.text, /ch0: 2 notes, from A4 to A5/);
+  assert.match(r.text, /ch1: silent/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

@@ -42,10 +42,10 @@ const DOCS = {
   utoa: 'Convert an unsigned number to a string in a shared buffer; returns its address (valid until the next call).',
   itoa: 'Convert a signed number to a string in a shared buffer; returns its address.',
   pad_map: 'Internal helper: blank cells so a number field is `width` columns wide.',
-  print_u: 'Print an unsigned number at (`col`, `row`) in a 5-column field (clears stale digits).',
+  print_u: 'Print an unsigned number at (`col`, `row`) in a 5-column field (clears stale digits). Left-aligned: the number starts at `col`.',
   print_i: 'Print a signed number at (`col`, `row`) in a 6-column field.',
-  wprint_u: 'Print an unsigned number into the window layer in a 5-column field.',
-  wprint_i: 'Print a signed number into the window layer in a 6-column field.',
+  wprint_u: 'Print an unsigned number into the window layer in a 5-column field. The number is written from `col` (left-aligned) and the rest of the field is blanked, so put a label at least 5 columns before the next thing on the row.',
+  wprint_i: 'Print a signed number into the window layer in a 6-column field (left-aligned like `wprint_u`).',
   // math
   min: 'Smaller of two (signed) values.',
   max: 'Larger of two (signed) values.',
