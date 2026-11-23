@@ -374,3 +374,17 @@ func frame() { n++; if (n == 3) { fade_bg_set(0, rgb(2, 4, 6)); fade_to(4, 1); }
   for (let i = 0; i < 12; i++) m.runFrame(0);
   assert.equal(m.read16(C.BG_PAL), 0x246, 'the NEW colour appears, not the old one');
 });
+
+test('std/sfx: a tone from sfx_tone stops by itself when its hold runs out', () => {
+  const src = `import "std/sfx";
+var n;
+func init() { lcd(LCD_BG); }
+func frame() { n++; if (n == 3) { sfx_tone(0, 440, 12, 2, 5); } sfx_update(); }`;
+  const m = new Machine(compileToCartridge(src, { filename: 's.vly' }).bytes);
+  m.boot();
+  const on = () => (m.read8(C.AUDIO + 3) & 0x80) !== 0;
+  for (let i = 0; i < 5; i++) m.runFrame(0);
+  assert.equal(on(), true, 'sounding during the hold');
+  for (let i = 0; i < 10; i++) m.runFrame(0);
+  assert.equal(on(), false, 'off after the hold');
+});

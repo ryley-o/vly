@@ -234,6 +234,7 @@ export function checkCartridge(rom, o = {}) {
   }
   if (!script) add('path', 'info', 'no recorded path was checked, so the late game (later stages, bosses, the ending) was not looked at', 'Record a winning run with a bot (`vly docs workflow`) and run `vly check --input-file tests/win.input`.');
 
+  for (const c of checks) if ((o.ignore || []).includes(c.id) && (c.status === 'warn' || c.status === 'fail')) { c.message += ' (ignored: you said this does not apply to this run)'; c.status = 'info'; delete c.hint; }
   const verdict = checks.some((c) => c.status === 'fail') ? 'fail' : checks.some((c) => c.status === 'warn') ? 'warn' : 'pass';
   return {
     ok: verdict !== 'fail', verdict,

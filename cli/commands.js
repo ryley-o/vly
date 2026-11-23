@@ -524,7 +524,7 @@ export const commands = {
           try {
             const script = fs.readFileSync(path.resolve(spec.input), 'utf8');
             const save = spec.save ? new Uint8Array(fs.readFileSync(path.resolve(spec.save))) : null;
-            const rr = checkCartridge(rom, { frames: 600, script, save, ...project });
+            const rr = checkCartridge(rom, { frames: 600, script, save, ignore: spec.ignore || (spec.fast ? ['save_rate'] : []), ...project });
             step(rr.ok, `replay ${name}${spec.save ? ` (from ${spec.save})` : ''}`, rr.summary);
             for (const c of rr.checks.filter((c) => c.status === 'fail' || c.status === 'warn')) lines.push(`        ${c.status.toUpperCase()}  ${c.id}: ${c.message}`);
           } catch (e) { step(false, `replay ${name}`, e.message.split('\n')[0]); }
@@ -639,7 +639,7 @@ export const commands = {
   },
 
   check: {
-    help: 'vly check [cart.vlc|source] [--frames N] [--input-file path.input [--save file.sav]] [--save-input trace.input] [--json]\n  Quality gates: plays the game with no input, with START, and with a careless player for N frames (default 7200, two\n  minutes), and reports faults, cycle budget, whether it is alive, sound, sprite use, text covered by sprites and variety.\n  Every WARN is a bug to fix or a decision to explain; any FAIL means it is not finished. Exit code 1 on a FAIL.',
+    help: 'vly check [cart.vlc|source] [--frames N] [--ignore id,id] [--input-file path.input [--save file.sav]] [--save-input trace.input] [--json]\n  Quality gates: plays the game with no input, with START, and with a careless player for N frames (default 7200, two\n  minutes), and reports faults, cycle budget, whether it is alive, sound, sprite use, text covered by sprites and variety.\n  Every WARN is a bug to fix or a decision to explain; any FAIL means it is not finished. Exit code 1 on a FAIL.',
     async run(args) {
       if (!args._[0] && fs.existsSync('vly.json')) { try { const cfg = JSON.parse(fs.readFileSync('vly.json', 'utf8')); if (cfg.entry) args._[0] = cfg.entry; } catch { /* fall through to the error below */ } }
       const { rom, built } = await loadCart(args._[0]);
@@ -648,7 +648,7 @@ export const commands = {
       const script = inputText(args) || null;                              // --input / --input-file: a recorded path (a bot's winning run) to check as well
       const save = args.flags.save ? new Uint8Array(fs.readFileSync(args.flags.save)) : null;
       const project = projectInfo(args._[0]);
-      const r = checkCartridge(rom, { frames, script, save, symbols: built?.symbols, ram: built?.stats?.ram, ...project });
+      const r = checkCartridge(rom, { frames, script, save, symbols: built?.symbols, ram: built?.stats?.ram, ignore: args.flags.ignore ? String(args.flags.ignore).split(',') : [], ...project });
       if (r.snapshot) {                                     // keep the evidence next to the build: the picture and the exact input
         const dir = path.join(project.dir || process.cwd(), 'build');
         fs.mkdirSync(dir, { recursive: true });

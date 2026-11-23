@@ -105,3 +105,14 @@ test('vly release: checks each route in releaseReplays (with an optional save) a
   assert.equal(bad.status, 1);
   assert.match(bad.stdout, /FAIL\s+replay tests\/missing\.input/);
 });
+
+test('vly check --ignore turns a named warning into a note', async () => {
+  const { checkCartridge } = await import('../src/tools/check.js');
+  const b = await buildText({ text: GAME, filename: 'main.vly', baseDir: '/nonexistent' });
+  const noisy = 'START@10,' + Array.from({ length: 40 }, (_, i) => `START@${40 + i * 30}`).join(',');
+  const a = checkCartridge(new Uint8Array(b.bytes), { frames: 3000, script: noisy });
+  const had = a.checks.some((c) => c.id === 'save_rate' && c.status === 'warn');
+  const ig = checkCartridge(new Uint8Array(b.bytes), { frames: 3000, script: noisy, ignore: ['save_rate'] });
+  assert.equal(ig.checks.some((c) => c.id === 'save_rate' && c.status === 'warn'), false);
+  if (had) assert.ok(ig.checks.some((c) => c.id === 'save_rate' && c.status === 'info'), 'kept as a note');
+});

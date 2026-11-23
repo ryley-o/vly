@@ -444,12 +444,13 @@ func sfx_play(id) {
   sfx_on = 1;
   sfx_begin();
 }
-// Hold \`ch\` for \`frames\` and play a tone on it, for effects you drive yourself, such as an engine whose pitch follows speed:
+// Hold \`ch\` for \`frames\` and play a tone on it (the tone stops by itself when the hold runs out, so call this every frame while it should sound), for effects you drive yourself, such as an engine whose pitch follows speed:
 //   sfx_tone(2, 90 + speed * 4, 8, 0, 2);   // call every frame while it runs
-func sfx_tone(ch, hz, vol, duty, frames) { audio_hold[ch] = frames; tone(ch, hz, vol, duty); }
+var sfx_tn[4];
+func sfx_tone(ch, hz, vol, duty, frames) { audio_hold[ch] = frames; sfx_tn[ch] = 1; tone(ch, hz, vol, duty); }
 // Call once per frame.
 func sfx_update() {
-  for (var c = 0; c < 4; c++) { if (audio_hold[c] > 0) { audio_hold[c]--; } }
+  for (var c = 0; c < 4; c++) { if (audio_hold[c] > 0) { audio_hold[c]--; if (audio_hold[c] == 0 && sfx_tn[c]) { sfx_tn[c] = 0; tone_off(c); } } }   // a tone from sfx_tone stops when its hold runs out
   if (!sfx_on) { return; }
   sfx_left--;
   if (sfx_left <= 0) {
