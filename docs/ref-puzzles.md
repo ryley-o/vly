@@ -70,6 +70,17 @@ Do not explain a rule and hope. Build level 1 so that it cannot be solved (or ca
 
 In `DESIGN.md`: the rule in one sentence; what is visible on screen; the world table (levels, the rule each adds, **the decision it creates**); how the levels are made and how each was proved; the par and random-win-rate curve; how undo, restart and hint work; and what you could not verify (feel, clarity and difficulty for people).
 
+## 7b. Too easy is a failure too (calibrating for your audience)
+
+A puzzle that nobody can fail is not a puzzle. One trial's word game passed every fairness check and its owner's verdict was "way too easy: any human that can read will never fail" (a player only had to find the next word in a run-on line). Fairness and difficulty are different axes: *fair* means the answer is findable and unique; *hard* means finding it takes insight, not just attention.
+
+- **Decide your audience and say so in `DESIGN.md`.** A game for adults who like puzzles can ask for insight, lateral thinking, working through a clue, deduction or knowledge; a game for children cannot.
+- **Look for the "aha", not the lookup.** A good puzzle has a moment where the player sees a thing differently (a clue read another way, a pattern noticed, a constraint combined with another). If the answer comes from scanning and matching, it is a task, not a puzzle.
+- **A solver can measure easiness.** Count how many candidate answers survive each clue or constraint, how many steps the player must hold in their head, and how many wrong leads are plausible. If every step has one obvious candidate, it is trivial.
+- **Ramp to a hard end.** Early puzzles teach and reassure; middle ones combine ideas; the last ones should make a good player stop and think, and some players should need the hint system. Keep the finale fair (one answer, a clue that justifies it) but demanding.
+- **Hints are what make a hard game kind.** Layered hints (a nudge, then a stronger nudge, then the answer) cost the player something small (a grade, a counter) and are always available, so a hard puzzle is a challenge and not a wall.
+- **Test with the right model of a player:** not "can read", but "competent and stuck". Ask: what would stop a clever adult for five minutes here, and what gets them unstuck?
+
 ## 8. Word games (where words come from, and how to keep them fair)
 
 A word game needs a word list, and the list is a design decision with legal and quality sides. Patterns from a trial that worked (a game where you cut a run-on ribbon of letters into words; 128 ribbons; every piece that is a real word lights up):
