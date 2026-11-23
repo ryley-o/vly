@@ -18,6 +18,8 @@ These are patterns from our trials, not rules. A different arcade game (an endle
 
 ## 2. Run structure: fixed, endless or both
 
+(First, a warning about the trial this guide came from: its owner found it **brutal**. A bot ladder and a solver prove a game is survivable; they do not prove a person can anticipate it. Read `vly docs ref-humans` before you tune difficulty: decide whether your game is *react* or *anticipate*, keep to one decision per beat, and keep the timing of the next event learnable.)
+
 - **Fixed, numbered stages** (the same lake every time): learnable, shareable, a par per stage, a grade per stage, and a place to put new hazards in a planned order. Cost: authored or generated content, and a ceiling once the player has solved them. A generator with a seed per stage gives you hundreds cheaply.
 - **Endless or random runs:** variety and a high-score table, no ceiling. Cost: harder to prove fair (you must prove the generator never makes an impossible pattern) and a run teaches less because it never repeats.
 - **A mix** (fixed stages that unlock an endless mode, or a daily seed) often suits a handheld best.
@@ -38,7 +40,7 @@ These are patterns from our trials, not rules. A different arcade game (an endle
 2. **Humanised bots:** the same policy with `humanize(policy, { delay, jitter, seed })` from `src/tools/bot.js`, run at several jitter values (0, 1, 2, 3, 5 frames), over every stage and several seeds. Report mean score as a share of par and the share of stages survived at each level.
 3. **Naive bots** (greedy, lazy, random) show the floor.
 4. **Read the ladder:** scores should rise with skill, a sloppy player should be able to do *something*, and the top should be hard to reach. A flat ladder means there is no skill in the game; a cliff means it is too hard.
-5. **Be honest about the limit:** bots model timing noise, not a human's confusion. Say what you could not measure (how fast a new player understands, whether the first stage teaches in ten seconds, what thumbs do on a phone).
+5. **Be honest about the limit:** bots model timing noise, not a human's confusion. **A bot ladder is not enough:** in our trial every bot check passed and the owner still found the game brutal ("very difficult to control or anticipate what to do next"), because the next event's timing changed with each choice and the bot knew the future. Read `vly docs ref-humans`, give a bot a reaction `delay`, and watch a person. Say what you could not measure (how fast a new player understands, whether the first stage teaches in ten seconds, what thumbs do on a phone).
 
 ## 5. Feel: the loop, the hit, the reward
 
