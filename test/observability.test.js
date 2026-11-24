@@ -259,3 +259,12 @@ func frame() { n++; if (n == 5) { tone(0, 440, 12, 0); } if (n == 40) { tone(0, 
   assert.match(r.text, /ch1: silent/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('vly docs --list and --section read a long guide in parts', async () => {
+  const l = await commands.docs.run({ _: ['design'], flags: { list: true } });
+  assert.match(l.text, /Depth and length|The canvas/);
+  const s = await commands.docs.run({ _: ['design'], flags: { section: 'the canvas' } });
+  assert.match(s.text, /^## 2\. The canvas/);
+  assert.ok(s.text.length < 20000 && s.text.length > 500, 'only that section: ' + s.text.length);
+  await assert.rejects(() => commands.docs.run({ _: ['design'], flags: { section: 'zzz no such' } }), /no heading containing/);
+});

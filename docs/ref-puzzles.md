@@ -70,6 +70,19 @@ Do not explain a rule and hope. Build level 1 so that it cannot be solved (or ca
 
 In `DESIGN.md`: the rule in one sentence; what is visible on screen; the world table (levels, the rule each adds, **the decision it creates**); how the levels are made and how each was proved; the par and random-win-rate curve; how undo, restart and hint work; and what you could not verify (feel, clarity and difficulty for people).
 
+### A puzzle pipeline that scales (from a 50-level threshold-contagion game)
+
+A trial whose rule was "a seated person stands when two neighbours stand; seat exactly par clappers so the whole house stands" (50 levels, 6 worlds, boards up to 7 x 6) built this pipeline, and most puzzle games will want the same shape:
+
+- **Check your first claim about the rule with the solver, before you write levels.** The author assumed a standing block grows into a bounding rectangle; the solver showed blocks are stable and merge at distance 2, and the teaching text had to change. A rule you only believe is not a rule.
+- **`exploreStates` checks a level; it is too slow to *search* for levels** (about 100 times slower than a purpose-built search). For generating levels, write a bitmask or typed-array solver (compiled C is fine for the build step; it never ships), and search with annealing or a generator under a **wall-clock cap**, then **re-verify every picked level with a second, independent solver** and require agreement on par and on every winning set (the trial: 76 boards, 0 mismatches).
+- **Count the proxies for hard, and keep them honest:** par; the number of winning sets (11 levels had exactly one answer); dead first moves (cells in no answer: 0 to 83% of first seats); the exact chance that a random par-size placement wins (33% in level 1, about 1 in 800,000 in level 50); and a greedy player that always makes the locally best move (it never reached par on 22 levels). These are exact and none of them is a person.
+- **Teaching levels can be unfailable.** A level whose random win rate is 100% is fine when its job is to show a rule (the reserved-seat teaching boards were like that).
+- **Hint ladders have to be exact to be kind.** Step 1 marks pieces that belong to no answer, step 2 blinks one correct move, step 3 shows a whole answer; cap the grade after hints. When your stored answers are incomplete (more answers than you saved), disable the "this is wrong" step instead of guessing, and say "try another".
+- **`analyzeCampaign`: enabling or restricting.** "Needs" means *unsolvable without the rule*. A rule that changes the par instead (here, every rule) must be passed in `restricting`, or the report says no level needs it. `src/tools/campaign.js` explains this; the trial's report then showed each world's rule first biting exactly where intended (fans at level 9, grumps at 17, reserved seats at 25).
+- **Cache slow reports.** A `tests/report.mjs` that re-solves every level took about 5 to 6 minutes and looked like a hang inside `vly release`; cache solver results in a file keyed by the level data. (`vly release` now says it is running the report and notes when it took over 30 seconds.)
+- **Leave menu rows a blank line apart** if you build your own menu: the 5 x 7 font makes adjacent rows touch.
+
 ## 7b. Too easy is a failure too (calibrating for your audience)
 
 A puzzle that nobody can fail is not a puzzle. One trial's word game passed every fairness check and its owner's verdict was "way too easy: any human that can read will never fail" (a player only had to find the next word in a run-on line). Fairness and difficulty are different axes: *fair* means the answer is findable and unique; *hard* means finding it takes insight, not just attention.

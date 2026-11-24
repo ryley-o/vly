@@ -554,7 +554,10 @@ export const commands = {
       // 5. the project's own report (difficulty, par, routes: whatever the genre needs)
       if (fs.existsSync('tests/report.mjs')) {
         const { spawnSync } = await import('node:child_process');
-        const rep = spawnSync('node', ['tests/report.mjs'], { encoding: 'utf8', timeout: 300000 });
+        process.stderr.write('running tests/report.mjs (the project report; a long solver can take a few minutes, nothing is stuck)...\n');
+        const repStart = Date.now();
+        const rep = spawnSync('node', ['tests/report.mjs'], { encoding: 'utf8', timeout: 600000 });
+        if (Date.now() - repStart > 30000) lines.push(`  note  tests/report.mjs took ${Math.round((Date.now() - repStart) / 1000)} s: cache its solver results in a file (keyed by the level data) so each release does not re-solve every level`);
         lines.push(`  report (tests/report.mjs${rep.status ? `, exit ${rep.status}` : ''}):`);
         lines.push((rep.stdout || rep.stderr || '').trimEnd().split('\n').map((l) => '        ' + l).join('\n'));
         if (rep.status) failed = true;
@@ -749,7 +752,7 @@ export const commands = {
   },
 
   docs: {
-    help: 'vly docs [topic] [--all]\n  Print documentation. With no topic, lists topics.',
+    help: 'vly docs [topic] [--all] [--list] [--section "words"]\n  Print documentation. With no topic, lists topics. A long guide can be read in parts: --list prints its headings and --section "words" prints only the section whose heading contains those words (case-insensitive), so a viewer that truncates long output still shows you everything.',
     async run(args) {
       const topics = docTopics();
       if (args.flags.all) {
@@ -764,6 +767,18 @@ export const commands = {
       const p = topics[t];
       if (!p) throw new CliError(`unknown topic "${t}". Topics: ${Object.keys(topics).join(', ')}`);
       const text = fs.readFileSync(p, 'utf8');
+      if (args.flags.list || args.flags.section) {
+        const lines = text.split('\n');
+        const heads = lines.map((l, i) => ({ i, m: /^(#{1,4}) (.*)$/.exec(l) })).filter((h) => h.m).map((h) => ({ i: h.i, level: h.m[1].length, title: h.m[2] }));
+        if (args.flags.list) return { text: heads.map((h) => `${'  '.repeat(h.level - 1)}${h.title}`).join('\n'), data: { topic: t, headings: heads.map((h) => h.title) } };
+        const want = String(args.flags.section).toLowerCase();
+        const at = heads.findIndex((h) => h.title.toLowerCase().includes(want));
+        if (at < 0) throw new CliError(`no heading containing "${args.flags.section}" in ${t}; try: vly docs ${t} --list`);
+        let end = lines.length;
+        for (let k = at + 1; k < heads.length; k++) if (heads[k].level <= heads[at].level) { end = heads[k].i; break; }
+        const part = lines.slice(heads[at].i, end).join('\n');
+        return { text: part, data: { topic: t, section: heads[at].title, text: part } };
+      }
       return { text, data: { topic: t, text } };
     },
   },
