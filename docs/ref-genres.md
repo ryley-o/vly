@@ -6,6 +6,15 @@ Read the recipe for your genre before you design it, and the others for ideas wo
 **Platformer.** Use `vly docs ref-sidescroller` and `import "std/platformer"` for the movement (the exact Super Mario Bros. numbers, tested), and read its section 0: borrow the feel, never the look. Variable-height jump, coyote time, one-way platforms, enemies that patrol and
 can be stomped, a checkpoint every 20 seconds, 3 or more stages, collectibles. (The `platformer` template is older hand-tuned physics: use `std/platformer`, and start from an empty project.)
 
+**Collection games with a choice at their heart (fishing, hunting, creature books, an aquarium or trophy cabin).** Two trials (a worldwide fishing game with 200 species, a hunting campaign with 100) shared a shape worth reusing:
+- **A world to unlock, a book to fill.** A map of 14 to 25 places, each with a small roster and a survey (four distinct catches complete a water and reveal its eighth entry). A book (FishDex, a hunt log) with three states per entry: unknown, seen, caught. The reward display (an aquarium, a trophy cabin) shows your *best* of each, with a "NEW BEST" moment when a catch improves a record.
+- **A decision with a visible price.** Hunting: a daylight and shell budget shown as marks, an approach (direct, covered, from here) that trades risk against reward, a scope that opens only inside a range. Fishing: the bite, then reel, pump, let line run or net, with visible line health, stamina, pace and slack and a qualitative odds band instead of a hidden number.
+- **Variety without randomness you cannot read.** Rarity tiers (variants) per species, size ranks derived from stored records, odds that improve after a release, a local roster so players know what might turn up.
+- **Choose turns over reflexes for the decision** (see `vly docs ref-humans`): the first fishing prototype used reaction windows and a delayed bot passed it while people struggled.
+- **Stable IDs and a save you can migrate.** Both games shipped many revisions (11 and 13) while players kept progress: fixed species and place IDs, a magic number and layout version in the save, a migration for each old layout, and a fixture save from every previous revision loaded in a test. See "Keep players' progress across releases" in `vly docs design`.
+- **Put a content note on the listing** for anything a player might not expect (a hunting game's note read "pixel-art shooting of animals").
+- **Prove coverage the way the guide says:** replay the whole campaign at normal speed and with a reaction delay, find every species in the random draws, and compare the offline player's cartridge with the shipped file byte for byte.
+
 **Racer (side view).** `games/hill-racer` is the worked example of everything in this playbook (read its source and tests). Terrain as a height function of x so the ground can be drawn and driven on; the vehicle follows the
 ground slope; ramps carry slope into the jump; lap and best-time as the score; rivals with rubber-banding; boost with an
 overheat bar; three or more tracks that differ in hill shapes, hazards and sky. HUD in the window layer.

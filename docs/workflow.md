@@ -133,8 +133,8 @@ fs.writeFileSync('tests/after-win.sav', r.save);                  // a finished 
 - **The delay applies to scalar variables only, unless you list arrays in `delayArrays: ['foe_x', 'foe_y']`**; otherwise array reads (`read('foe_x', i)`) are live. A human knows their own position instantly and sees the
   world late, so name your own state in `live: [...]` and keep the delayed world. (A bot that sees even its own position 12 frames late falls into the first pit.)
 - **A perfect bot proves nothing about fun.** A bot that never dies shows the level is winnable, not that it is fair. Run it again with a
-  reaction delay (`delay: 12` is about a fifth of a second, a quick human; `24` a slow one) and with a worse policy (random jitter, no
-  bombs): if only the perfect bot survives, the game is too hard; if even the worst bot wins easily, it is too easy.
+  reaction delay and with a worse policy (random jitter, no
+  bombs): if only the perfect bot survives, the game is too hard; if even the worst bot wins easily, it is too easy. **Read the delay numbers as baselines for one known button, not as a human:** `delay: 12` (a fifth of a second) is about a quick person answering one known cue with one known key, and `24` a slow one; a cue that needs a *choice* between buttons or several actions takes longer. For anything choice-heavy also run 36, 60 and 90 frames as sensitivity checks, drive the bot only from what a player can see or hear, inject a missed cue, an occasional wrong action and a brief input delay, and track first-attempt success, recoveries and abandons. One trial's fishing fight passed a delayed bot and was still far too hard for people; see `vly docs ref-humans`.
 - **Saves for tests.** A test can start from a save (`"save": "tests/after-win.sav"`) to check the title's best score, an unlocked stage or a
   harder loop. Make the file with a bot (`r.save` above) or with `vly run ... --save-out tests/x.sav` after a scripted run.
 - After a change you made on purpose and looked at, `vly test --accept` takes the new picture hashes (any test that fails for another reason is never accepted).

@@ -17,6 +17,21 @@ A trial (a stone-skipping arcade game, `vly docs ref-arcade`) passed every bot c
 - **One frame is 16.7 ms.** **[I]** A timing window of 2 or 3 frames (33 to 50 ms) is below what most people can hit blind; it is fine in a game whose rhythm the player can *anticipate* and calibrate, and brutal in a game that makes them *react*.
 - **Rhythm-game windows are a design choice, not a standard** **[S]**: examples are about 45 ms for the best grade and 90 ms for the next; one dance game uses -32/+96 ms; windows are often defined as a fraction of the beat; and most rhythm games ship a latency calibration screen because audio, display and input delays differ.
 
+### A choice budget, from a game that had to be redesigned (and its sources)
+
+A fishing game (Tidebound) first asked players to notice a change in the scene, work out the right direction, manage line tension and coordinate reeling, with short reaction windows. A delayed bot passed it and real players struggled, because the bot knew which cue to watch and which key answered it. Its maintainers wrote up the research they used; we have **not** read the papers ourselves, so treat the figures as study means under controlled conditions, **not** thresholds:
+
+- **Separate three things:** a known-button reaction, a choice between buttons, and a multi-action sequence. Budget from when the cue is *legible* to the last input the game accepts, and include noticing the cue, choosing and performing the response, and display and input latency.
+- **Study means:** simple visual reaction about **213 ms** after correcting for hardware delay (Woods et al.); in a 150-person sample, about **274 ms** for one known key and **475 ms** for a spatially mapped four-choice response, and about **556 ms** for another four-choice task with a less direct mapping (Deary, Liewald and Nissan). The direct, spatial mapping was faster: **map choices to the shape of the controls** (left cue, left button).
+- **A starting point for a required, unfamiliar choice in a non-rhythm game:** a **1 to 2 second** window on first use, or leave the prompt up until the player acknowledges it. Playtest it. Give earlier cues and forgiving recovery before you shorten windows; keep short precision timing optional or adjustable when timing is the point of the game.
+- **Use more than one channel** for a cue (a picture, a sound and a shake), and offer a single press where you can instead of repeated presses, long holds or simultaneous inputs.
+- **Turn-based beats reaction windows for decisions.** Tidebound's redesign made the bite a single A press in a 1.5-second window with a hook, a moving bobber, a sound and a six-pip countdown that pause freezes and a timeout that simply returns to casting; the fight became chosen turns (reel, pump, give line, net) with visible line health, stamina, pace and slack and a qualitative odds band. The decisions stayed; the reflex test went away.
+- **Shipped games offer models to borrow** (extended puzzle timing, puzzle bypasses, aim slow motion, slow modes, automatic resolution of button-mashing): preserve the decision, change the physical or temporal demand.
+- **Test on the target device.** One industry study saw a performance difference between 12 and 20 ms of added input latency on an aiming task; the same build feels different on a phone, a controller and a TV.
+- **A bot run shows a policy can finish; human fairness needs people** (watch first-time players on the real controls and revise any required action where confusion or missed cues block progress).
+
+Sources (as cited by the Tidebound maintainers): [Woods et al., 2015](https://doi.org/10.3389/fnhum.2015.00131); [Deary, Liewald and Nissan](https://www.pure.ed.ac.uk/ws/portalfiles/portal/8897761/a_free_easy_to_use_computer_based.pdf) (results pp. 10 to 11); Xbox Accessibility Guidelines [107](https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/107), [108](https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/108) and [116](https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/116) (inputs, time limits, difficulty options; core gameplay is excluded from the time-limit guidance); the accessibility pages of God of War Ragnarok, The Last of Us Part II and Star Wars Jedi: Survivor; an NVIDIA CHI workshop case study on low-latency aiming; a peer-reviewed audit of 260 commercial games' accessibility features (genre differences in motor features; limited support for broad claims about industry adoption).
+
 ## 2. React or anticipate? Decide which game you are making
 
 - **Reaction:** something appears and the player must respond. The honest budget is reaction time plus a choice plus latency: **about 0.3 to 0.5 seconds** from the cue becoming visible to the response being needed, more if there are several possible responses. A cue that gives 200 ms or less is a reflex test, and it is unfair on a phone.
@@ -59,7 +74,7 @@ Patterns that make a game kinder without making it dull (the platformer guide ha
 - [ ] One decision per beat, at most three or four things to track?
 - [ ] Is the next event's timing the same every time, so it can be learned?
 - [ ] Wide "good" window and narrow "perfect"; buffering; calibration if audio matters?
-- [ ] Does a bot with a 200 ms reaction delay get somewhere, and does a person?
+- [ ] Does a bot with a 200 ms reaction delay get somewhere, a bot with 36, 60 and 90 frames (and a missed cue now and then) still make progress where choices are required, and does a person?
 - [ ] Is retry instant and is a failure understood?
 
 ## Sources and honesty
