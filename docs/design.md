@@ -10,9 +10,10 @@ This page is long. If you read nothing else here:
 1. **Decide your idea before you open an editor** (`vly docs ref-originality`), and write `DESIGN.md`: the idea, who it is for, the core loop, the content plan, the sound world, how the selected thing is shown.
 2. **Read the one reference guide for your kind of game** (the table below), and `vly docs ref-readability` if anything is selectable; skip the rest until you need it (`vly docs design --list` shows this page's headings, `--section "words"` prints one).
 3. **A mechanic is not a game until it is in the levels**, so build a solver or a bot first and let it tell you which levels bite.
-4. **Look at your own screenshots at native size** (`--screenshot`, `--crop x,y,w,h` to zoom, `--cvd all`), and read the music as notes (`--audio --notes`): the tools pass things a person would not.
-5. **Run `vly check` early and `vly release` at the end**; both tell you what is missing.
-6. **The brief says surprise, so surprise on screen too**: a clever rule shown on a tiny, still screen is not what makes people stop and stare (see `vly docs ref-originality`, section 6b).
+4. **Fill the screen with what the player must see**: a board of up to 10 x 8 cells wants 16-pixel cells (`vly docs ref-puzzles`, section 5b), not 8; measure your largest level first.
+5. **Look at your own screenshots at native size** (`--screenshot`, `--crop x,y,w,h` to zoom, `--cvd all`), and read the music as notes (`--audio --notes`): the tools pass things a person would not.
+6. **Run `vly check` early and `vly release` at the end**; both tell you what is missing.
+7. **The brief says surprise, so surprise on screen too**: a clever rule shown on a tiny, still screen is not what makes people stop and stare (see `vly docs ref-originality`, section 6b).
 
 ## Reference guides (the central index)
 

@@ -49,6 +49,17 @@ Do not explain a rule and hope. Build level 1 so that it cannot be solved (or ca
 - **Animate the main action briefly** (the fold took 20 frames) and keep the cursor where the player left it, so repeated moves have a rhythm.
 - **Short bursts:** the game should resume where the player left off and never make them redo a level they solved.
 
+## 5b. Size the board to the screen (a lesson from CANON)
+
+A board game or puzzle whose board is a small island in an empty 160 x 144 screen is hard to perceive, however good the rules are. A trial built its first version with 8-pixel cells; the owner played it, said the board was "just a bit small to perceive" and asked for it bigger, and the second version, with 16-pixel cells, was the one people called amazing. Do this from the start:
+1. **Measure your largest level first** (columns x rows), before you draw anything.
+2. **Pick the biggest cell that fits.** The screen is 20 x 18 tiles (160 x 144 px). Cells of **16 x 16 px fill it for any board up to 10 columns x 8 rows**, leaving exactly one 8 px row above and below for status and a thin strip (8 + 128 + 8 = 144). Use 8 px cells only for boards bigger than 10 x 8, and then compare a screenshot at native size with a bigger crop (`--crop`) to check you can still tell the pieces apart.
+3. **The background is made of 8 x 8 tiles**, so a 16 px cell is a block of 2 x 2 tiles (the same `fig`-style helper that the puzzle template uses); 12 px cells are impossible on the background, so choose 8, 16 or 24 (or use sprites). Characters, cursors and anything that moves are 16 x 16 sprites (`SPR_16X16`; `sprite NAME 2x2` lays the four tiles out row by row). Redraw the art at the new size; do not stretch it.
+4. **Draw every level at the same cell size** and centre the smaller boards (a screen where the cell size changes between levels feels unstable).
+5. **A board a little too wide** (11 columns of 16 px is 176 px): make the outer wall columns the ones that fall off the screen, with `scroll(8, 0)`, and check by a test that no walkable cell is in the cropped part. No camera is needed.
+6. **Budget the rest of the screen**: at 16 px cells an 8-row board leaves **2 tile rows** for everything else (one above, one below); a 7-row board leaves 4. A status line goes in one row, a strip or a message in the other. The window layer cannot be a strip in the middle of the screen, so use background rows for the HUD.
+7. **Secondary displays are secondary.** CANON's staff of notes mattered less to play than the board did; it became a thin strip. Ask of each extra element whether the player needs it to make the next move.
+
 ## 6. Readability on four colours
 
 - **Give each piece a different shape as well as a colour** (circle, diamond, triangle, burst, star); colour alone fails on four shades and for some players.
