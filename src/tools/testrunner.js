@@ -9,6 +9,7 @@
 //         "expect": { "words": { "0xB400": 5 }, "bytes": { "0x8000": [0, 1] },
 //                     "frameHash": "auto", "stateHash": "auto", "maxCycles": 20000,
 //                     "saves": 1, "saveWords": { "0": 5 } } }   // save requests and the last save's words (byte offsets)
+//   A test with a "frameHash" (or "textInside": true) also fails when text is cut by the screen edge on its final screen ("allowClippedText": true on the test turns that off).
 //     ]
 //   }
 // Hash values of "auto" are filled in by `vly test --update`. Faults (div by zero, illegal opcode, writes to ROM,
@@ -16,7 +17,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { runCartridge } from './run.js';
+import { runCartridge, clippedText } from './run.js';
 import { buildFile } from './build.js';
 import { resolveAddr } from './names.js';
 import { faultSnapshot, firstFaultOf, formatSnapshot } from './snapshot.js';
@@ -79,6 +80,12 @@ export async function runSpecFile(specPath, { update = false, accept = false } =
         if (accept || (update && t.updateOnMismatch)) { stale.push([key, res[key]]); }
         else failures.push(`${key}: expected ${ex[key]}, got ${res[key]}   (if the change is on purpose and you have looked at it: vly test --accept)`);
       }
+    }
+    // a picture test (frameHash) also checks the picture: text cut by the screen edge fails it, unless the test says "allowClippedText": true
+    // ("textInside": true asks for the same check without a picture hash)
+    if ((ex.frameHash !== undefined || ex.textInside === true) && !t.allowClippedText) {
+      const cut = clippedText(res.machine.mem);
+      if (cut.length) failures.push(`text is cut off by the screen edge on the final screen: ${cut.slice(0, 3).join('; ')}   (draw the text where the scroll cannot move it, or set "allowClippedText": true on this test if the cut is on purpose)`);
     }
     if (ex.saves !== undefined && res.saves.length !== ex.saves) failures.push(`save requests: expected ${ex.saves}, got ${res.saves.length}`);
     if (ex.saveWords) {

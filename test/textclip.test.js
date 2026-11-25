@@ -38,3 +38,22 @@ test('vly check says so: the text_clip check warns on a cut line and passes on a
   assert.equal(pick(bad).status, 'warn'); assert.match(pick(bad).message, /loses "2"/);
   assert.equal(pick(good).status, 'pass');
 });
+
+test('vly test: a picture test fails when text is cut on its final screen, and "allowClippedText" or no frameHash lets it through', async () => {
+  const fs = await import('node:fs'); const os = await import('node:os'); const path = await import('node:path');
+  const { runSpecFile } = await import('../src/tools/testrunner.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-textclip-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'main.vly'), 'func init() { load_font(0); text(0, 0, "2-5 THE ROUND"); }\nfunc frame() { poke8(SCX, 8); }\n');
+    const spec = (t) => { fs.writeFileSync(path.join(dir, 'vly.json'), JSON.stringify({ src: 'main.vly', tests: [t] })); return runSpecFile(path.join(dir, 'vly.json'), { update: false }); };
+    const r1 = await spec({ name: 'pic', frames: 5, expect: { frameHash: 'auto' } });
+    const r2 = await spec({ name: 'text only', frames: 5, expect: { textInside: true } });
+    const r3 = await spec({ name: 'allowed', frames: 5, allowClippedText: true, expect: { textInside: true } });
+    const r4 = await spec({ name: 'no picture', frames: 5, expect: { maxCycles: 100000 } });
+    const fails = (r) => (r.results || r).flatMap((x) => x.failures || []).join('\n');
+    assert.match(fails(r2), /text is cut off by the screen edge on the final screen: "2-5 THE ROUND" loses "2"/);
+    assert.ok(!/text is cut off/.test(fails(r3)), fails(r3));
+    assert.ok(!/text is cut off/.test(fails(r4)), fails(r4));
+    assert.match(fails(r1), /text is cut off/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

@@ -142,11 +142,10 @@ export function runCartridge(rom, o = {}) {
  * something in it, '@' where a sprite sits, '.' for an empty cell. Reads the layers the way the renderer does.
  */
 /**
- * Text that the screen edge cuts: lines of font glyphs in the background (or window) map, some of whose 8x8 cells are on the screen and some not
- * (a status line pushed left by a scrolled background is the classic). Cells of a line are glyph cells with at most two blank cells between them.
- * Text that is wholly off screen (part of a scrolling world) is not reported. Returns strings such as `"2-5 THE ROUND" loses "2" at the left edge (scroll 8,0)`.
+ * Every line of font glyphs in the background and window maps (cells with at most two blank cells between them), with where each cell is on
+ * the screen: state 'in' (wholly on screen; up to 2 px over the edge counts as a screen shake), 'part' or 'out', and its pixel position.
  */
-export function clippedText(mem) {
+function scanTextLines(mem) {
   const lcdc = mem[C.LCDC];
   const bgOn = lcdc & C.LCDC_BG, winOn = lcdc & C.LCDC_WIN;
   const scx = mem[C.SCX], scy = mem[C.SCY], wx = mem[C.WX], wy = mem[C.WY];
@@ -156,8 +155,9 @@ export function clippedText(mem) {
     const t = cell & 0x1ff;
     return glyphs.get(Array.from(mem.subarray(C.TILE_RAM + t * 16, C.TILE_RAM + t * 16 + 16)).join(',')) ?? null;   // null: not a glyph
   };
-  const out = [];
-  const lines = (mapBase, place) => {
+  const vis = (p0, lim) => (p0 >= -2 && p0 + 8 <= lim + 2 ? 'in' : p0 + 8 <= 0 || p0 >= lim ? 'out' : 'part');
+  const lines = [];
+  const scan = (mapBase, place) => {
     for (let r = 0; r < 32; r++) {
       const cells = [];
       for (let c = 0; c < 32; c++) { const a = mapBase + 2 * (r * 32 + c); cells.push(charOf(mem[a] | (mem[a + 1] << 8))); }
@@ -170,41 +170,71 @@ export function clippedText(mem) {
           let j = k; while (j < 32 && cells[j] === null) j++;
           if (j < 32 && j - k <= 2) k = j; else break;                      // a gap of at most two blank cells stays in the line
         }
-        const state = [];
-        for (let k = c; k <= last; k++) state.push(place(k, r));          // 'in', 'part' or 'out'
-        const text = Array.from({ length: last - c + 1 }, (_, k) => cells[c + k] ?? ' ').join('');
-        const some = state.some((s) => s !== 'out'), cut = state.some((s) => s !== 'in');
-        if (some && cut && text.trim()) {
-          const first = state.findIndex((s) => s === 'in'), lastIn = state.length - 1 - [...state].reverse().findIndex((s) => s === 'in');
-          const lostL = text.slice(0, Math.max(first, 0)).trim(), lostR = text.slice(lastIn + 1).trim();
-          const parts = [];
-          if (state[0] !== 'in' && first !== 0) parts.push(lostL ? `loses "${lostL}" at the left or top edge` : 'is cut by the left or top edge');
-          if (state[state.length - 1] !== 'in') parts.push(lostR ? `loses "${lostR}" at the right or bottom edge` : 'is cut by the right or bottom edge');
-          if (!parts.length) parts.push('is partly off the screen');
-          out.push(`"${text.trim()}" ${parts.join(' and ')}`);
-        }
+        const at = [];
+        for (let q = c; q <= last; q++) at.push(place(q, r));
+        lines.push({ text: Array.from({ length: last - c + 1 }, (_, q) => cells[c + q] ?? ' ').join(''), cells: at });
         c = last + 1;
       }
     }
   };
-  const vis = (p0, size, lim) => (p0 >= -2 && p0 + 8 <= lim + 2 ? 'in' : p0 + 8 <= 0 || p0 >= lim ? 'out' : 'part');   // up to 2 px over the edge is a screen shake, not a cut
+  const mk = (x0, y0) => {
+    const sx = vis(x0, 160), sy = vis(y0, 144);
+    return { x0, y0, state: sx === 'out' || sy === 'out' ? 'out' : sx === 'in' && sy === 'in' ? 'in' : 'part' };
+  };
   if (bgOn) {
-    lines(C.BG_MAP, (c, r) => {
+    scan(C.BG_MAP, (c, r) => {
       const px = ((c * 8 - scx) % 256 + 256) % 256, py = ((r * 8 - scy) % 256 + 256) % 256;
       const x0 = px > 248 ? px - 256 : px, y0 = py > 248 ? py - 256 : py;
-      if (winOn && x0 + 4 >= wx && y0 + 4 >= wy) return 'out';           // under the window: not what the player sees
-      const sx = vis(x0, 8, 160), sy = vis(y0, 8, 144);
-      return sx === 'out' || sy === 'out' ? 'out' : sx === 'in' && sy === 'in' ? 'in' : 'part';
+      if (winOn && x0 + 4 >= wx && y0 + 4 >= wy) return { x0, y0, state: 'out' };   // under the window: not what the player sees
+      return mk(x0, y0);
     });
   }
-  if (winOn) {
-    lines(C.WIN_MAP, (c, r) => {
-      const sx = vis(wx + c * 8, 8, 160), sy = vis(wy + r * 8, 8, 144);
-      return sx === 'out' || sy === 'out' ? 'out' : sx === 'in' && sy === 'in' ? 'in' : 'part';
-    });
+  if (winOn) scan(C.WIN_MAP, (c, r) => mk(wx + c * 8, wy + r * 8));
+  return { lines, scroll: scx || scy ? ` (scroll ${scx},${scy})` : '' };
+}
+
+/**
+ * Text that the screen edge cuts: a line some of whose cells are on the screen and some not (a status line pushed left by a scrolled
+ * background is the classic). Text wholly off screen (part of a scrolling world) is not reported. Returns strings such as
+ * `"2-5 THE ROUND" loses "2" at the left or top edge (scroll 8,0)`.
+ */
+export function clippedText(mem) {
+  const { lines, scroll } = scanTextLines(mem);
+  const out = [];
+  for (const { text, cells } of lines) {
+    const state = cells.map((c) => c.state);
+    const some = state.some((x) => x !== 'out'), cut = state.some((x) => x !== 'in');
+    if (!(some && cut && text.trim())) continue;
+    const first = state.findIndex((x) => x === 'in'), lastIn = state.length - 1 - [...state].reverse().findIndex((x) => x === 'in');
+    const lostL = first > 0 ? text.slice(0, first).trim() : '', lostR = lastIn >= 0 ? text.slice(lastIn + 1).trim() : '';
+    const parts = [];
+    if (state[0] !== 'in') parts.push(lostL ? `loses "${lostL}" at the left or top edge` : 'is cut by the left or top edge');
+    if (state[state.length - 1] !== 'in') parts.push(lostR ? `loses "${lostR}" at the right or bottom edge` : 'is cut by the right or bottom edge');
+    if (!parts.length) parts.push('is partly off the screen');
+    out.push(`"${text.trim()}" ${parts.join(' and ')}`);
   }
-  const scroll = scx || scy ? ` (scroll ${scx},${scy})` : '';
-  return [...new Set(out)].map((s) => s + scroll);
+  return [...new Set(out)].map((x) => x + scroll);
+}
+
+/**
+ * Text with no margin: a line of visible glyph cells in the outermost cell column or row of the screen (the first and last of 20 columns, the
+ * first and last of 18 rows), so its letters touch the screen edge. Not a cut, only cramped. Returns strings such as `"LV 3" touches the top edge`.
+ */
+export function edgeText(mem) {
+  const { lines } = scanTextLines(mem);
+  const out = [];
+  for (const { text, cells } of lines) {
+    if (!text.trim()) continue;
+    const vis = cells.filter((c) => c.state === 'in' && c.x0 > -3);
+    if (!vis.length) continue;
+    const sides = [];
+    if (vis.some((c) => c.y0 <= 2)) sides.push('top');
+    if (vis.some((c) => c.y0 + 8 >= 142)) sides.push('bottom');
+    if (vis.some((c) => c.x0 <= 2)) sides.push('left');
+    if (vis.some((c) => c.x0 + 8 >= 158)) sides.push('right');
+    if (sides.length) out.push(`"${text.trim()}" touches the ${sides.join(' and ')} edge`);
+  }
+  return [...new Set(out)];
 }
 
 export function screenText(mem, { sprites: listSprites = false } = {}) {

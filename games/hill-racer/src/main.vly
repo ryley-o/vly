@@ -283,7 +283,7 @@ func start_title() {
   text_pal = 7; wclear(7);
   wtext(5, 2, "HILL RACER");
   wtext(3, 4, "A GAS    B TURBO");
-  wtext(2, 5, "D-PAD TILTS IN AIR");
+  wtext(1, 5, "D-PAD TILTS IN AIR");
   for (var c = 0; c < 20; c++) { set_wcell(c, 15, (T + art_g0) | (0 << 12)); set_wcell(c, 16, (T + art_dirt0 + (c & 1)) | (0 << 12)); set_wcell(c, 17, (T + art_dirt1 - (c & 1)) | (0 << 12)); }
   theme(0); ui_pals();
   title_track();
@@ -299,7 +299,7 @@ func title_track() {
   for (var i = 0; i < 11; i++) { wchar(4 + i, 8, peek8(names + track * 12 + i)); }
   wchar(2, 8, 60); wchar(17, 8, 62);
   wtext(4, 10, "                ");
-  if (track >= unlocked) { wtext(4, 10, "WIN THE LAST TRACK"); }
+  if (track >= unlocked) { wtext(1, 10, "WIN THE LAST TRACK"); }
   else if (best[track] > 0) { wtext(4, 10, "BEST"); wtime(9, 10, best[track]); }
   else { wtext(4, 10, "NO TIME YET"); }
 }

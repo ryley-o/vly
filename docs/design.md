@@ -434,6 +434,7 @@ If you cannot see images, `screen_text` shows text and sprites; its `notes` call
 - [ ] Title, play, pause, game over, retry, win all work and transition smoothly
 - [ ] `faults: none`, worst-frame cycles under 80,000, `check` has no unexplained WARN
 - [ ] Screenshots from start, mid-game and end reviewed: no floating objects, no overlap with the HUD, the background scrolls with the world
+- [ ] **Every screen of the game, not only the typical ones, was looked at at native size and zoomed on its corners and edges** (`--crop`): no text or art cut by an edge or by a scroll, a margin inside the edges, no rows touching; `vly check`'s `text_clip` passes, and a picture test of each distinct screen (title, menus, cards, the widest or most unusual board, results, ending) is in `vly.json`
 - [ ] Every player-caused event has its own sound; music is 20 or more seconds before it repeats; the title has music
 - [ ] A full run from title to the end (or a long arcade run) was played by script, including a death and a retry
 - [ ] The first minute is easy, the difficulty rises, the player always knows why they lost
