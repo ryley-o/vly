@@ -268,3 +268,17 @@ test('vly docs --list and --section read a long guide in parts', async () => {
   assert.ok(s.text.length < 20000 && s.text.length > 500, 'only that section: ' + s.text.length);
   await assert.rejects(() => commands.docs.run({ _: ['design'], flags: { section: 'zzz no such' } }), /no heading containing/);
 });
+
+test('vly contrast and vly highlight: contrast ratios, colour-vision simulation and a selection-visibility report', async () => {
+  const { contrast, simulateColor, highlightReport, highlightVerdict } = await import('../src/tools/colorvision.js');
+  assert.equal(contrast([255, 255, 255], [0, 0, 0]).toFixed(1), '21.0');
+  assert.ok(contrast([255, 255, 0], [255, 255, 255]) < 1.2, 'yellow on white is nearly invisible');
+  // red and green of equal brightness are close for a green-blind player
+  assert.ok(contrast(simulateColor([200, 60, 40], 'deutan'), simulateColor([60, 160, 40], 'deutan')) < 1.5);
+  const good = 'var sel;\nfunc init() { load_font(0); lcd(LCD_BG); text(2, 2, "ONE"); text(2, 4, "TWO"); }\nfunc frame() { if (btnp(BTN_DOWN)) { sel = 1; } if (sel == 1) { text(0, 4, ">"); } }';
+  const b = await buildText({ text: good, filename: 'main.vly', baseDir: '/x' });
+  const rep = highlightReport(new Uint8Array(b.bytes), { input: '', frames: 10, dirs: ['DOWN', 'LEFT'] });
+  assert.equal(rep.results.find((x) => x.dir === 'LEFT').changedPixels, 0, 'LEFT does nothing here');
+  assert.ok(rep.results.find((x) => x.dir === 'DOWN').changedPixels > 0, 'DOWN moves the marker');
+  assert.equal(typeof highlightVerdict(rep).ok, 'boolean');
+});

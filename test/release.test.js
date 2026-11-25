@@ -116,3 +116,12 @@ test('vly check --ignore turns a named warning into a note', async () => {
   assert.equal(ig.checks.some((c) => c.id === 'save_rate' && c.status === 'warn'), false);
   if (had) assert.ok(ig.checks.some((c) => c.id === 'save_rate' && c.status === 'info'), 'kept as a note');
 });
+
+test('vly check warns when the game plays a stock loop from std/tunes, and --ignore music silences it', async () => {
+  const { checkCartridge } = await import('../src/tools/check.js');
+  const b = await buildText({ text: GAME, filename: 'main.vly', baseDir: '/nonexistent' });
+  const r = checkCartridge(new Uint8Array(b.bytes), { frames: 600, stockTunes: true });
+  assert.ok(r.checks.some((c) => c.id === 'music' && c.status === 'warn' && /std\/tunes/.test(c.message)));
+  const q = checkCartridge(new Uint8Array(b.bytes), { frames: 600, stockTunes: true, ignore: ['music'] });
+  assert.ok(!q.checks.some((c) => c.id === 'music' && c.status === 'warn'));
+});

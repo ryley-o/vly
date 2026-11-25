@@ -26,6 +26,7 @@ const FACTS = [
   ['vly check is the quality gate', /vly check/, ENTRY],
   ['copy a classic\'s feel, never its look', /feel[^.]*(never|not)[^.]*look|feel, not (its|the) look/i, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],
   ['the idea, levels, power-ups and structure guides exist', /ref-originality[\s\S]*ref-levels|ref-levels[\s\S]*ref-originality/, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],
+  ['the readability guide exists', /ref-readability/, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],
   ['the human-factors guide exists', /ref-humans/, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],
   ['the arcade guide exists', /ref-arcade/, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],
   ['the puzzle guide exists', /ref-puzzles/, ['AGENTS.md', 'llms.txt', '.claude/skills/vly-design/SKILL.md']],

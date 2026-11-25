@@ -287,9 +287,9 @@ Each step is one note (0 is a rest) lasting one step. Give each voice its own bu
 bass on channel 2 (see the channel plan in the design playbook). Hill Racer builds a 24-bar race song and a 16-bar title song this way.
 
 
-## std/tunes: music you do not have to compose
+## std/tunes: five placeholder loops (do not ship them)
 
-Five ready-made loops, 16 to 24 bars each (20 to 30 seconds before they repeat), melody on channel 0 and bass on channel 2, so
+Five ready-made loops for an early build, **not for the finished game**: every game that ships them sounds the same, and `vly check` warns about them. Replace them with your own motif or an arranged public-domain tune (`vly docs ref-music`, "Where your music comes from"). They are 16 to 24 bars each (20 to 30 seconds before they repeat), melody on channel 0 and bass on channel 2, so
 channels 1 and 3 stay free for sound effects.
 
 ```

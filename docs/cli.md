@@ -10,6 +10,8 @@ Every command accepts `--json` and then prints one JSON object with `"ok": true|
 |---|---|
 | `vly new <dir> [--template blank\|flow\|hello\|game\|pong\|battle\|platformer\|puzzle\|shooter]` | create a project: `blank` (the default) is a title screen and nothing else, `flow` is the menu, save, how-to page and level grid every game needs, the others are games to learn techniques from |
 | `vly build [entry] [-o out.vlc] [--asm] [--symbols]` | compile `.vly` / assemble `.asm`; writes the cartridge and `<out>.map.json` (RAM map, function sizes); `--asm` also writes the generated assembly |
+| `vly contrast <#rrggbb> <#rrggbb> [...]` | contrast ratio of colours, normally and under red-blind, green-blind, blue-blind and grey vision; 3:1 is the minimum for a selected state |
+| `vly highlight <cart> --input SPEC [--frames N] [--dirs ...]` | can a player see the selection? runs to a screen, moves the cursor in each direction and reports how many pixels change and the share at 3:1 contrast under every vision; fails when it is weak (`vly docs ref-readability`) |
 | `vly levels <map.txt ...>` | profile ASCII level maps: dead screens, long flat empty runs, ground variety, repeated enemies, a new hazard introduced with company, jumps with no consequence, the intensity curve; it also checks statically that the level can be passed (a pit wider than `--max-gap`, a wall taller than `--max-step`); `--enemies abc` / `--ignore xyz` say which letters are enemies or scenery, `;` lines are comments; it lists what to look at (`vly docs ref-levels`) |
 | `vly run <cart or source> [options]` | run headlessly and report; see below |
 | `vly test [paths] [--update]` | run test specs (`vly.json` `"tests"`, `*.test.json`) |
@@ -50,6 +52,7 @@ vly run game.vly --frames 120 --input "RIGHT@0-59, A@60" --screenshot shot.png -
 | `--mem a,b:len` | read memory at the end: addresses (`0xB400:16`) or variable names (`score`, `grid[3]`) |
 | `--ascii` | print a low-resolution ASCII picture of the final screen |
 | `--notes [N]` | with the audio rendered, list the notes each sound channel played (start time, length, pitch name and Hz; the first N per channel, default 24) and each channel's range: check a melody, a rising chain or a shrill tone without listening. Implies audio |
+| `--cvd protan,deutan,tritan,gray\|all` | with `--screenshot s.png`, also write `s.protan.png` and the other simulations: the same picture as a red-blind, green-blind, blue-blind or grey-screen player sees it |
 | `--oam` | list every sprite on the final screen: slot, x, y, tile, palette, size, flips (a LOWER slot draws on top of a higher one: use it to see what is hiding what) |
 | `--filmstrip N --filmstrip-out strip.png` | ONE image with N evenly spaced frames, each labelled with its frame number: the fastest way to see how a game evolves |
 | `--watch score,x,grid[3]` | a timeline of every change to those variables, with the frame it happened in (frame -1 is after `init`) |

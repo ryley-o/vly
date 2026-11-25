@@ -101,6 +101,8 @@ Keep numbers that grow past 32,767 (age in frames) in two words or compare with 
 
 **Teach every mechanic by making the player use it, early.** Do not explain a rule and hope: build the first levels so that level 1 cannot be solved without mechanic A, level 2 not without mechanic B, level 3 only with both (a quilt puzzle: the first needs one turn, the second one swap, the third both), with a tiny before and after picture where the rule first matters. Then **prove it, do not assume it**: `src/tools/campaign.js` (`analyzeCampaign`) takes a solver you write (does this level have a solution using only these mechanics, and what is the fewest moves?) and reports the first level that actually requires each rule, the levels that claim to teach a rule but do not need it, an opening that is too easy (three of the first five levels solved in one move) and a difficulty that does not rise; put it in `tests/report.mjs` and `vly release` prints it. Over a long campaign also track which decisions get harder and where each new rule first matters, so you know what to playtest.
 
+**Any screen with a cursor or a selection:** read `vly docs ref-readability` (invert or frame the selected item; brightness, not hue; `vly highlight`).
+
 **Anything with timing or reactions:** read `vly docs ref-humans` (reaction times, choice cost, latency, fair windows).
 
 **Arcade and score-chase.** `vly docs ref-arcade` is the full guide (run structure, fairness by construction, a ladder of bots, instant retry, what brings players back).

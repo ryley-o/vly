@@ -16,6 +16,7 @@ import { parseUntil } from '../src/tools/names.js';
 import { profileCartridge, profileFrames } from '../src/tools/profile.js';
 import { checkCartridge, monkeyScript, audibility } from '../src/tools/check.js';
 import { analyzeLevel, formatLevelProfile } from '../src/tools/levelprofile.js';
+import { contrast, parseColor, simulateColor, simulateImage, highlightReport, highlightVerdict, VISIONS } from '../src/tools/colorvision.js';
 import { compare as compareProject, verdict, loadIndex as loadOriginalityIndex, readProjectFiles } from '../src/tools/originality.js';
 import { parseTilesText, tilesFromRGBA, tilesToRGBA, pngToTilesText } from '../src/tools/tiles.js';
 import { runSpecFile, findSpecFiles } from '../src/tools/testrunner.js';
@@ -83,6 +84,8 @@ function projectInfo(target) {
     const self = ['templates', 'games'].map((g) => path.relative(path.join(ROOT, g), dir)).find((r) => r && !r.startsWith('..') && !r.includes(path.sep));
     const refs = self ? Object.fromEntries(Object.entries(idx.refs).filter(([k]) => k !== self && k !== `template ${self}`)) : idx.refs;
     const files = readProjectFiles(dir);
+    const allText = Object.values(files).join('\n');
+    if (/import\s+"std\/tunes"/.test(allText) && /tune_play\s*\(\s*TUNE_/.test(allText)) out.stockTunes = true;     // plays one of the five shared loops
     if (Object.keys(files).length) out.originality = verdict(compareProject(files, { ...idx, refs }));
   } catch { /* no index: no gate */ }
   const brief = path.join(dir, 'DESIGN.md');
@@ -200,7 +203,7 @@ export const commands = {
   },
 
   run: {
-    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--oam] [--notes [N]] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio] [--set var=value,...]\n  Run a cartridge headlessly. --set starts from a chosen state (variables set after init, before frame 1; needs the source or a build with its .map.json). Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
+    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--oam] [--notes [N]] [--cvd protan,deutan,tritan,gray|all] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio] [--set var=value,...]\n  Run a cartridge headlessly. --set starts from a chosen state (variables set after init, before frame 1; needs the source or a build with its .map.json). Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
     async run(args) {
       const { rom, built } = await loadCart(args._[0]);
       let ram = built?.stats?.ram;
@@ -259,6 +262,15 @@ export const commands = {
       if (args.flags.screenshot) {
         writePng(args.flags.screenshot, r.screenshots.get(r.stoppedAt ?? frames), scale);
         files.push(args.flags.screenshot);
+        if (args.flags.cvd) {                                // the same picture as other players see it: protan, deutan, tritan, gray (or all)
+          const kinds = args.flags.cvd === true || args.flags.cvd === 'all' ? ['protan', 'deutan', 'tritan', 'gray'] : String(args.flags.cvd).split(',');
+          for (const k of kinds) {
+            if (!VISIONS.includes(k) || k === 'normal') throw new CliError(`--cvd is protan, deutan, tritan, gray or all (got "${k}")`);
+            const f = args.flags.screenshot.replace(/(\.png)?$/, `.${k}.png`);
+            writePng(f, simulateImage(r.screenshots.get(r.stoppedAt ?? frames), k), scale);
+            files.push(f);
+          }
+        }
       }
       if (args.flags.shots) {
         const dir = args.flags['out-dir'] || '.';
@@ -743,6 +755,36 @@ export const commands = {
     },
   },
 
+  contrast: {
+    help: 'vly contrast <#rrggbb> <#rrggbb> [...]\n  Contrast ratio (WCAG 1 to 21) between two colours, as seen normally and by players with red-blind (protan), green-blind (deutan), blue-blind (tritan) vision and in grey. 3:1 is the usual minimum for a selected or focused state and for icons, 4.5:1 for small text. With several colours, every pair of neighbours in the list is compared. Use it to choose palette entries for a cursor, a selected row or text.',
+    async run(args) {
+      if (args._.length < 2) throw new CliError('give two or more colours, like: vly contrast "#1a2440" "#f5c63c"');
+      let cols; try { cols = args._.map(parseColor); } catch (e) { throw new CliError(e.message); }
+      const rows = [];
+      let text = '';
+      for (let i = 0; i + 1 < cols.length; i++) {
+        const per = {};
+        for (const v of VISIONS) per[v] = Number(contrast(simulateColor(cols[i], v), simulateColor(cols[i + 1], v)).toFixed(2));
+        rows.push({ a: args._[i], b: args._[i + 1], ...per });
+        text += `${args._[i]} vs ${args._[i + 1]}: ${VISIONS.map((v) => `${v} ${per[v].toFixed(2)}:1`).join('   ')}   ${Math.min(...Object.values(per)) >= 3 ? 'ok (3:1 under every vision)' : Object.values(per).every((x) => x >= 1.5) ? 'weak: under 3:1 for some players' : 'FAILS: nearly the same brightness for some players'}\n`;
+      }
+      return { text, data: { pairs: rows } };
+    },
+  },
+  highlight: {
+    help: 'vly highlight <cart|source> --input SPEC [--frames N] [--dirs UP,DOWN,LEFT,RIGHT] [--save file.sav] [--json]\n  Can a player SEE what is selected? Runs your input to a screen with a cursor or a selection (a menu, the level grid, a picker), then moves the selection one step in each direction and reports how many pixels changed and how strongly (contrast at least 3:1 and 1.5:1, normally and under red-blind, green-blind, blue-blind and grey vision). It fails when few pixels change or the change is low-contrast for some players: a selection that only changes hue, or only by one shade, or by a few pixels. The thresholds are our estimates. Read docs ref-readability.',
+    async run(args) {
+      if (!args._[0] && fs.existsSync('vly.json')) { try { const cfg = JSON.parse(fs.readFileSync('vly.json', 'utf8')); if (cfg.entry) args._[0] = cfg.entry; } catch { /* error below */ } }
+      const { rom } = await loadCart(args._[0]);
+      const save = args.flags.save ? new Uint8Array(fs.readFileSync(args.flags.save)) : null;
+      const input = inputText(args);
+      if (!input) throw new CliError('give the input that reaches the screen, for example --input "START@30,A@90" (or --input-file path)');
+      const dirs = args.flags.dirs ? String(args.flags.dirs).split(',') : undefined;
+      const rep = highlightReport(rom, { input, frames: args.flags.frames ? int(args.flags.frames) : null, ...(dirs ? { dirs } : {}), save });
+      const v = highlightVerdict(rep);
+      return { text: `${v.ok ? 'PASS' : 'LOOK AT THIS'}: selection visibility at frame ${rep.lastFrame}\n${v.text}\n`, data: { ...rep, ok: v.ok }, ok: v.ok, exitCode: v.ok ? 0 : 1 };
+    },
+  },
   isa: {
     help: 'vly isa [--json]\n  Print the instruction set.',
     async run() {
