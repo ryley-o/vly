@@ -27,7 +27,7 @@ palette in `text_pal` (default 0). Coordinates are in 8x8 cells.
 | `ui_box(map, col, row, w, h)` | draw a framed blank box, `w` x `h` cells including the frame |
 | `ui_clear(map, col, row, w, h)` | blank a rectangle |
 | `ui_centre(w)` | the column that centres something `w` cells wide on the 20-cell screen: use it for menus, grids and titles instead of a hand-picked margin |
-| `menu_open(map, col, row, items, count)` | draw a menu; `items` is a word table of strings: `table items = {"FIGHT", "ITEM"};` |
+| `menu_open(map, col, row, items, count)` | draw a menu; `items` is a word table of strings: `table items = {"FIGHT", "ITEM"};`. **Set `menu_gap = 2` first** for a blank row between items (the default 1 packs them and the 5 x 7 glyphs touch), and **`menu_sel_pal = 1`** (after defining palette 1 as an inverse of palette 0: colours 0 and 3 swapped) so the selected item is a light bar with dark letters, easy to see in grey and for colour-blind players (`vly docs ref-readability`) |
 | `menu_update()` | call every frame: returns `-1` (nothing yet), the chosen index when A is pressed, or `-2` when B is pressed. UP/DOWN move the cursor and wrap |
 | `menu_close()` | erase the menu |
 | `dialog_open(map, col, row, w, h)` | draw a dialogue box |

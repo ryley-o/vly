@@ -29,7 +29,7 @@ The numbers we use: relative luminance `L = 0.2126 R + 0.7152 G + 0.0722 B` on l
 
 ## 3. Patterns that work (strongest first)
 
-1. **Invert the selected item.** Swap background and ink: a light bar with dark letters in a dark list, or the reverse. It changes the most pixels by the most brightness, and works in grey and under every colour deficiency. In VLY: a second background palette with colours 0 and 3 swapped, and draw the selected item with `text_pal = 1` (redraw the rows when the selection moves; a menu built this way passed `vly highlight` at 100% under every vision, with 1,280 pixels changing per move):
+1. **Invert the selected item.** Swap background and ink: a light bar with dark letters in a dark list, or the reverse. It changes the most pixels by the most brightness, and works in grey and under every colour deficiency. For `std/ui` menus it is two lines: define palette 1 as the inverse of palette 0, then `menu_gap = 2; menu_sel_pal = 1;` before `menu_open` (blank row between items, selected item inverted). By hand, in VLY: a second background palette with colours 0 and 3 swapped, and draw the selected item with `text_pal = 1` (redraw the rows when the selection moves; a menu built this way passed `vly highlight` at 100% under every vision, with 1,280 pixels changing per move):
 
    ```
    bg_pal(0, rgb(1, 2, 6), rgb(4, 6, 12), rgb(9, 11, 15), rgb(15, 15, 15));   // dark background, light ink

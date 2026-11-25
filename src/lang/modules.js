@@ -153,11 +153,25 @@ var menu_row;
 var menu_items;
 var menu_count;
 var menu_sel;
+var menu_w;
+var menu_gap = 1;            // rows per item: 1 packs them (the glyphs touch), 2 leaves a blank row between items and reads much better
+var menu_sel_pal;            // 0: only the arrow marks the selection. 1 to 7: the selected item is also drawn with this background palette (make it an INVERSE of palette 0, so it is a light bar with dark letters: see docs ref-readability)
+func menu_item_row(i) { return menu_row + 1 + i * menu_gap; }
+func menu_draw_item(i, pal) {
+  var oldp = text_pal;
+  text_pal = pal;
+  put_text(menu_map, menu_col + 2, menu_item_row(i), peek(menu_items + i * 2));
+  for (var k = ui_strlen(peek(menu_items + i * 2)); k < menu_w; k++) { poke(menu_map + (((menu_item_row(i)) << 5) + menu_col + 2 + k) * 2, font_base + (pal << 12)); }
+  text_pal = oldp;
+}
 func menu_draw_cursor() {
   for (var i = 0; i < menu_count; i++) {
     var c = font_base;
-    if (i == menu_sel) { c = ui_base + ui_tiles_ui_cursor + (text_pal << 12); }
-    poke(menu_map + (((menu_row + 1 + i) << 5) + menu_col + 1) * 2, c);
+    var pal = text_pal;
+    if (i == menu_sel) { if (menu_sel_pal > 0) { pal = menu_sel_pal; } c = ui_base + ui_tiles_ui_cursor + (pal << 12); }
+    else if (menu_sel_pal > 0) { c = font_base + (pal << 12); }
+    if (menu_sel_pal > 0) { menu_draw_item(i, pal); }
+    poke(menu_map + ((menu_item_row(i) << 5) + menu_col + 1) * 2, c);
   }
 }
 // Open a menu: draws the box and the items. Returns nothing; call menu_update() every frame.
@@ -165,8 +179,9 @@ func menu_open(map, col, row, items, count) {
   menu_map = map; menu_col = col; menu_row = row; menu_items = items; menu_count = count; menu_sel = 0;
   var w = 0;
   for (var i = 0; i < count; i++) { w = max(w, ui_strlen(peek(items + i * 2))); }
-  ui_box(map, col, row, w + 4, count + 2);
-  for (var j = 0; j < count; j++) { put_text(map, col + 2, row + 1 + j, peek(items + j * 2)); }
+  menu_w = w;
+  ui_box(map, col, row, w + 4, (count - 1) * menu_gap + 3);
+  for (var j = 0; j < count; j++) { put_text(map, col + 2, menu_item_row(j), peek(items + j * 2)); }
   menu_draw_cursor();
 }
 // Handle the D-pad and buttons. Returns -1 while nothing is chosen, the chosen index (0..n-1) when A or START is pressed,
@@ -181,7 +196,7 @@ func menu_update() {
 func menu_close() {
   var w = 0;
   for (var i = 0; i < menu_count; i++) { w = max(w, ui_strlen(peek(menu_items + i * 2))); }
-  ui_clear(menu_map, menu_col, menu_row, w + 4, menu_count + 2);
+  ui_clear(menu_map, menu_col, menu_row, w + 4, (menu_count - 1) * menu_gap + 3);
 }
 
 // ---- typewriter dialogue ----

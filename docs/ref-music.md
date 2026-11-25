@@ -56,6 +56,8 @@ So the recommended order of preference, with the reason for each:
 
 **Make your music different from everyone else's on purpose.** Before you write a note, choose a *sound world* and record it in `DESIGN.md`: a **mode** (major, natural minor, dorian, mixolydian, minor or major pentatonic, harmonic minor, a whole-tone or hexatonic colour), a **tempo** and a **groove** (straight, swung, a waltz in three, a march), a **timbre plan** (which duty width for the lead, whether the second voice arpeggiates or echoes, whether the bass walks or pedals) and a **motif**. Draw two or three of these at random from the lists rather than taking the first that comes to mind; the first idea is everyone's first idea. A different sound world per place (a key and tempo and instrument per stage) is one of the cheapest ways to make a game feel big.
 
+**Vary the phrase shape, not only the mode.** A generator that fills tables from a mode, a groove and a bass type gives pieces that differ in key and rhythm but share one phrase shape, and a careful listener hears the family resemblance (one trial's eight pieces did). Change the *contour* (rising, arching, falling, leaping), the *phrase length* (4, 6, 8 bars) and the *rhythm cell* between pieces too, and let a piece's second half answer the first differently.
+
 **Check it without ears.** `vly run build/x.vlc --frames 3600 --audio --notes 40` lists each channel's notes with pitch names, start times and lengths and each channel's range: confirm the mode (which notes appear), the tempo, that the motif actually returns, that nothing is shrill or silent, and that two of your own pieces do not share the same bass line.
 
 ## 3. Craft

@@ -388,3 +388,24 @@ func frame() { n++; if (n == 3) { sfx_tone(0, 440, 12, 2, 5); } sfx_update(); }`
   for (let i = 0; i < 10; i++) m.runFrame(0);
   assert.equal(on(), false, 'off after the hold');
 });
+
+test('std/ui menus: menu_gap spaces the rows and menu_sel_pal draws the selected item in another palette', () => {
+  const src = `import "std/ui";
+table items = {"ONE", "TWO", "THREE"};
+func init() { load_font(0); lcd(LCD_BG); ui_init(100); menu_gap = 2; menu_sel_pal = 1; menu_open(BG_MAP, 2, 2, items, 3); }
+func frame() { menu_update(); }`;
+  const m = new Machine(compileToCartridge(src, { filename: 'm.vly' }).bytes);
+  m.boot();
+  m.runFrame(0);
+  const cell = (col, row) => m.read16(C.BG_MAP + (row * 32 + col) * 2);
+  const pal = (v) => (v >> 12) & 7;
+  // items sit on rows 3, 5, 7 (a blank row between), the first one in palette 1 with the arrow beside it
+  assert.equal(pal(cell(4, 3)), 1, 'selected item in palette 1');
+  assert.equal(pal(cell(4, 5)), 0, 'the others in the normal palette');
+  assert.equal(cell(4, 4), cell(4, 6), 'the rows between items are untouched box interior');
+  assert.notEqual(cell(4, 4) & 0xfff, cell(4, 3) & 0xfff, 'and not text');
+  m.runFrame(C.BTN.DOWN);
+  m.runFrame(0);
+  assert.equal(pal(cell(4, 3)), 0);
+  assert.equal(pal(cell(4, 5)), 1, 'the selection moved');
+});
