@@ -4,6 +4,16 @@ Read this before you design anything, and again before you call a game finished.
 design and verification mistakes, not coding mistakes. This page is the difference between a toy and a game someone wants
 to keep playing.
 
+## Read this first (five minutes)
+
+This page is long. If you read nothing else here:
+1. **Decide your idea before you open an editor** (`vly docs ref-originality`), and write `DESIGN.md`: the idea, who it is for, the core loop, the content plan, the sound world, how the selected thing is shown.
+2. **Read the one reference guide for your kind of game** (the table below), and `vly docs ref-readability` if anything is selectable; skip the rest until you need it (`vly docs design --list` shows this page's headings, `--section "words"` prints one).
+3. **A mechanic is not a game until it is in the levels**, so build a solver or a bot first and let it tell you which levels bite.
+4. **Look at your own screenshots at native size** (`--screenshot`, `--crop x,y,w,h` to zoom, `--cvd all`), and read the music as notes (`--audio --notes`): the tools pass things a person would not.
+5. **Run `vly check` early and `vly release` at the end**; both tell you what is missing.
+6. **The brief says surprise, so surprise on screen too**: a clever rule shown on a tiny, still screen is not what makes people stop and stare (see `vly docs ref-originality`, section 6b).
+
 ## Reference guides (the central index)
 
 **How to read the guidance here.** It is a set of patterns that tend to work and patterns that tend to fail, with the reasons, not a rulebook. Numbers are starting points taken from classics or from our own trials, and the thresholds in our tools are estimates; there will be games where the right answer is different. When you break a pattern, do it on purpose and say why in `DESIGN.md`. When a pattern fits, use it and spend your effort on what is yours.

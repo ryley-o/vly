@@ -10,7 +10,7 @@ import "std/music";    // a three-voice tracker for background music and jingles
 
 **Names a module keeps for itself.** Importing a module reserves these name prefixes, so do not start your own variables or functions with them (the compiler tells you which module owns a name and to rename yours): `ui_ menu_ dlg_ dialog_` (std/ui), `anim_` (std/anim), `mus_ music_ N_ MUS_` (std/music), `spr_` and `spr` (std/sprites), `sfx_ SFX_` (std/sfx), `stream_` (std/stream), `tune_ TUNE_` (std/tunes), `fade_` (std/fade), `bt_ BT_ cf_ confirm_ pg_ grade_ grid_` (std/flow), `pl_` (std/platformer). The standard library keeps `font_base`, `text_pal` and `audio_hold`.
 
-**Variables a module lets you poke** (everything else is private): `fade_bg[32]` and `fade_obj[32]` (the palettes a fade scales: `fade_save()` copies the live palettes there; change a word to change what the fade brings back, then `fade_set(level)` or `fade_to(level, speed)`), `fade_speed` (frames per step), `mus_duty[voice]` (pulse width of a music voice, 0 to 3; also `music_duty(voice, d)`), `mus_muted` (1 silences the music), `audio_hold[channel]` (frames a sound effect owns a channel; music leaves a held channel alone), `text_pal` (palette 0 to 7 that `text()` uses), `font_base` (tile where the glyphs start), `menu_sel` (the highlighted item after `menu_open`).
+**Variables a module lets you poke** (everything else is private): `fade_bg[32]` and `fade_obj[32]` (the palettes a fade scales: `fade_save()` copies the live palettes there; change a word to change what the fade brings back, then `fade_set(level)` or `fade_to(level, speed)`), `fade_speed` (frames per step), `mus_duty[voice]` (pulse width of a music voice, 0 to 3; also `music_duty(voice, d)`), `mus_muted` (1 silences the music), `audio_hold[channel]` (frames a sound effect owns a channel; music leaves a held channel alone), `text_pal` (palette 0 to 7 that `text()` uses), `font_base` (tile where the glyphs start), `menu_sel` (the highlighted item after `menu_open`), `menu_gap` (0 or 2: a blank row between items; set it before `menu_open`), `menu_sel_pal` (the palette the selected item is drawn in; 0 keeps the cursor tile only), `cf_sel` (the highlighted choice of a `std/flow` confirm box).
 
 Built-in modules are written in VLY. Like the standard library, only the functions and variables your program uses are
 included in the cartridge, and you can redefine any of them. They need `load_font()` (text) and, for `std/ui`, one call
@@ -26,6 +26,7 @@ palette in `text_pal` (default 0). Coordinates are in 8x8 cells.
 | `ui_init(first)` | load the UI tiles at tile `first` (call once, after `load_font`) |
 | `ui_box(map, col, row, w, h)` | draw a framed blank box, `w` x `h` cells including the frame |
 | `ui_clear(map, col, row, w, h)` | blank a rectangle |
+| `ui_strlen(s)` | the length in characters of a string (a word table entry or a literal), for centring or measuring text |
 | `ui_centre(w)` | the column that centres something `w` cells wide on the 20-cell screen: use it for menus, grids and titles instead of a hand-picked margin |
 | `menu_open(map, col, row, items, count)` | draw a menu; `items` is a word table of strings: `table items = {"FIGHT", "ITEM"};`. **Set `menu_gap = 2` first** for a blank row between items (the default 1 packs them and the 5 x 7 glyphs touch), and **`menu_sel_pal = 1`** (after defining palette 1 as an inverse of palette 0: colours 0 and 3 swapped) so the selected item is a light bar with dark letters, easy to see in grey and for colour-blind players (`vly docs ref-readability`) |
 | `menu_update()` | call every frame: returns `-1` (nothing yet), the chosen index when A is pressed, or `-2` when B is pressed. UP/DOWN move the cursor and wrap |
@@ -64,6 +65,8 @@ func frame() {
 | `approach(v, target, step)` | move `v` toward `target` by at most `step`, never overshooting |
 
 ## `std/music`: a tiny tracker
+
+(To play a single note on an event, not a song: `tone(channel, music_hz(N_E4), volume, duty)`; `music_hz(n)` is the note's pitch in hertz, and `N_C2` to `N_B6` are the note numbers.)
 
 Up to three voices, each playing a `btable` of `(note, steps)` pairs on one audio channel.
 
@@ -266,7 +269,7 @@ func frame() {
 }
 ```
 
-Call `fade_save()` after you set palettes on purpose (it remembers the real colours); `fade_set(n)` jumps to a level; a step costs about 15,000 cycles (so fade in steps, not in one frame, and do not combine it with another big call). Set or change palettes at full brightness (`fade_set(4)` first), then `fade_save()`; palette changes made while faded are lost when you save. To change colours while the screen is faded or fading (a screen change behind black, a lava stage, a flash), use `fade_bg_set(i, colour)` and `fade_obj_set(i, colour)` (`i` is the entry 0 to 31, so palette `p`, colour `k` is `p * 4 + k`): they update the remembered colour and show it at the current brightness. **Do not** write `bg_pal` and then call `fade_save()` while faded: `fade_save()` restores the old colours first, so your new ones are lost (the screen comes back in the old palette). Setting a whole screen's palettes with the two setters and one `fade_to` costs far less than `fade_save()` plus `fade_set()` (about 31,000 cycles each).
+Call `fade_save()` after you set palettes on purpose (it remembers the real colours); `fade_set(n)` jumps to a level; a step costs about 15,000 cycles (so fade in steps, not in one frame, and do not combine it with another big call). Set or change palettes at full brightness (`fade_set(4)` first), then `fade_save()`; palette changes made while faded are lost when you save. To change colours while the screen is faded or fading (a screen change behind black, a lava stage, a flash), use `fade_bg_set(i, colour)` and `fade_obj_set(i, colour)` (`i` is the entry 0 to 31, so palette `p`, colour `k` is `p * 4 + k`): they update the remembered colour and show it at the current brightness. **Do not** write `bg_pal` and then call `fade_save()` while faded: `fade_save()` restores the old colours first, so your new ones are lost (the screen comes back in the old palette). Setting a whole screen's palettes with the two setters and one `fade_to` costs far less than `fade_save()` plus `fade_set()` (about 31,000 cycles each). Each setter call costs roughly 2,000 cycles (a trial measured 36 entries in one frame at about 80,000), so write a large palette over two or three frames, not in one.
 `spr_text(x, y, "WARNING", pal)` (in `std/sprites`) draws big letters as sprites, for banners and messages over the action; call it first in the frame so
 the letters get the low slot numbers and sit on top. The letters are drawn in **palette colour 3**, so choose an object palette whose colour 3 contrasts with the
 background (a dark colour 3 over a dark scene is unreadable).

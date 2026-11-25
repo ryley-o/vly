@@ -89,6 +89,16 @@ Great mechanic-led games get their levels *from* the mechanic (Braid's worlds ea
 - The first-idea trap (section 0), and the stock set dressing (clocks, lanterns, gears, space).
 - A story pasted on after the mechanic is done: the story chooses the art, the music and the structure, so decide it first.
 
+## 6b. When the brief is "wow" (a trial that chose its own idea)
+
+A fresh agent told to surprise people chose a delayed-echo puzzle: a clever rule, an exhaustive solver, 30 proven levels, and a screen that was a small plain board with a staff of notes underneath. Everything about it could be checked by a program, and it was a good puzzle, but nobody would stop and stare. Agents drift toward ideas they can verify by number, because the tools reward that. A "wow" has parts a solver cannot score, so plan them on purpose:
+- **Something moves that should not**: scale (a giant boss, a screen-filling effect), a transformation (the world rotates, floods, shatters, changes palette), many things at once (a swarm, a crowd, a fluid), or a sudden change of verb. Motion is what a still screenshot hides.
+- **The screen is the instrument**: use the whole 160 x 144, layers that scroll at different speeds, palette cycling, sprite tricks and screen shake (see `ref-genres` for each kind of game) instead of a small centred board.
+- **Sound and picture are one event** (the echo game had this part right: every step is a note).
+- **One thing a person will describe to a friend** in a sentence: "the enemies are my own recorded ghosts", "the level is a song". Write that sentence in `DESIGN.md` and check that the screen shows it in the first ten seconds.
+- **A first minute that hooks without reading**: title, instructions by picture, first success in under thirty seconds.
+Puzzles are fine; choose a puzzle because you want one, then give it a presentation that is not a tiny board.
+
 ## 7. What to write down
 
 In `DESIGN.md`, before you code (and `vly check` prints it back): the one-sentence mechanic; the feeling and the one true thing; ten titles and the three survivors with their scores; **five level ideas for the chosen one**; what is borrowed from a classic's feel; the facets you made your own (at least three) and how they reinforce each other; the three closest known games and what you changed; and three things in this game that no game you know has.

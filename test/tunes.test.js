@@ -161,3 +161,19 @@ test('the guide: the example in docs/ref-classics.md works end to end, and every
     assert.ok(r.audio.some((v) => Math.abs(v) > 0.02), 'audible');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('music_hz gives the pitch of a note, and vly run --crop and --mem words work through the real CLI', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-run12-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'main.vly'), 'import "std/music";\nvar hz; var arr[3]; table pal = { rgb(1, 2, 3), -4 }; var neg;\nfunc init() { hz = music_hz(N_A4); arr[0] = 7; arr[1] = 300; arr[2] = 5; neg = pal[1]; }\nfunc frame() {}\n');
+    const vly = (...a) => spawnSync('node', [path.resolve('cli/vly.js'), ...a], { cwd: dir, encoding: 'utf8' });
+    const r = vly('run', 'main.vly', '--frames', '2', '--mem', 'hz:2,arr:6,neg:2', '--screenshot', 'shot.png', '--crop', '10,20,40,30', '--scale', '2');
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.match(r.stdout, /mem hz[^\n]*\(= 440\)/);
+    assert.match(r.stdout, /mem arr[^\n]*as 3 words[^\n]*: 7 300 5/);
+    assert.match(r.stdout, /mem neg[^\n]*fc ff/);
+    const png = (await import('../src/tools/png.js')).decodePNG(fs.readFileSync(path.join(dir, 'shot.png')));
+    assert.deepEqual([png.width, png.height], [80, 60]);
+    assert.notEqual(vly('run', 'main.vly', '--frames', '2', '--screenshot', 's.png', '--crop', '0,0,500,10').status, 0);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

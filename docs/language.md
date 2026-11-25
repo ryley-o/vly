@@ -61,7 +61,7 @@ func big(a) bank 4 { ... }        // a function whose code lives in ROM bank 4 (
 ```
 
 - Order does not matter: you can use a function or table before it is declared.
-- Global initializers must be constants. To start from a computed value, assign it in `init()`.
+- Global initializers must be constants. To start from a computed value, assign it in `init()`. "Constants" includes `rgb(r, g, b)`, negative numbers, other `const`s and operators, so a `table` may hold colours and signed values: `table pal = { rgb(1, 2, 3), -4 };`.
 - Arrays are indexed from 0 and **not bounds-checked**. `scores[i]` is a variable, so `scores` alone is its address.
 - A global is only allocated (and an initializer only runs) if reachable code uses it, so unused variables cost nothing.
 
@@ -91,7 +91,7 @@ Compound assignment on an array element evaluates the index expression twice, so
 - `init()` (optional, no parameters) runs once at power-on with a budget of 1,200,000 cycles. `frame()` (required,
   no parameters) runs once per frame with a budget of 120,000 cycles. If a routine exceeds its budget it is cut off
   and `vly run` / `vly test` report an OVERRUN fault.
-- You may redefine any function of the standard library (the ones in `vly docs stdlib`); your definition wins. The functions and variables of the modules you import (`std/music`, `std/platformer` and the rest) have reserved name prefixes (only for modules you actually import; a clash with an imported module is a build error) and cannot be redefined: the compiler says which module owns the name. To change what a module does, write your own function with a different name and call that instead.
+- You may redefine any function of the standard library (the ones in `vly docs stdlib`); your definition wins. The functions and variables of the modules you import (`std/music`, `std/platformer` and the rest) have reserved name prefixes (only for modules you actually import; a clash with an imported module is a build error) and cannot be redefined: the compiler says which module owns the name. (The list of reserved prefixes is at the top of `vly docs modules`: `ui_ menu_ dlg_ mus_ music_ spr_ sfx_ fade_ bt_ cf_ pg_ grade_ grid_ pl_` and others. A variable called `grid_sel` or `menu_pos` will not build if you import the module.) To change what a module does, write your own function with a different name and call that instead.
 - Only functions reachable from `init()` and `frame()` are included in the cartridge (others get a warning).
 
 ## Intrinsics (built in)

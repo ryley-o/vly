@@ -313,6 +313,8 @@ var mus_tick;
 var mus_muted;
 // Frames per step. Smaller is faster.
 func music_tempo(frames_per_step) { mus_step = frames_per_step; }
+// The pitch of a note number in hertz (N_A4 is 440): for tone() when a game plays a note on an event, a step or a key press.
+func music_hz(n) { return mus_hz[n]; }
 // Start \`song\` (a btable of note, steps pairs) on voice v (0-2) using audio channel ch (0-1 pulse, 2 triangle) at volume vol.
 func music_play(v, ch, song, vol) {
   mus_song[v] = song; mus_pos[v] = 0; mus_wait[v] = 0; mus_ch[v] = ch; mus_vol[v] = vol; mus_cur[v] = 0; mus_duty[v] = 2;

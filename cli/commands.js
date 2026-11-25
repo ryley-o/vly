@@ -147,8 +147,16 @@ function sizeReport(size) {
   return { bytes: size, max: C.MAX_ROM_SIZE, percent: +((size / C.MAX_ROM_SIZE) * 100).toFixed(2), banks, chunks: Math.ceil(size / 24575) };
 }
 
+let CROP = null;   // --crop x,y,w,h: the part of the screen that screenshots keep (machine pixels)
 function writePng(file, rgba, scale) {
-  const up = upscale(C.SCREEN_W, C.SCREEN_H, rgba, scale);
+  let w = C.SCREEN_W, h = C.SCREEN_H, px = rgba;
+  if (CROP) {
+    const [cx, cy, cw, ch] = CROP;
+    px = new Uint8Array(cw * ch * 4);
+    for (let y = 0; y < ch; y++) px.set(rgba.subarray(((cy + y) * C.SCREEN_W + cx) * 4, ((cy + y) * C.SCREEN_W + cx + cw) * 4), y * cw * 4);
+    w = cw; h = ch;
+  }
+  const up = upscale(w, h, px, scale);
   fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
   fs.writeFileSync(file, encodePNG(up.width, up.height, up.rgba, 4));
 }
@@ -206,7 +214,7 @@ export const commands = {
   },
 
   run: {
-    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--shots 0,30,60 --out-dir dir] [--ascii] [--oam] [--notes [N]] [--cvd protan,deutan,tritan,gray|all] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio] [--set var=value,...]\n  Run a cartridge headlessly. --set starts from a chosen state (variables set after init, before frame 1; needs the source or a build with its .map.json). Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
+    help: 'vly run <cart.vlc|source> [--frames N] [--input SPEC] [--save file] [--save-out file]\n  [--screenshot file.png] [--scale N] [--crop x,y,w,h] [--shots 0,30,60 --out-dir dir] [--ascii] [--oam] [--notes [N]] [--cvd protan,deutan,tritan,gray|all] [--mem ADDR:LEN,...] [--json]\n  [--watch var,var] [--until state==6] [--worst N] [--profile] [--trace FRAME[:LIMIT]|init[:LIMIT]] [--filmstrip N --filmstrip-out strip.png]\n  [--gif out.gif [--gif-every 2] [--gif-scale 2]] [--wav out.wav] [--audio] [--set var=value,...]\n  Run a cartridge headlessly. --set starts from a chosen state (variables set after init, before frame 1; needs the source or a build with its .map.json). Input SPEC example: "RIGHT@0-59,A+RIGHT@60-79,START@100".',
     async run(args) {
       const { rom, built } = await loadCart(args._[0]);
       let ram = built?.stats?.ram;
@@ -228,6 +236,12 @@ export const commands = {
       let stripFrames = null;
       if (args.flags.filmstrip && args.flags.filmstrip !== true) { stripFrames = evenFrames(frames, int(args.flags.filmstrip)); for (const f of stripFrames) shotFrames.add(f); }
       else if (args.flags['filmstrip-out'] && args.flags.shots) stripFrames = String(args.flags.shots).split(',').map(int);
+      CROP = null;
+      if (args.flags.crop) {
+        const cr = String(args.flags.crop).split(',').map(int);
+        if (cr.length !== 4 || cr.some((v) => !Number.isFinite(v)) || cr[0] < 0 || cr[1] < 0 || cr[2] < 1 || cr[3] < 1 || cr[0] + cr[2] > C.SCREEN_W || cr[1] + cr[3] > C.SCREEN_H) throw new CliError(`--crop x,y,w,h in screen pixels (the screen is ${C.SCREEN_W}x${C.SCREEN_H}), for example --crop 40,30,80,60`);
+        CROP = cr;
+      }
       if (args.flags.screenshot) shotFrames.add(frames);
       if (args.flags.shots) for (const s of String(args.flags.shots).split(',')) shotFrames.add(int(s));
       let mem = [];
@@ -347,7 +361,7 @@ export const commands = {
       }
       text += `frame hash: ${r.frameHash}\nstate hash: ${r.stateHash}\n`;
       if (r.saves.length) text += `save requests: ${r.saves.length}\n`;
-      r.mem.forEach((m, i) => { text += `mem ${mem[i].name} @ ${hex(m.addr)}: ${m.bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ')}${m.bytes.length === 2 ? `  (= ${m.bytes[0] | (m.bytes[1] << 8)})` : ''}\n`; });
+      r.mem.forEach((m, i) => { text += `mem ${mem[i].name} @ ${hex(m.addr)}: ${m.bytes.map((b) => b.toString(16).padStart(2, '0')).join(' ')}${m.bytes.length === 2 ? `  (= ${m.bytes[0] | (m.bytes[1] << 8)})` : m.bytes.length > 2 && m.bytes.length % 2 === 0 ? `  (as ${m.bytes.length >> 1} words, low byte first in memory: ${Array.from({ length: m.bytes.length >> 1 }, (_, k) => m.bytes[k * 2] | (m.bytes[k * 2 + 1] << 8)).join(' ')})` : ''}\n`; });
       if (watch.length) {
         text += `timeline of ${watch.map((w) => w.name).join(', ')} (frame -1 = after init):\n`;
         for (const c of r.changes) text += `  frame ${String(c.frame).padStart(4)}: ${c.name} ${c.from === undefined ? '' : c.from + ' -> '}${c.to}\n`;
