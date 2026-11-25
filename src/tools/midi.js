@@ -143,6 +143,8 @@ export function midiToSong(bytes, o = {}) {
     lead[s] = hi ? hi : 0; onsetLead[s] = hi && starts ? 1 : 0;
     bass[s] = lo < 999 ? lo : 0; onsetBass[s] = lo < 999 && startsB ? 1 : 0;
   }
+  // legato: join a note to the next across a one-step gap (staccato music otherwise plays as mostly rests)
+  if (o.legato) for (let s = 1; s < total - 1; s++) if (!lead[s] && lead[s - 1] && lead[s + 1]) lead[s] = lead[s - 1];
   const toEvents = (line, onsets, maxNote, floor = 0) => {
     const ev = [];
     let i = 0;
@@ -152,7 +154,7 @@ export function midiToSong(bytes, o = {}) {
       while (j < total && line[j] === n && !(onsets[j] && n !== 0)) j++;
       let v = n === 0 ? 0 : vlyNote(Math.min(n, maxNote));
       while (v && v < floor) v += 12;
-      ev.push([v, j - i]);
+      for (let left = j - i; left > 0; left -= 250) ev.push([v, Math.min(left, 250)]);   // a duration is one byte: a longer note or rest is split
       i = j;
     }
     return ev;
@@ -187,6 +189,15 @@ export function songToVly(song, name = 'tune') {
   if (song.arp) out += `btable ${name}_arp = { ${fmt(song.arp)}, 255 };\n`;
   out += `func ${name}_play() {\n  music_tempo(${song.framesPerStep});\n  music_play(0, 0, ${name}_lead, 9);\n  music_play(1, 2, ${name}_bass, 8);\n${song.arp ? `  music_play(2, 1, ${name}_arp, 4);   // voice 2 on the second pulse channel (an arpeggio): a sound effect on channel 1 takes it over\n` : ''}}\n`;
   return out;
+}
+
+/** How many bars the MIDI file holds (the last note's end, rounded up to a whole bar). */
+export function midiBars(bytes) {
+  const m = parseMidi(bytes);
+  const ts = m.timesigs[0] || { num: 4, den: 4 };
+  const barTicks = m.division * 4 / ts.den * ts.num;
+  let end = 0; for (const t of m.tracks) for (const n of t.notes) if (n.ch !== 9 && n.end > end) end = n.end;
+  return Math.max(1, Math.ceil((end - 1) / barTicks));
 }
 
 /** How many bars of this MIDI fit in about `seconds` of play, rounded to a multiple of 4 (a phrase), at least 8. */

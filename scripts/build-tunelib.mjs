@@ -5,11 +5,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { midiToSong, barsForSeconds, noteName } from '../src/tools/midi.js';
+import { midiToSong, barsForSeconds, midiBars, noteName } from '../src/tools/midi.js';
 
 const CACHE = process.env.TUNELIB_CACHE || '/tmp/tunelib-cache';
 fs.mkdirSync(CACHE, { recursive: true });
-const pieces = JSON.parse(fs.readFileSync(process.env.TUNELIB_PIECES || '/tmp/sf/crawl/pieces.json', 'utf8'));
+const pieces = (process.env.TUNELIB_PIECES || '/tmp/sf/crawl/pieces.json:/tmp/sf/crawl/pieces2.json').split(':').flatMap((f) => JSON.parse(fs.readFileSync(f, 'utf8')));   // crawls of the Mutopia listings (piece, title, composer, licence, MIDI url)
 const byId = new Map(pieces.map((p) => [p.piece, p]));
 
 // [mutopia id, slug, short title, tags (mood), scenes (where it fits), energy 1-5, bpm override (quarter note) or null, from bar or null, bars or null, note]
@@ -29,8 +29,8 @@ for (const c of CURATION) {
   if (String.fromCharCode(...bytes.subarray(0, 4)) !== 'MThd') { console.error('not a MIDI file:', c.id); fs.unlinkSync(file); continue; }
   try {
     const first = c.from || 1;
-    const n = c.bars || barsForSeconds(bytes, 36, c.bpm ? { bpm: c.bpm } : {});
-    const song = midiToSong(bytes, { bars: [first, first + n - 1], grid: 'auto', bpm: c.bpm, split: c.split, tracks: c.tracks, transpose: c.transpose });
+    const n = Math.min(c.bars || barsForSeconds(bytes, 36, c.bpm ? { bpm: c.bpm } : {}), midiBars(bytes) - first + 1);
+    const song = midiToSong(bytes, { bars: [first, first + n - 1], grid: 'auto', bpm: c.bpm, split: c.split, tracks: c.tracks, transpose: c.transpose, legato: c.legato });
     const leadSteps = song.lead.reduce((a, [, d]) => a + d, 0), restSteps = song.lead.filter(([x]) => !x).reduce((a, [, d]) => a + d, 0);
     const seconds = song.steps * song.framesPerStep / 60;
     out.push({

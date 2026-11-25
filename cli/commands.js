@@ -16,8 +16,8 @@ import { parseUntil } from '../src/tools/names.js';
 import { profileCartridge, profileFrames } from '../src/tools/profile.js';
 import { checkCartridge, monkeyScript, audibility } from '../src/tools/check.js';
 import { analyzeLevel, formatLevelProfile } from '../src/tools/levelprofile.js';
-import { findTunes, getTune, suggest, vocabulary, tuneSong, tuneSource, loadTunes } from '../src/tools/tunes.js';
-import { midiToSong, songToVly, barsForSeconds, noteName } from '../src/tools/midi.js';
+import { findTunes, getTune, suggest, libraryTunesIn, vocabulary, tuneSong, tuneSource, loadTunes } from '../src/tools/tunes.js';
+import { midiToSong, songToVly, barsForSeconds, midiBars, noteName } from '../src/tools/midi.js';
 import { contrast, parseColor, simulateColor, simulateImage, highlightReport, highlightVerdict, VISIONS } from '../src/tools/colorvision.js';
 import { compare as compareProject, verdict, loadIndex as loadOriginalityIndex, readProjectFiles } from '../src/tools/originality.js';
 import { parseTilesText, tilesFromRGBA, tilesToRGBA, pngToTilesText } from '../src/tools/tiles.js';
@@ -88,6 +88,7 @@ function projectInfo(target) {
     const files = readProjectFiles(dir);
     const allText = Object.values(files).join('\n');
     if (/import\s+"std\/tunes"/.test(allText) && /tune_play\s*\(\s*TUNE_/.test(allText)) out.stockTunes = true;     // plays one of the five shared loops
+    try { const lt = libraryTunesIn(allText); if (lt.length) out.libraryTunes = lt; } catch { /* no library: no note */ }
     if (Object.keys(files).length) out.originality = verdict(compareProject(files, { ...idx, refs }));
   } catch { /* no index: no gate */ }
   const brief = path.join(dir, 'DESIGN.md');
@@ -803,7 +804,7 @@ export const commands = {
         if (str('bars')) { const m = /^(\d+)(?:-(\d+))?$/.exec(f.bars); if (!m) throw new CliError('--bars looks like 1-16'); bars = [+m[1], +(m[2] || m[1])]; }
         let song;
         try {
-          if (!bars) { const n = barsForSeconds(bytes, 36, str('bpm') ? { bpm: Number(f.bpm) } : {}); bars = [1, n]; }
+          if (!bars) { const n = Math.min(barsForSeconds(bytes, 36, str('bpm') ? { bpm: Number(f.bpm) } : {}), midiBars(bytes)); bars = [1, n]; }
           song = midiToSong(bytes, { bars, grid: 'auto', bpm: str('bpm') ? Number(f.bpm) : undefined, split: str('split') ? int(f.split) : undefined, transpose: str('transpose') ? int(f.transpose) : undefined, arp: f['no-arp'] ? false : undefined });
         } catch (e) { throw new CliError(`cannot convert ${f.midi}: ${e.message}`); }
         const name = String(str('name') || path.basename(f.midi).replace(/\.[^.]+$/, '')).replace(/[^a-z0-9_]/gi, '_').replace(/^(\d)/, '_$1').toLowerCase();

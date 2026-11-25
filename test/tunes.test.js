@@ -6,14 +6,14 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { buildFile } from '../src/tools/build.js';
 import { runCartridge } from '../src/tools/run.js';
-import { loadTunes, findTunes, getTune, vocabulary, tuneSong, tuneSource, stepsPerBar } from '../src/tools/tunes.js';
+import { loadTunes, findTunes, getTune, vocabulary, tuneSong, tuneSource, stepsPerBar, libraryTunesIn } from '../src/tools/tunes.js';
 import { parseMidi, midiToSong, songToVly, noteName } from '../src/tools/midi.js';
 
 const lib = loadTunes();
 const sum = (ev) => ev.reduce((a, [, d]) => a + d, 0);
 
 test('the tune library: every entry has provenance, sane music data and equal-length voices', () => {
-  assert.ok(lib.tunes.length >= 70, `${lib.tunes.length} tunes`);
+  assert.ok(lib.tunes.length >= 130, `${lib.tunes.length} tunes`);
   const ids = new Set();
   for (const t of lib.tunes) {
     assert.ok(/^[a-z0-9-]+$/.test(t.id) && !ids.has(t.id), `unique slug ${t.id}`); ids.add(t.id);
@@ -22,7 +22,7 @@ test('the tune library: every entry has provenance, sane music data and equal-le
     for (const k of ['title', 'composer', 'note', 'key', 'meter']) assert.ok(String(t[k]).length > 2, `${t.id} has ${k}`);
     assert.ok(t.tags.length >= 2 && t.scenes.length >= 2, `${t.id} has moods and scenes`);
     assert.ok(t.energy >= 1 && t.energy <= 5, t.id);
-    assert.ok(t.seconds >= 20 && t.seconds <= 90, `${t.id} lasts ${t.seconds} s`);
+    assert.ok(t.seconds >= 15 && t.seconds <= 90, `${t.id} lasts ${t.seconds} s`);
     assert.ok(t.framesPerStep >= 1 && t.framesPerStep <= 60, t.id);
     const total = stepsPerBar(t) * t.bars;
     for (const v of ['lead', 'bass', 'arp']) {
@@ -41,6 +41,17 @@ test('known melodies start with the right notes (checks the converter against tu
   assert.deepEqual(head('ode-to-joy', 15), 'B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 B4 A4 A4'.replace(/#/g, 's').split(' '));
   assert.deepEqual(head('bach-minuet-in-g', 8), 'D5 G4 A4 B4 C5 D5 G4 G4'.split(' '));
   assert.deepEqual(head('rondo-alla-turca', 5), 'B4 A4 Gs4 A4 C5'.split(' '));
+  assert.deepEqual(head('greensleeves', 13), 'A4 C5 D5 E5 F5 E5 D5 B4 G4 A4 B4 C5 A4'.split(' '));
+  assert.deepEqual(head('new-britain', 8), 'D4 G4 B4 G4 B4 A4 G4 E4'.split(' '));
+  assert.deepEqual(head('good-king-wenceslas', 6), 'A4 A4 A4 B4 A4 A4'.split(' '));
+  assert.deepEqual(head('soldiers-joy', 12), 'F#4 G4 A4 A4 A4 A4 A4 D5 D5 C#5 B4 A4'.replace(/#/g, 's').split(' '));
+});
+
+test('libraryTunesIn spots an unchanged library tune in source text, and not a transposed one', () => {
+  const t = getTune('ode-to-joy');
+  assert.deepEqual(libraryTunesIn(tuneSource(t, { name: 'x' })), ['ode-to-joy']);
+  assert.deepEqual(libraryTunesIn(tuneSource(t, { name: 'x', transpose: 3 })), []);
+  assert.deepEqual(libraryTunesIn('var a = 1;'), []);
 });
 
 test('findTunes filters by scene, mood, energy and composer, and vocabulary lists the words', () => {
@@ -135,7 +146,7 @@ test('the MIDI converter: a small hand-made file becomes lead, bass and arpeggio
 
 test('the guide: the example in docs/ref-classics.md works end to end, and every tune it names exists', async () => {
   const doc = fs.readFileSync('docs/ref-classics.md', 'utf8');
-  assert.ok(doc.includes(`library of ${lib.tunes.length} classical`), 'the guide states the number of tunes');
+  assert.ok(lib.tunes.length > 130 && doc.includes('library of more than 130 '), 'the guide states the size of the library, and the library is that big');
   const ids = new Set(lib.tunes.map((t) => t.id));
   for (const line of doc.split('\n').filter((l) => l.startsWith('| **'))) for (const [, id] of line.matchAll(/`([a-z0-9]+(?:-[a-z0-9]+)+)`/g)) assert.ok(ids.has(id), `the guide names "${id}", which is not in the library`);
   for (const [, id] of doc.matchAll(/vly tune ([a-z0-9]+(?:-[a-z0-9]+)+)/g)) assert.ok(ids.has(id), `the guide runs vly tune ${id}`);

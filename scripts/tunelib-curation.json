@@ -1565,5 +1565,1016 @@
 "energy": 2,
 "note": "A neat, courtly dance with a four-square tune: simple enough for a tutorial, polite enough for a castle hall.",
 "bpm": 104
+},
+{
+"id": 1888,
+"slug": "hall-of-the-mountain-king",
+"title": "In the Hall of the Mountain King (Grieg, Peer Gynt)",
+"tags": [
+"creeping",
+"building",
+"sinister",
+"ostinato"
+],
+"scenes": [
+"chase",
+"dungeon",
+"tension",
+"sneak",
+"boss-approach"
+],
+"energy": 4,
+"note": "The famous creeping theme: the same short phrase repeated over a pedal bass, higher and faster each time. It begins softly (sneaking) and is meant to accelerate: start at this tempo and lower music_tempo every pass for a chase that gets out of hand.",
+"bpm": 116,
+"transpose": 12,
+"legato": true
+},
+{
+"id": 2014,
+"slug": "march-of-the-dwarfs",
+"title": "March of the Dwarfs / Troldtog (Grieg)",
+"tags": [
+"stomping",
+"grotesque",
+"march"
+],
+"scenes": [
+"dungeon",
+"boss-approach",
+"cave",
+"march",
+"comic"
+],
+"energy": 4,
+"note": "A stomping, mischievous march with a chromatic twist: a good cave, mine or mountain-troll level. Lead and bass trade quickly.",
+"bpm": 112
+},
+{
+"id": 781,
+"slug": "wedding-day-at-troldhaugen",
+"title": "Wedding Day at Troldhaugen (Grieg)",
+"tags": [
+"festive",
+"joyful",
+"bright"
+],
+"scenes": [
+"festival",
+"title",
+"victory",
+"ballroom",
+"village"
+],
+"energy": 3,
+"note": "A joyful, flowing wedding piece with a singing tune. A bright title or a village celebration.",
+"bpm": 96
+},
+{
+"id": 246,
+"slug": "ases-death",
+"title": "Åse's Death (Grieg, Peer Gynt)",
+"tags": [
+"mourning",
+"slow",
+"solemn"
+],
+"scenes": [
+"sad",
+"ending",
+"ceremony",
+"graveyard"
+],
+"energy": 1,
+"note": "A slow, solemn lament in strings: a funeral or a loss. Very simple and heavy; a tune for the saddest beat of a story.",
+"bpm": 54,
+"transpose": 12
+},
+{
+"id": 109,
+"slug": "greensleeves",
+"title": "Greensleeves (traditional, lute setting)",
+"tags": [
+"wistful",
+"modal",
+"old-english",
+"lilting"
+],
+"scenes": [
+"hub",
+"tavern",
+"night",
+"sad-sweet",
+"menu"
+],
+"energy": 2,
+"note": "The old English ballad in a lute setting: a minor-mode lilt in 6/8. Familiar and warm. Use it for a tavern, an old town or a quiet reflective stage.",
+"bpm": 84
+},
+{
+"id": 529,
+"slug": "red-apple-rag",
+"title": "Red Apple Rag (traditional fiddle tune)",
+"tags": [
+"hoedown",
+"bouncy",
+"cheerful"
+],
+"scenes": [
+"farm",
+"explore",
+"comic",
+"minigame",
+"market"
+],
+"energy": 4,
+"note": "An American old-time fiddle tune: a bouncing, jig-like hoedown. For a farm, a barn dance or a cheerful caper.",
+"bpm": 112
+},
+{
+"id": 510,
+"slug": "soldiers-joy",
+"title": "Soldier's Joy (traditional fiddle tune)",
+"tags": [
+"hoedown",
+"brisk",
+"merry"
+],
+"scenes": [
+"farm",
+"camp",
+"festival",
+"minigame",
+"comic"
+],
+"energy": 4,
+"note": "A very old fiddle tune used for country dances in Britain and America. Quick, merry and instantly danceable.",
+"bpm": 120
+},
+{
+"id": 1020,
+"slug": "aamulla-varhain",
+"title": "Aamulla varhain (Finnish folk song)",
+"tags": [
+"folk",
+"gentle",
+"nordic"
+],
+"scenes": [
+"hub",
+"meadow",
+"calm",
+"village"
+],
+"energy": 2,
+"note": "A gentle Finnish folk song (\"early in the morning\"): a quiet, northern, folk-song feel for a village at dawn.",
+"bpm": 80
+},
+{
+"id": 888,
+"slug": "oats-and-beans",
+"title": "Oats and Beans and Barley Grow (traditional)",
+"tags": [
+"rustic",
+"playful",
+"simple"
+],
+"scenes": [
+"farm",
+"meadow",
+"minigame",
+"tutorial"
+],
+"energy": 3,
+"note": "A simple English children's singing game: a bouncy, easy tune for a farm or an early, friendly level.",
+"bpm": 84
+},
+{
+"id": 814,
+"slug": "john-barleycorn",
+"title": "John Barleycorn (English folk song)",
+"tags": [
+"folk",
+"earthy",
+"modal"
+],
+"scenes": [
+"farm",
+"tavern",
+"hub",
+"night"
+],
+"energy": 2,
+"note": "A strong English folk melody about the barley harvest; earthy and a little dark. A tavern or a harvest festival.",
+"bpm": 84
+},
+{
+"id": 889,
+"slug": "water-of-tyne",
+"title": "The Water of Tyne (northern English folk song)",
+"tags": [
+"yearning",
+"folk",
+"gentle"
+],
+"scenes": [
+"sad-sweet",
+"night",
+"water",
+"calm"
+],
+"energy": 1,
+"note": "A yearning ballad: a woman waiting for her love across the river. Slow and simple.",
+"bpm": 66
+},
+{
+"id": 376,
+"slug": "flee-as-a-bird",
+"title": "Flee as a Bird (traditional)",
+"tags": [
+"plaintive",
+"serene",
+"soaring"
+],
+"scenes": [
+"sad-sweet",
+"calm",
+"ending",
+"night"
+],
+"energy": 1,
+"note": "A plaintive, soaring melody; good for a quiet departure, a bird scene or an ending.",
+"bpm": 66
+},
+{
+"id": 1003,
+"slug": "its-me-oh-lord",
+"title": "It's Me, O Lord (traditional spiritual)",
+"tags": [
+"gospel",
+"earnest",
+"warm"
+],
+"scenes": [
+"ending",
+"credits",
+"ceremony",
+"calm"
+],
+"energy": 2,
+"note": "A gospel spiritual in four parts: earnest and warm. For an ending, a memorial or a quiet moment of thanks.",
+"bpm": 72
+},
+{
+"id": 1283,
+"slug": "new-britain",
+"title": "New Britain, the tune of \"Amazing Grace\" (traditional)",
+"tags": [
+"hymn",
+"warm",
+"pentatonic",
+"noble"
+],
+"scenes": [
+"ending",
+"credits",
+"ceremony",
+"calm",
+"hub"
+],
+"energy": 2,
+"note": "The tune known as Amazing Grace: a pentatonic melody that is among the easiest in the world to remember. For an ending, a memorial or a gentle moment of hope.",
+"bpm": 72
+},
+{
+"id": 1300,
+"slug": "veni-emmanuel",
+"title": "Veni Emmanuel (O Come, O Come Emmanuel)",
+"tags": [
+"modal",
+"longing",
+"solemn"
+],
+"scenes": [
+"title",
+"ceremony",
+"winter",
+"night",
+"sad-sweet"
+],
+"energy": 2,
+"note": "An old plainchant-derived tune in a minor mode, long and yearning. Winter, a procession, a quiet title.",
+"bpm": 72
+},
+{
+"id": 1243,
+"slug": "the-first-noel",
+"title": "The First Noel (traditional carol)",
+"tags": [
+"carol",
+"warm",
+"winter"
+],
+"scenes": [
+"winter",
+"festival",
+"ending",
+"hub"
+],
+"energy": 2,
+"note": "The carol, in four-part harmony. For a winter scene or a seasonal ending.",
+"bpm": 84
+},
+{
+"id": 905,
+"slug": "good-king-wenceslas",
+"title": "Good King Wenceslas (traditional carol tune)",
+"tags": [
+"carol",
+"marching",
+"winter"
+],
+"scenes": [
+"winter",
+"march",
+"festival",
+"hub"
+],
+"energy": 3,
+"note": "A walking, wintry carol: the tune is steady and square, and loops well. A snowy journey.",
+"bpm": 96
+},
+{
+"id": 644,
+"slug": "holly-and-the-ivy",
+"title": "The Holly and the Ivy (traditional carol)",
+"tags": [
+"carol",
+"lilting",
+"winter"
+],
+"scenes": [
+"winter",
+"festival",
+"hub",
+"tavern"
+],
+"energy": 3,
+"note": "A lilting English carol: a folk-dance feel in 3/4 or 6/8. A winter fair.",
+"bpm": 92
+},
+{
+"id": 1236,
+"slug": "dundee",
+"title": "Dundee (Scottish psalm tune)",
+"tags": [
+"hymn",
+"plain",
+"old"
+],
+"scenes": [
+"ceremony",
+"ending",
+"credits",
+"calm"
+],
+"energy": 2,
+"note": "A sturdy old Scottish psalm tune: square and plain; a good memorial or a quiet title.",
+"bpm": 72
+},
+{
+"id": 1291,
+"slug": "st-denio",
+"title": "St. Denio (Welsh hymn tune)",
+"tags": [
+"hymn",
+"majestic",
+"bright"
+],
+"scenes": [
+"title",
+"ceremony",
+"victory",
+"ending"
+],
+"energy": 3,
+"note": "A bright Welsh hymn tune (\"Immortal, invisible\"): confident and majestic.",
+"bpm": 84
+},
+{
+"id": 527,
+"slug": "thaxted",
+"title": "Thaxted (Holst, the Jupiter tune)",
+"tags": [
+"noble",
+"broad",
+"patriotic"
+],
+"scenes": [
+"title",
+"ceremony",
+"victory",
+"ending"
+],
+"energy": 3,
+"note": "The broad, noble tune from Holst's \"Jupiter\" set as a hymn: a royal, expansive theme. Holst died in 1934.",
+"bpm": 84
+},
+{
+"id": 1299,
+"slug": "tryggare-kan-ingen-vara",
+"title": "Tryggare kan ingen vara (Swedish hymn tune)",
+"tags": [
+"hymn",
+"nordic",
+"calm"
+],
+"scenes": [
+"calm",
+"night",
+"ending",
+"hub"
+],
+"energy": 1,
+"note": "A plain, calm Swedish hymn tune; a peaceful ending.",
+"bpm": 66
+},
+{
+"id": 1240,
+"slug": "es-ist-ein-ros",
+"title": "Es ist ein Ros entsprungen (A Rose Has Sprung)",
+"tags": [
+"carol",
+"tender",
+"german"
+],
+"scenes": [
+"winter",
+"night",
+"calm",
+"ending"
+],
+"energy": 1,
+"note": "A tender German carol, in four parts. A quiet winter night.",
+"bpm": 66
+},
+{
+"id": 220,
+"slug": "burgmuller-la-chasse",
+"title": "La Chasse, Op. 100 No. 9 (Burgmüller)",
+"tags": [
+"galloping",
+"hunting",
+"bright"
+],
+"scenes": [
+"chase-light",
+"explore",
+"forest",
+"minigame"
+],
+"energy": 4,
+"note": "A galloping hunting piece with horn-call figures in 6/8: forest, hunt, a light-hearted chase.",
+"bpm": 126
+},
+{
+"id": 225,
+"slug": "burgmuller-la-styrienne",
+"title": "La Styrienne, Op. 100 No. 14 (Burgmüller)",
+"tags": [
+"dance",
+"rustic",
+"lilting"
+],
+"scenes": [
+"festival",
+"village",
+"market",
+"minigame"
+],
+"energy": 3,
+"note": "A rustic Styrian dance: a lilting folk-dance melody. A village fair.",
+"bpm": 104
+},
+{
+"id": 203,
+"slug": "burgmuller-arabesque",
+"title": "L'Arabesque, Op. 100 No. 2 (Burgmüller)",
+"tags": [
+"light",
+"quick",
+"sparkling"
+],
+"scenes": [
+"explore",
+"minigame",
+"market",
+"comic"
+],
+"energy": 3,
+"note": "A light, quick piece in minor with a bouncing line; a good running or collecting stage.",
+"bpm": 120
+},
+{
+"id": 218,
+"slug": "burgmuller-pastorale",
+"title": "La Pastorale, Op. 100 No. 3 (Burgmüller)",
+"tags": [
+"pastoral",
+"gentle",
+"flowing"
+],
+"scenes": [
+"meadow",
+"hub",
+"farm",
+"calm"
+],
+"energy": 2,
+"note": "A gentle pastoral: shepherd's country feeling in 6/8.",
+"bpm": 92
+},
+{
+"id": 222,
+"slug": "burgmuller-bergeronnette",
+"title": "La Bergeronnette, Op. 100 No. 21 (Burgmüller)",
+"tags": [
+"light",
+"tripping",
+"birdlike"
+],
+"scenes": [
+"meadow",
+"explore",
+"forest",
+"comic"
+],
+"energy": 3,
+"note": "A tripping little piece: \"the wagtail\". A bird, a garden, a light stage.",
+"bpm": 108
+},
+{
+"id": 227,
+"slug": "burgmuller-ballade",
+"title": "Ballade, Op. 100 No. 15 (Burgmüller)",
+"tags": [
+"story",
+"minor",
+"narrative"
+],
+"scenes": [
+"title",
+"tension",
+"night",
+"sad-sweet"
+],
+"energy": 3,
+"note": "A story-telling piece with a minor opening and a bright turn: it suits a story-driven intro or a mystery.",
+"bpm": 104
+},
+{
+"id": 223,
+"slug": "burgmuller-adieu",
+"title": "L'Adieu, Op. 100 No. 12 (Burgmüller)",
+"tags": [
+"tender",
+"farewell",
+"calm"
+],
+"scenes": [
+"ending",
+"sad-sweet",
+"calm",
+"night"
+],
+"energy": 1,
+"note": "\"The farewell\": gentle and tender. A short farewell scene or an ending.",
+"bpm": 72
+},
+{
+"id": 216,
+"slug": "burgmuller-courant-limpide",
+"title": "Le Courant Limpide, Op. 100 No. 7 (Burgmüller)",
+"tags": [
+"flowing",
+"clear",
+"water"
+],
+"scenes": [
+"water",
+"explore",
+"calm",
+"hub"
+],
+"energy": 2,
+"note": "\"The clear stream\": a flowing, easy figure. Water, a river, a calm exploring stage.",
+"bpm": 104
+},
+{
+"id": 229,
+"slug": "burgmuller-babillarde",
+"title": "La Babillarde, Op. 100 No. 4 (Burgmüller)",
+"tags": [
+"chattering",
+"light",
+"playful"
+],
+"scenes": [
+"comic",
+"market",
+"minigame",
+"tutorial"
+],
+"energy": 3,
+"note": "\"The chatterbox\": quick, light and talkative. A market, a gossip scene, a comic stage.",
+"bpm": 116
+},
+{
+"id": 230,
+"slug": "burgmuller-inquietude",
+"title": "Inquiétude, Op. 100 No. 18 (Burgmüller)",
+"tags": [
+"restless",
+"anxious",
+"minor"
+],
+"scenes": [
+"tension",
+"chase-light",
+"dungeon",
+"night"
+],
+"energy": 3,
+"note": "\"Restlessness\": an anxious, rolling minor figure. A low-key tense stage.",
+"bpm": 112
+},
+{
+"id": 221,
+"slug": "burgmuller-tendre-fleur",
+"title": "Tendre Fleur, Op. 100 No. 10 (Burgmüller)",
+"tags": [
+"tender",
+"sweet",
+"gentle"
+],
+"scenes": [
+"calm",
+"meadow",
+"hub",
+"ending"
+],
+"energy": 2,
+"note": "\"Tender flower\": sweet and gentle.",
+"bpm": 92
+},
+{
+"id": 1653,
+"slug": "mendelssohn-scherzo-e-minor",
+"title": "Scherzo in E minor (Mendelssohn)",
+"tags": [
+"fairy",
+"quick",
+"airy",
+"minor"
+],
+"scenes": [
+"forest",
+"night",
+"explore",
+"chase-light",
+"haunted"
+],
+"energy": 4,
+"note": "Quick and airy: the sound of fairies and elves (Mendelssohn also wrote \"A Midsummer Night's Dream\"). A forest at night, a light chase.",
+"bpm": 132,
+"transpose": -12
+},
+{
+"id": 1741,
+"slug": "venetian-gondola-song",
+"title": "Venetian Gondola Song, Op. 30 No. 6 (Mendelssohn)",
+"tags": [
+"barcarolle",
+"rocking",
+"tender"
+],
+"scenes": [
+"water",
+"boat",
+"night",
+"sad-sweet",
+"calm"
+],
+"energy": 2,
+"note": "A barcarolle: a rocking 6/8 gondola rhythm with a singing melody over it. A canal, a boat, a moonlit river.",
+"bpm": 72
+},
+{
+"id": 592,
+"slug": "mendelssohn-volkslied",
+"title": "Song Without Words Op. 53 No. 5, \"Folk Song\" (Mendelssohn)",
+"tags": [
+"folk-like",
+"plain",
+"singing"
+],
+"scenes": [
+"hub",
+"meadow",
+"calm",
+"menu"
+],
+"energy": 2,
+"note": "A simple, folk-like melody over steady chords.",
+"bpm": 92
+},
+{
+"id": 1744,
+"slug": "mendelssohn-op85-1",
+"title": "Song Without Words Op. 85 No. 1 (Mendelssohn)",
+"tags": [
+"gentle",
+"flowing",
+"warm"
+],
+"scenes": [
+"hub",
+"calm",
+"menu",
+"explore"
+],
+"energy": 2,
+"note": "A gently flowing song without words.",
+"bpm": 84
+},
+{
+"id": 610,
+"slug": "thunder-and-lightning-polka",
+"title": "Thunder and Lightning Polka (Johann Strauss II)",
+"tags": [
+"polka",
+"boisterous",
+"comic"
+],
+"scenes": [
+"comic",
+"storm",
+"minigame",
+"festival",
+"chase-light"
+],
+"energy": 4,
+"note": "A boisterous polka with thunder-claps: a comic storm, a frantic kitchen or a slapstick chase.",
+"bpm": 132
+},
+{
+"id": 139,
+"slug": "scarlatti-sonata-c",
+"title": "Sonata in C major (D. Scarlatti, harpsichord)",
+"tags": [
+"bright",
+"crisp",
+"baroque"
+],
+"scenes": [
+"hub",
+"explore",
+"minigame",
+"menu"
+],
+"energy": 3,
+"note": "A bright, crisp harpsichord sonata: clear and tidy, a good tutorial or puzzle background.",
+"bpm": 108
+},
+{
+"id": 232,
+"slug": "kuhlau-sonatine-allegro",
+"title": "Sonatina Op. 20 No. 1, Allegro (Kuhlau)",
+"tags": [
+"classical",
+"neat",
+"cheerful"
+],
+"scenes": [
+"tutorial",
+"hub",
+"minigame",
+"explore"
+],
+"energy": 3,
+"note": "A neat, cheerful classical sonatina: a clear tune with simple harmony. A friendly early stage.",
+"bpm": 116
+},
+{
+"id": 234,
+"slug": "kuhlau-sonatine-rondo",
+"title": "Sonatina Op. 20 No. 1, Rondo (Kuhlau)",
+"tags": [
+"classical",
+"playful",
+"bouncing"
+],
+"scenes": [
+"minigame",
+"comic",
+"explore",
+"tutorial"
+],
+"energy": 3,
+"note": "A playful rondo: a bouncing tune that comes back. A good loop.",
+"bpm": 112
+},
+{
+"id": 407,
+"slug": "rameau-les-sauvages",
+"title": "Les Sauvages (Rameau)",
+"tags": [
+"exotic",
+"stamping",
+"lively"
+],
+"scenes": [
+"jungle",
+"tribal",
+"market",
+"explore",
+"comic"
+],
+"energy": 4,
+"note": "A rhythmic baroque dance depicting \"savages\": a stamping, catchy tune. A jungle, a tribal market, an expedition.",
+"bpm": 120
+},
+{
+"id": 414,
+"slug": "rameau-tendres-plaintes",
+"title": "Les Tendres Plaintes (Rameau)",
+"tags": [
+"tender",
+"sighing",
+"baroque"
+],
+"scenes": [
+"calm",
+"sad-sweet",
+"night",
+"hub"
+],
+"energy": 1,
+"note": "\"The tender complaints\": a sighing, gentle baroque rondeau.",
+"bpm": 72
+},
+{
+"id": 487,
+"slug": "rameau-tambourin",
+"title": "Tambourin (Rameau)",
+"tags": [
+"dance",
+"brisk",
+"drone"
+],
+"scenes": [
+"festival",
+"market",
+"comic",
+"minigame"
+],
+"energy": 4,
+"note": "A drone-bass dance imitating pipe and tabor: brisk and rustic.",
+"bpm": 120
+},
+{
+"id": 191,
+"slug": "pleyel-rondo",
+"title": "Rondo (Pleyel)",
+"tags": [
+"bright",
+"classical",
+"neat"
+],
+"scenes": [
+"hub",
+"tutorial",
+"explore",
+"minigame"
+],
+"energy": 3,
+"note": "A bright classical rondo: neat and friendly.",
+"bpm": 116
+},
+{
+"id": 898,
+"slug": "albeniz-rumores-de-la-caleta",
+"title": "Rumores de la Caleta (Albéniz)",
+"tags": [
+"spanish",
+"guitar-like",
+"warm"
+],
+"scenes": [
+"hub",
+"market",
+"night",
+"beach",
+"explore"
+],
+"energy": 3,
+"note": "A Spanish malagueña: guitar-like repeated notes over a flamenco colour. A southern town or a beach evening.",
+"bpm": 104
+},
+{
+"id": 2162,
+"slug": "bartok-romanian-folk-dance",
+"title": "Romanian Folk Dance (Bartók)",
+"tags": [
+"folk",
+"stomping",
+"angular"
+],
+"scenes": [
+"festival",
+"market",
+"comic",
+"explore"
+],
+"energy": 4,
+"note": "A stamping, angular folk dance with modal colour. A rural fair.",
+"bpm": 104
+},
+{
+"id": 1985,
+"slug": "echigo-jishi",
+"title": "Echigo Jishi (Japanese lion dance, koto)",
+"tags": [
+"pentatonic",
+"lively",
+"festival"
+],
+"scenes": [
+"festival",
+"market",
+"explore",
+"comic"
+],
+"energy": 4,
+"note": "A traditional lion-dance piece: lively and rhythmic, in a pentatonic colour. A very different sound world from the European pieces; good for a festival or a Japanese-set stage.",
+"bpm": 112
+},
+{
+"id": 1971,
+"slug": "sakura-miyotote",
+"title": "Sakura-Miyotote (Japanese traditional, koto)",
+"tags": [
+"pentatonic",
+"blossom",
+"gentle"
+],
+"scenes": [
+"calm",
+"meadow",
+"hub",
+"spring"
+],
+"energy": 2,
+"note": "A traditional koto piece in a pentatonic mode: calm and open. Spring, a garden, a shrine.",
+"bpm": 80
+},
+{
+"id": 1765,
+"slug": "chidori-meimei",
+"title": "Chidori Meimei (Japanese traditional, shamisen)",
+"tags": [
+"pentatonic",
+"plover",
+"light"
+],
+"scenes": [
+"water",
+"explore",
+"night",
+"calm"
+],
+"energy": 2,
+"note": "A shamisen piece named for plovers: light, plucked, sparse. A shore or a calm night.",
+"bpm": 90,
+"transpose": 12
+},
+{
+"id": 1961,
+"slug": "gonbe-ga-tanemaku",
+"title": "Gonbe ga Tanemaku (Japanese folk song)",
+"tags": [
+"folk",
+"playful",
+"pentatonic"
+],
+"scenes": [
+"farm",
+"meadow",
+"minigame",
+"hub"
+],
+"energy": 3,
+"note": "A Japanese folk song about a farmer sowing seeds: a simple, playful tune.",
+"bpm": 100,
+"transpose": 12
 }
 ]

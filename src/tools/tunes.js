@@ -85,3 +85,17 @@ export function tuneSource(t, o = {}) {
   const credit = `// ${t.title}: a public-domain composition by ${t.composer}, converted from the Mutopia Project edition ${t.sourceUrl} (${t.publisher}).\n// Put the composer's name on your credits or title screen.\n`;
   return credit + songToVly(song, name);
 }
+
+/** Which library tunes does this source text play with their lead notes unchanged? (a run of 14 pairs from the middle of the lead appears as it is) */
+export function libraryTunesIn(text) {
+  const flat = String(text).replace(/\s+/g, '');
+  if (!/btable/.test(flat)) return [];
+  const hit = [];
+  for (const t of loadTunes().tunes) {
+    const pairs = t.lead.map(([n, d]) => `${n},${d}`);
+    if (pairs.length < 20) continue;
+    const at = (k) => pairs.slice(k, k + 14).join(',');
+    if ([Math.floor(pairs.length / 3), Math.floor(pairs.length / 2), Math.floor(pairs.length * 2 / 3)].some((k) => flat.includes(at(k)))) hit.push(t.id);
+  }
+  return hit;
+}

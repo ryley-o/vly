@@ -1,6 +1,6 @@
 # Reference: public-domain melodies, ready to play (`vly tune`)
 
-Read this when your game needs music and you want a tune that is **already good**, not one you have to invent note by note. `vly tune` is a library of 83 classical, ragtime and march melodies, each already converted to VLY-1 music data (a lead, a bass and an arpeggio voice) with notes on where it fits, how fast it is and how loud it feels. It is the answer to "the music was original but did not land": a melody that centuries of listeners have already kept is a better starting point than a fresh melody that nobody has tested.
+Read this when your game needs music and you want a tune that is **already good**, not one you have to invent note by note. `vly tune` is a library of more than 130 classical, ragtime, march, folk, carol and hymn melodies, each already converted to VLY-1 music data (a lead, a bass and an arpeggio voice) with notes on where it fits, how fast it is and how loud it feels. It is the answer to "the music was original but did not land": a melody that centuries of listeners have already kept is a better starting point than a fresh melody that nobody has tested.
 
 It sits beside `vly docs ref-music` (how the four channels work, loops and variety, drums, writing your own). Read ref-music section 2b for the order of preference; this guide is how to do option 2 well: **an arranged public-domain tune that fits your game's world, transformed so it sounds like your game.**
 
@@ -28,7 +28,7 @@ Every tune is **32 to 48 seconds** long before it loops. Use `--bars a-b` for a 
 
 ## 2. Licence and credit (the careful version)
 
-What we did: every tune comes from the [Mutopia Project](https://www.mutopiaproject.org/), which publishes typeset scores with MIDI files and states the licence **per piece**. We included only pieces whose page says *Public Domain*, and `sourceUrl` in `vly tune <id>` takes you to that page. Every composer is long dead (the most recent, Sousa, died in 1932; Satie 1925, Fauré 1924, Debussy 1918, Joplin 1917) and every composition was published before 1910, so the compositions are free to use in the United States and in countries that protect works for the author's life plus 70 years.
+What we did: every tune comes from the [Mutopia Project](https://www.mutopiaproject.org/), which publishes typeset scores with MIDI files and states the licence **per piece**. We included only pieces whose page says *Public Domain*, and `sourceUrl` in `vly tune <id>` takes you to that page. Every named composer died in 1945 or earlier (the latest are Bartók, 1945, and Holst, 1934; then Sousa 1932, Satie 1925, Fauré 1924, Debussy 1918, Joplin 1917), and every composition was published before 1925. Folk songs, carols and hymn tunes are traditional: no author, and the four-part or piano setting is the Mutopia contributor's own public-domain dedication. So the compositions are free in the United States (works published before 1931) and in countries that protect works for the author's life plus 70 years.
 
 What you must still do:
 
@@ -58,21 +58,27 @@ A guide to the scenes (the full list: `vly tune --scene <word>`):
 
 | Scene | Good starting points |
 |---|---|
-| **Title (bright)** | `eine-kleine-nachtmusik`, `liberty-bell-march`, `ode-to-joy`, `schubert-marche-militaire`, `royal-fireworks` |
+| **Title (bright)** | `wedding-day-at-troldhaugen`, `eine-kleine-nachtmusik`, `liberty-bell-march`, `ode-to-joy`, `schubert-marche-militaire`, `royal-fireworks` |
 | **Title (dramatic)** | `toccata-and-fugue-dm` (first bars as a sting), `symphony-5-reduction`, `pathetique-1` |
-| **Hub, town, menu** | `mozart-k331-theme`, `bach-minuet-in-g`, `handel-gavotte`, `bach-bourree-english-suite`, `sun-flower-slow-drag`, `peacherine-rag`, `an-die-musik` |
-| **Meadow, farm, village** | `bach-sheep-may-safely-graze`, `heidenroslein`, `seasons-august`, `glueckes-genug` |
-| **Exploring, adventure** | `etude-op10-1` (rolling), `mozart-gigue`, `bach-bourree-e-minor`, `von-fremden-landern` (a journey begins), `arabesque-1` |
-| **Platformer, comic, caper** | `maple-leaf-rag`, `the-easy-winners`, `elite-syncopations`, `breeze-from-alabama`, `minute-waltz`, `rondo-alla-turca` |
-| **Water, boat, lake** | `auf-dem-wasser-zu-singen`, `die-forelle`, `etude-op25-1`, `bach-prelude-in-c`, `clair-de-lune` |
-| **Night, calm, sleep** | `gymnopedie-1`, `gymnopedie-2`, `clair-de-lune`, `schubert-wiegenlied`, `faure-berceuse`, `traumerei` |
+| **Hub, town, menu** | `mozart-k331-theme`, `scarlatti-sonata-c`, `kuhlau-sonatine-allegro`, `mendelssohn-op85-1`, `bach-minuet-in-g`, `handel-gavotte`, `bach-bourree-english-suite`, `sun-flower-slow-drag`, `peacherine-rag`, `an-die-musik` |
+| **Meadow, farm, village** | `burgmuller-pastorale`, `burgmuller-bergeronnette`, `aamulla-varhain`, `oats-and-beans`, `gonbe-ga-tanemaku`, `bach-sheep-may-safely-graze`, `heidenroslein`, `seasons-august`, `glueckes-genug` |
+| **Farm, camp, barn dance** | `red-apple-rag`, `soldiers-joy`, `john-barleycorn`, `rameau-tambourin` |
+| **Exploring, adventure** | `burgmuller-la-chasse` (a hunt), `mendelssohn-scherzo-e-minor` (a forest at night), `etude-op10-1` (rolling), `mozart-gigue`, `bach-bourree-e-minor`, `von-fremden-landern` (a journey begins), `arabesque-1` |
+| **Platformer, comic, caper** | `thunder-and-lightning-polka`, `burgmuller-babillarde`, `burgmuller-arabesque`, `maple-leaf-rag`, `the-easy-winners`, `elite-syncopations`, `breeze-from-alabama`, `minute-waltz`, `rondo-alla-turca` |
+| **Water, boat, lake** | `venetian-gondola-song`, `burgmuller-courant-limpide`, `auf-dem-wasser-zu-singen`, `die-forelle`, `etude-op25-1`, `bach-prelude-in-c`, `clair-de-lune` |
+| **Night, calm, sleep** | `water-of-tyne`, `flee-as-a-bird`, `es-ist-ein-ros`, `gymnopedie-1`, `gymnopedie-2`, `clair-de-lune`, `schubert-wiegenlied`, `faure-berceuse`, `traumerei` |
 | **Ballroom, party** | `chopin-waltz-bminor`, `traviata-valzer`, `traviata-brindisi`, `beethoven-menuett`, `brahms-waltz-15` |
 | **Market, festival, parade** | `seasons-february`, `napolitan-dance`, `traviata-zingari`, `traviata-mattadori`, `liberty-bell-march`, `el-capitan` |
-| **Tension, dungeon, haunted** | `tempest-1`, `beethoven-quartet-4-1`, `quartettsatz`, `mozart-symphony-25-1`, `mozart-dies-irae` (use sparingly) |
+| **Cave, mine, troll mountain** | `hall-of-the-mountain-king` (it speeds up), `march-of-the-dwarfs` |
+| **Tavern, old town** | `greensleeves`, `john-barleycorn`, `holly-and-the-ivy`, `albeniz-rumores-de-la-caleta` |
+| **Winter, festive season** | `the-first-noel`, `good-king-wenceslas`, `holly-and-the-ivy`, `veni-emmanuel`, `es-ist-ein-ros`, `seasons-january` |
+| **Other sound worlds** | `echigo-jishi`, `sakura-miyotote`, `chidori-meimei` (Japanese traditional: pentatonic), `bartok-romanian-folk-dance`, `rameau-les-sauvages`, `albeniz-rumores-de-la-caleta` (Spanish) |
+| **Tension, dungeon, haunted** | `burgmuller-inquietude`, `tempest-1`, `beethoven-quartet-4-1`, `quartettsatz`, `mozart-symphony-25-1`, `mozart-dies-irae` (use sparingly) |
 | **Chase** | `fantaisie-impromptu`, `erlkonig`, `appassionata-3`, `quartettsatz`, `rondo-alla-turca` (a light chase) |
 | **Boss, final battle** | `pathetique-1`, `symphony-5-reduction`, `appassionata-3`, `erlkonig`, `toccata-and-fugue-dm` |
 | **Victory, fanfare** | `royal-fireworks`, `traviata-brindisi`, `liberty-bell-march`, `ode-to-joy` |
-| **Sad, loss, ending** | `chopin-prelude-4`, `chopin-prelude-20` (12 bars, very strong), `pathetique-2`, `bach-air-on-the-g-string`, `solace`, `bethena`, `mozart-marche-funebre`, `death-and-the-maiden` |
+| **Hymn, ceremony, memorial** | `new-britain` (the Amazing Grace tune), `st-denio`, `thaxted`, `dundee`, `its-me-oh-lord`, `ases-death` |
+| **Sad, loss, ending** | `burgmuller-adieu`, `chopin-prelude-4`, `chopin-prelude-20` (12 bars, very strong), `pathetique-2`, `bach-air-on-the-g-string`, `solace`, `bethena`, `mozart-marche-funebre`, `death-and-the-maiden` |
 
 Do not pick a tune for being famous. A tune everybody knows pulls the player out of your game ("that is the Beethoven one") unless the reference is the joke. Prefer the second tier: `bach-bourree-english-suite` will not distract anyone, and `etude-op10-1` sounds like an adventure without sounding like a quotation.
 
@@ -102,7 +108,16 @@ Rules that held up:
 
 ## 5. Make it yours (transformations that keep the tune and change the feel)
 
-The tune is a starting point. Change at least three of these so the music belongs to your game, and say what you changed in `DESIGN.md`:
+**The library is a starting point, not a soundtrack.** Every other game can start from the same tunes, so what makes the music yours is what you do to it. A game that plays a library tune with its notes unchanged gets an info line from `vly check` that says so. The recipe, in order:
+
+1. **Choose** for the scene and the energy (section 3), not for fame.
+2. **Cut** to the best phrase or two (`--bars`): the tune's hook, not its introduction or its development.
+3. **Transform** at least three of the table below, and keep the first phrase's notes (that is what players recognise).
+4. **Add something of your own**: a motif of 3 to 6 notes (ref-music section 3) played by the arpeggio voice or a second pulse voice over it, a drum part on channel 3, an ending written for your game, or a countermelody.
+5. **Credit** the composer on the title or credits screen, and write in `DESIGN.md` what you changed.
+6. **Check** it (section 7), and listen for the seam when it loops.
+
+The list of changes:
 
 | Change | How | Effect |
 |---|---|---|
@@ -128,7 +143,7 @@ The library is an **automatic reduction** of a piano or ensemble score to three 
 - **Introductions and endings come with the piece.** Several pieces begin with a few bars of accompaniment before the tune enters (the Gymnopedies, Clair de lune, the Brindisi), and an excerpt may end mid-phrase. Use `--bars` to start where the tune starts and to end on a phrase end.
 - **Dense tunes make a busy lead**: `appassionata-3`, `fantaisie-impromptu`, `etude-op10-1` and the Chopin etudes play 8 to 15 notes a second on the lead. That is the sound of the piece, but it can tire a listener fast and it leaves no space for a sound effect.
 - **Tempo and key are estimates.** The tempo is the one we set per piece (a MIDI file often has none), rounded to a whole number of frames per step, so a stated 120 bpm may play at 112. The key name is guessed from the notes (a piece that moves around may be reported as a neighbouring key). Neither affects playing.
-- **The first notes were checked against melodies we know** (*Ode to Joy*, the *Minuet in G*, *Rondo alla Turca*; `test/tunes.test.js`). The other 80 were not checked note by note, only converted and played (every tune compiles, runs without a fault and is audible). **If a tune is the heart of your scene, check its opening against a score you can read before you rely on it**, and tell us (in `DESIGN.md`) if it is wrong.
+- **The first notes were checked against melodies we know** (*Ode to Joy*, the *Minuet in G*, *Rondo alla Turca*, *Greensleeves*, *New Britain*, *Good King Wenceslas*, *Soldier's Joy*; `test/tunes.test.js`). The rest were not checked note by note, only converted and played (every tune compiles, runs without a fault and is audible). **If a tune is the heart of your scene, check its opening against a score you can read before you rely on it**, and tell us (in `DESIGN.md`) if it is wrong.
 
 ## 7. Check it without ears
 
@@ -138,14 +153,25 @@ The library is an **automatic reduction** of a piano or ensemble score to three 
 4. **Check the seam:** play it through twice (`--frames` 2x its length) and look at where the loop restarts: a full stop in the notes sounds like a restart.
 5. **Play it under the game**, with sound effects (they take channel 1, which is why the arpeggio lives there and never the only melody).
 
+## 7b. What indie developers and researchers say (and what it means here)
+
+We searched game-development forums (OpenGameArt, itch.io, GameDev.net) and the research on language models writing music. Summaries, not full texts:
+
+- **The recurring trap is the recording, not the score.** Threads on [OpenGameArt](https://opengameart.org/forumtopic/famous-public-domain-music-scores), [itch.io](https://itch.io/post/15238850) and [GameDev.net](https://nene.gamedev.net/forums/topic/18997-sources-for-public-domain-music) agree: a score being public domain does not make a recording of it public domain, a site calling a recording "public domain" is not proof (one developer reported a copyright claim on exactly that), and you should keep a record of where each track came from. Our answer is the library's design: we convert a *score's* notes into data, and every entry carries its source page.
+- **Developers name the sources we use.** IMSLP is the large score library (rules vary by country and edition), Musopen is for recordings (not for us), and the Mutopia Project is where public-domain scores come with MIDI. The classical preludes (Chopin's Op. 28 No. 4 closes the game *Fez*, an itch.io commenter points out) are a known fit for games.
+- **Folk melodies are public domain, a given setting may not be.** Collections in ABC notation (for example [abcnotation.com's collection index](https://abcnotation.com/tunes), the Nottingham Music Database, and [the alexsosn abc-collection](https://awesome.ecosyste.ms/projects/github.com%2Falexsosn%2Fabc-collection) on GitHub) are large, but their licences differ per collection and per file: the Nottingham database says part of it is not public domain, and some files were made from MIDI. A melody may be free while its arrangement is not, so check each file's notes.
+- **Language models are weak at composing whole pieces unaided.** A 2025 survey says generated music can be syntactically valid but lack harmonic coherence, melodic fluency and form ([arXiv 2509.00132](https://arxiv.org/html/2509.00132v1)); a 2026 preprint on agents that *generate, measure and revise* MIDI against statistics for rhythm, harmony, melody and form ([Libretto](https://huggingface.co/papers/2606.22708.md)) points the same way: start from material with proven structure, and measure what you change. That is why this guide asks you to start from a melody that exists, transform it, and check it with tools (`--notes`, the range checks).
+
 ## 8. Beyond the library
 
 You may want a piece that is not here: a folk song for a harbour, a hymn, another movement.
 
+0. **Look in the listings first.** The Mutopia Project has [Folk](https://ibiblio.org/mutopia/cgibin/make-table.cgi?Style=Folk) and [Traditional](https://www.ibiblio.org/mutopia/cgibin/make-table.cgi?Composer=Traditional) listings, with a licence per piece; many pieces there are not in the library yet.
 1. **Find a source with a stated licence.** The Mutopia Project (filter by licence; open a piece page, read the licence and the composer's dates) offers MIDI and typeset scores. The International Music Score Library Project (IMSLP) is huge but its copyright rules depend on the country and the edition, and a modern edition or arrangement can be protected even when the composer is old: use a score or MIDI whose page states a public-domain or CC0 licence, never an unverified MIDI collection.
 2. **Convert it:** `vly tune --midi piece.mid --bars 1-16 [--bpm 110] [--split 60] [--transpose -2] [--name harbour] [--out harbour.vly]` prints the first notes (compare them with the score), the range and the tempo, and writes the same three btables and play function. `--split` is the MIDI note below which notes count as bass (60 is middle C); lower it for a piece that sits low (a lute or a bass-heavy piece), or raise the whole piece with `--transpose 12`.
-3. **Short, famous, old tunes** (a folk song, a hymn) you may transcribe by hand from a score you can read. Do not trust memory for the notes of a tune: a language model's memory of a melody is often wrong in a few notes, and a few wrong notes make a tune sound broken rather than different. Put the score source in `DESIGN.md`.
-4. **Recordings, samples and sheet music of living composers are not sources.** If you cannot say where a melody came from and when its author died, do not use it.
+3. **Folk songs from an ABC collection:** convert the ABC text to MIDI with the free `abc2midi` tool (part of abcMIDI), then use `vly tune --midi`. Check the collection's licence and the file's own notes first (section 7b); only the tune is free, a collection's typesetting or arrangement may not be.
+4. **Short, famous, old tunes** (a folk song, a hymn) you may transcribe by hand from a score you can read. Do not trust memory for the notes of a tune: a language model's memory of a melody is often wrong in a few notes, and a few wrong notes make a tune sound broken rather than different. Put the score source in `DESIGN.md`.
+5. **Recordings, samples and sheet music of living composers are not sources.** If you cannot say where a melody came from and when its author died, do not use it.
 
 ## What to write down
 
