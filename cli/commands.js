@@ -808,7 +808,7 @@ export const commands = {
           song = midiToSong(bytes, { bars, grid: 'auto', bpm: str('bpm') ? Number(f.bpm) : undefined, split: str('split') ? int(f.split) : undefined, transpose: str('transpose') ? int(f.transpose) : undefined, arp: f['no-arp'] ? false : undefined });
         } catch (e) { throw new CliError(`cannot convert ${f.midi}: ${e.message}`); }
         const name = String(str('name') || path.basename(f.midi).replace(/\.[^.]+$/, '')).replace(/[^a-z0-9_]/gi, '_').replace(/^(\d)/, '_$1').toLowerCase();
-        const src = `// Converted from ${path.basename(f.midi)} by vly tune --midi. Check that this piece is in the public domain (the composition AND this edition) and credit it.\n` + songToVly(song, name);
+        const src = `// Converted from ${path.basename(f.midi)} by vly tune --midi. Check that this piece is in the public domain (the composition AND this edition) and credit it in your listing, not on a play screen.\n` + songToVly(song, name);
         if (str('out')) { fs.mkdirSync(path.dirname(path.resolve(f.out)), { recursive: true }); fs.writeFileSync(f.out, src); }
         const first = song.lead.slice(0, 12).map(([x]) => (x ? noteName(x + 35) : '-')).join(' ');
         const head = `${path.basename(f.midi)}: ${song.ts.num}/${song.ts.den}, ${song.bpm} bpm, key ${song.key.name} (estimated), bars ${bars[0]}-${bars[1]} (${song.bars}), ${Math.round(song.steps * song.framesPerStep / 60)} s, music_tempo(${song.framesPerStep})\nlead ${song.range.lead.join('-')}; first notes: ${first}\nCompare the first notes with a score you can read before you use it.\n`;

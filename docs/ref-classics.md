@@ -32,7 +32,7 @@ What we did: every tune comes from the [Mutopia Project](https://www.mutopiaproj
 
 What you must still do:
 
-1. **Credit the composer** on a title or credits screen (`"Gymnopedie No. 1, Erik Satie"`). It is courtesy, it is honest, and for a game with an arranged tune it is what players expect.
+1. **Credit the composer where credits belong, not in the game.** Music is for enjoying, not for reading: do not print "MUSIC: MOZART" on the title, on a level card or anywhere in play (the owner's verdict on a game that did). Put the composer and piece in the store listing's credits (`"Music: Mozart, Piano Sonata K.331; Handel, Gavotte; adapted for VLY-1"`), in `DESIGN.md` and in the source comment `vly tune --out` writes. If your game already has a credits or about page, add a line there; do not build one just for this.
 2. **Never use a recording, a sample library or somebody else's published arrangement as your source.** A composition and a recording of it have separate copyright clocks: Beethoven's sonata is free, a 1990 recording of it is not, and a modern arrangement may be protected. The library's notes are a mechanical reduction of a public-domain *edition*; the notes on the page are the composer's.
 3. **Do not add a piece to your game because you remember it.** If you want a tune that is not in the library, get it from a score or a MIDI you can trace to a stated licence (section 8), check the composer's death date, and say where it came from in `DESIGN.md`.
 4. **A few entries carry a caveat in their `composer` field** because the attribution to Bach is traditional but doubtful (the Minuet in G is by Petzold, "Bist du bei mir" by Stölzel, and the *Notebook for Anna Magdalena Bach* pieces are of uncertain authorship). Credit them as the field says.
@@ -114,7 +114,7 @@ Rules that held up:
 2. **Cut** to the best phrase or two (`--bars`): the tune's hook, not its introduction or its development.
 3. **Transform** at least three of the table below, and keep the first phrase's notes (that is what players recognise).
 4. **Add something of your own**: a motif of 3 to 6 notes (ref-music section 3) played by the arpeggio voice or a second pulse voice over it, a drum part on channel 3, an ending written for your game, or a countermelody.
-5. **Credit** the composer on the title or credits screen, and write in `DESIGN.md` what you changed.
+5. **Credit** the composer in the listing's credits and `DESIGN.md` (not on a play screen), and write in `DESIGN.md` what you changed.
 6. **Check** it (section 7), and listen for the seam when it loops.
 
 The list of changes:
@@ -175,7 +175,7 @@ You may want a piece that is not here: a folk song for a harbour, a hymn, anothe
 
 ## What to write down
 
-In `DESIGN.md`: the set list (moment, energy, tune id, composer, the changes you made), the motif of your own and where it returns, where each classic came from (`vly tune <id>` prints it), and the credits line for your title or credits screen.
+In `DESIGN.md`: the set list (moment, energy, tune id, composer, the changes you made), the motif of your own and where it returns, where each classic came from (`vly tune <id>` prints it), and the credits line for your store listing (not a play screen).
 
 ## Sources and honesty
 

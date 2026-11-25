@@ -82,7 +82,7 @@ export function tuneSong(t, o = {}) {
 export function tuneSource(t, o = {}) {
   const song = tuneSong(t, o);
   const name = String(o.name || t.id.replace(/-/g, '_')).replace(/[^a-z0-9_]/gi, '_');
-  const credit = `// ${t.title}: a public-domain composition by ${t.composer}, converted from the Mutopia Project edition ${t.sourceUrl} (${t.publisher}).\n// Put the composer's name on your credits or title screen.\n`;
+  const credit = `// ${t.title}: a public-domain composition by ${t.composer}, converted from the Mutopia Project edition ${t.sourceUrl} (${t.publisher}).\n// Credit the composer in your store listing and DESIGN.md (not on a play screen).\n`;
   return credit + songToVly(song, name);
 }
 
