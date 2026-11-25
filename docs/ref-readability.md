@@ -67,6 +67,7 @@ The numbers we use: relative luminance `L = 0.2126 R + 0.7152 G + 0.0722 B` on l
 
 ## 6. Anti-patterns
 
+- **Text the screen edge cuts.** A scrolled background moves every row of its map, including a status line drawn in it: a trial's level label read "-5 THE ROUND" on the 11-wide boards because `scroll(8, 0)` pushed its first character off the screen, and nobody noticed for two revisions. Draw HUD text where the scroll cannot move it (the window layer, or sprites, or shift the text by the scroll), keep every line 8 px inside each edge, and run `vly check`: its `text_clip` check reports any line of text that is partly off the screen (a line cut by a scroll, a label that runs past column 20). Look at the top-left corner of every screen at native size too, on the *widest or most unusual* screen of the game, not on a typical one.
 - A highlight that is a different hue at the same brightness.
 - A cursor so strong that it blanks the item beneath it with no label saying what the item is.
 - A one-pixel outline, or an outline the colour of the cell, the page or the grid.

@@ -141,6 +141,72 @@ export function runCartridge(rom, o = {}) {
  * a letter or digit where a cell holds a font glyph (so text() shows up as readable text), '#' for any other tile with
  * something in it, '@' where a sprite sits, '.' for an empty cell. Reads the layers the way the renderer does.
  */
+/**
+ * Text that the screen edge cuts: lines of font glyphs in the background (or window) map, some of whose 8x8 cells are on the screen and some not
+ * (a status line pushed left by a scrolled background is the classic). Cells of a line are glyph cells with at most two blank cells between them.
+ * Text that is wholly off screen (part of a scrolling world) is not reported. Returns strings such as `"2-5 THE ROUND" loses "2" at the left edge (scroll 8,0)`.
+ */
+export function clippedText(mem) {
+  const lcdc = mem[C.LCDC];
+  const bgOn = lcdc & C.LCDC_BG, winOn = lcdc & C.LCDC_WIN;
+  const scx = mem[C.SCX], scy = mem[C.SCY], wx = mem[C.WX], wy = mem[C.WY];
+  const glyphs = new Map();
+  for (let g = 1; g < C.FONT_TILES; g++) glyphs.set(Array.from(FONT.subarray(g * 16, g * 16 + 16)).join(','), String.fromCharCode(32 + g));
+  const charOf = (cell) => {
+    const t = cell & 0x1ff;
+    return glyphs.get(Array.from(mem.subarray(C.TILE_RAM + t * 16, C.TILE_RAM + t * 16 + 16)).join(',')) ?? null;   // null: not a glyph
+  };
+  const out = [];
+  const lines = (mapBase, place) => {
+    for (let r = 0; r < 32; r++) {
+      const cells = [];
+      for (let c = 0; c < 32; c++) { const a = mapBase + 2 * (r * 32 + c); cells.push(charOf(mem[a] | (mem[a + 1] << 8))); }
+      let c = 0;
+      while (c < 32) {
+        if (cells[c] === null) { c++; continue; }
+        let last = c, k = c + 1;
+        while (k < 32) {
+          if (cells[k] !== null) { last = k; k++; continue; }
+          let j = k; while (j < 32 && cells[j] === null) j++;
+          if (j < 32 && j - k <= 2) k = j; else break;                      // a gap of at most two blank cells stays in the line
+        }
+        const state = [];
+        for (let k = c; k <= last; k++) state.push(place(k, r));          // 'in', 'part' or 'out'
+        const text = Array.from({ length: last - c + 1 }, (_, k) => cells[c + k] ?? ' ').join('');
+        const some = state.some((s) => s !== 'out'), cut = state.some((s) => s !== 'in');
+        if (some && cut && text.trim()) {
+          const first = state.findIndex((s) => s === 'in'), lastIn = state.length - 1 - [...state].reverse().findIndex((s) => s === 'in');
+          const lostL = text.slice(0, Math.max(first, 0)).trim(), lostR = text.slice(lastIn + 1).trim();
+          const parts = [];
+          if (state[0] !== 'in' && first !== 0) parts.push(lostL ? `loses "${lostL}" at the left or top edge` : 'is cut by the left or top edge');
+          if (state[state.length - 1] !== 'in') parts.push(lostR ? `loses "${lostR}" at the right or bottom edge` : 'is cut by the right or bottom edge');
+          if (!parts.length) parts.push('is partly off the screen');
+          out.push(`"${text.trim()}" ${parts.join(' and ')}`);
+        }
+        c = last + 1;
+      }
+    }
+  };
+  const vis = (p0, size, lim) => (p0 >= -2 && p0 + 8 <= lim + 2 ? 'in' : p0 + 8 <= 0 || p0 >= lim ? 'out' : 'part');   // up to 2 px over the edge is a screen shake, not a cut
+  if (bgOn) {
+    lines(C.BG_MAP, (c, r) => {
+      const px = ((c * 8 - scx) % 256 + 256) % 256, py = ((r * 8 - scy) % 256 + 256) % 256;
+      const x0 = px > 248 ? px - 256 : px, y0 = py > 248 ? py - 256 : py;
+      if (winOn && x0 + 4 >= wx && y0 + 4 >= wy) return 'out';           // under the window: not what the player sees
+      const sx = vis(x0, 8, 160), sy = vis(y0, 8, 144);
+      return sx === 'out' || sy === 'out' ? 'out' : sx === 'in' && sy === 'in' ? 'in' : 'part';
+    });
+  }
+  if (winOn) {
+    lines(C.WIN_MAP, (c, r) => {
+      const sx = vis(wx + c * 8, 8, 160), sy = vis(wy + r * 8, 8, 144);
+      return sx === 'out' || sy === 'out' ? 'out' : sx === 'in' && sy === 'in' ? 'in' : 'part';
+    });
+  }
+  const scroll = scx || scy ? ` (scroll ${scx},${scy})` : '';
+  return [...new Set(out)].map((s) => s + scroll);
+}
+
 export function screenText(mem, { sprites: listSprites = false } = {}) {
   const lcdc = mem[C.LCDC];
   const bgOn = lcdc & C.LCDC_BG, winOn = lcdc & C.LCDC_WIN, objOn = lcdc & C.LCDC_OBJ;

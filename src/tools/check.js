@@ -3,7 +3,7 @@
 import { faultSnapshot, firstFaultOf, formatSnapshot } from './snapshot.js';
 import * as C from '../core/constants.js';
 import { toHex } from '../core/sha256.js';
-import { runCartridge, screenText } from './run.js';
+import { runCartridge, screenText, clippedText } from './run.js';
 
 const MASKS = [0, 0, 1, 2, 4, 8, 1 | 4, 1 | 8, 2 | 4, 2 | 8]; // none, up, down, left, right, and the diagonals
 
@@ -107,6 +107,7 @@ export function checkCartridge(rom, o = {}) {
   const monkey = monkeyInput(seed);
   const hashes = new Set(), screens = new Set();
   const notes = new Set();
+  const clips = new Set();
   let maxSprites = 0, maxBlank = 0, maxOverBudget = 0;
   const heavyFrames = [];
   let shrill = 0, voiced = 0;
@@ -128,6 +129,7 @@ export function checkCartridge(rom, o = {}) {
       const st = screenText(m.mem, { sprites: true });
       screens.add(st.text);
       for (const n of st.notes) if (notes.size < 5) notes.add(n);
+      for (const n of clippedText(m.mem)) if (clips.size < 5) clips.add(n);
       const sp = spriteStats(m.mem);
       maxSprites = Math.max(maxSprites, sp.onScreen); maxBlank = Math.max(maxBlank, sp.blank);
     },
@@ -144,6 +146,7 @@ export function checkCartridge(rom, o = {}) {
         const st = screenText(m.mem, { sprites: true });
         screens.add(st.text);
         for (const n of st.notes) if (notes.size < 5) notes.add(n);
+        for (const n of clippedText(m.mem)) if (clips.size < 5) clips.add(n);
         const sp = spriteStats(m.mem);
         maxSprites = Math.max(maxSprites, sp.onScreen); maxBlank = Math.max(maxBlank, sp.blank);
       },
@@ -211,6 +214,10 @@ export function checkCartridge(rom, o = {}) {
   // text covered
   if (notes.size) add('overlap', 'warn', `sprites cover text: ${[...notes].join('; ')}`, 'Keep gameplay out of the HUD zone; put the HUD in the window layer; move the sprite or the text.');
   else add('overlap', 'pass', 'no sprite covered text in the sampled frames');
+
+  // text cut by the screen edge (a scrolled background that carries a status line, a label placed too far right or down)
+  if (clips.size) add('text_clip', 'warn', `text is cut off by the screen edge: ${[...clips].join('; ')}`, 'The background scroll moves every row of the map, status text included. Draw the HUD in the window layer, or move the text by the scroll amount, or do not scroll a screen that has text; keep text 8 px inside every edge. (See `vly docs ref-readability`, section 6.)');
+  else add('text_clip', 'pass', 'no text was cut by the screen edge in the sampled frames');
 
   // variety
   if (screens.size < 4) add('variety', 'warn', `the sampled play showed only ${screens.size} distinct screens of tile layout`, 'Real depth shows up as more places and states: stages, menus, game over, win. The careless player may simply not reach them; script a full run with input to be sure, and see the design playbook (depth targets).');

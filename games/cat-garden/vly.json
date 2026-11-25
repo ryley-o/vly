@@ -26,7 +26,7 @@
           "water": 6,
           "bed[0]": 9236
         },
-        "frameHash": "36962b4ba1d1c8351451363cff65f64f4384482d3b66941162d4e7f7e4c00d40",
+        "frameHash": "4eed57410d940485fb02d751b63fb24bc47222e39931081a63669bc177fa2b3a",
         "maxCycles": 80000
       }
     },
@@ -120,7 +120,7 @@
           "cleared": 7,
           "hearts[4]": 1285
         },
-        "frameHash": "b49eb18c95bbac3cd52484e3a99bdd3798f615d4367b6293d1235eb3a96aa3b9"
+        "frameHash": "4006d8814232e88ad8777b5b7240d93ae20d56b5c54826bd3940fe0ccee13e61"
       }
     },
     {
@@ -134,7 +134,7 @@
           "day": 1,
           "won": 0
         },
-        "frameHash": "318444f6d443ac7643fcd7a4293a62bb06a111161615addd52132fbcae1fbf43"
+        "frameHash": "4d346f8502766bce0f42b09d0b8dafcd808f8d6dc8862c0c44cce3c7efbaed05"
       }
     },
     {

@@ -288,7 +288,7 @@ func frame() {
     var r = menu_update();
     if (r == 0) {
       menu_close();
-      menu_open(WIN_MAP, 10, 0, move_names, 4);
+      menu_open(WIN_MAP, 8, 0, move_names, 4);
       state = S_MOVES;
     }
     if (r == 1) { // run: a new encounter, no streak change

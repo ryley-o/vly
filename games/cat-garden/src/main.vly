@@ -440,7 +440,7 @@ func trans_update() {
       if (pend == 2) {
         if (rain_flag) { say("IT RAINED TONIGHT!"); }
         else { hud_fill(1); wtext(0, 1, "GOOD MORNING. DAY"); wprint_u(18, 1, day); msg_t = 170; }
-      } else if (pend == 5) { say2("WELCOME TO", tbl(garden_names, g) + 4); }
+      } else if (pend == 5) { say(tbl(garden_names, g)); }
       else { say(tbl(garden_names, g)); }
     }
   }
