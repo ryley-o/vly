@@ -9,8 +9,10 @@ import { commands, CliError } from './commands.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const BOOLEAN_FLAGS = new Set(['profile', 'tile', 'accept', 
-  'new', 'no-sources', 'no-verify', 'no-publish', 'dry-run', 'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex', 'audio',
+  'new', 'no-sources', 'no-verify', 'no-publish', 'dry-run', 'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex', 'audio', 'list', 'oam',
 ]);
+// flags whose value is optional: `--notes` or `--notes 40`; `--cvd` or `--cvd deutan,gray`
+const OPTIONAL_VALUE = { notes: (v) => /^\d+$/.test(v), cvd: (v) => /^(protan|deutan|tritan|gray|all)(,(protan|deutan|tritan|gray))*$/.test(v) };
 const SHORT = { o: 'out', h: 'help', f: 'frames', i: 'input', s: 'screenshot', j: 'json', v: 'version' };
 
 function parseArgv(argv) {
@@ -23,6 +25,7 @@ function parseArgv(argv) {
       const key = eq >= 0 ? a.slice(2, eq) : a.slice(2);
       if (eq >= 0) args.flags[key] = a.slice(eq + 1);
       else if (BOOLEAN_FLAGS.has(key)) args.flags[key] = true;
+      else if (OPTIONAL_VALUE[key]) { const next = argv[i + 1]; if (next !== undefined && OPTIONAL_VALUE[key](next)) { args.flags[key] = next; i++; } else args.flags[key] = true; }
       else {
         const next = argv[i + 1];
         if (next === undefined) throw new CliError(`flag --${key} needs a value`);

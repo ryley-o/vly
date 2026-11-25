@@ -282,3 +282,23 @@ test('vly contrast and vly highlight: contrast ratios, colour-vision simulation 
   assert.ok(rep.results.find((x) => x.dir === 'DOWN').changedPixels > 0, 'DOWN moves the marker');
   assert.equal(typeof highlightVerdict(rep).ok, 'boolean');
 });
+
+test('the real CLI parses --oam, --notes, --cvd and docs --list without a value', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const cli = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'cli', 'vly.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vly-flags-'));
+  const src = path.join(dir, 'g.vly');
+  fs.writeFileSync(src, 'func init() { load_font(0); lcd(LCD_BG | LCD_OBJ); hide_all_sprites(); tone(0, 440, 12, 0); sprite(0, 20, 20, 65, 0); }\nfunc frame() {}');
+  const run = (...a) => spawnSync('node', [cli, ...a], { encoding: 'utf8' });
+  const r = run('run', src, '--frames', '30', '--oam', '--notes', '--screenshot', path.join(dir, 's.png'), '--cvd');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /sprites on screen \(1 of 64/);
+  assert.match(r.stdout, /ch0: 1 notes/);
+  for (const k of ['protan', 'deutan', 'tritan', 'gray']) assert.ok(fs.existsSync(path.join(dir, `s.${k}.png`)), k);
+  const l = run('docs', 'design', '--list');
+  assert.equal(l.status, 0, l.stderr);
+  assert.match(l.stdout, /The canvas/);
+  const n = run('run', src, '--frames', '30', '--notes', '5');
+  assert.equal(n.status, 0, n.stderr);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
