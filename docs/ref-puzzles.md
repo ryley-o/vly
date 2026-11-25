@@ -60,6 +60,17 @@ A board game or puzzle whose board is a small island in an empty 160 x 144 scree
 6. **Budget the rest of the screen**: at 16 px cells an 8-row board leaves **2 tile rows** for everything else (one above, one below); a 7-row board leaves 4. A status line goes in one row, a strip or a message in the other. The window layer cannot be a strip in the middle of the screen, so use background rows for the HUD.
 7. **Secondary displays are secondary.** CANON's staff of notes mattered less to play than the board did; it became a thin strip. Ask of each extra element whether the player needs it to make the next move.
 
+## 5c. Growing a campaign (a lesson from SHADOW: 30 levels became 90)
+
+Asked to triple a proven puzzle campaign, the agent kept the first 30 levels in place, appended six new worlds of ten, and shipped it. What it learned, and what to copy:
+- **Append, never reorder, and version the save.** Old saves keep their grades on the same levels only if the old levels keep their numbers. Put a layout-version byte in the save, write a one-time `migrate_save()` that moves fields, and keep a test that loads a save from each earlier release.
+- **Every new world needs its own idea.** New worlds that introduced a rule (one-way tiles, levers, a longer delay, a third echo) were good; worlds assembled from "all the rules at once" were the weakest (the last world was made of leftover candidates, with no idea of its own, and its first three levels were near-identical). If the search cannot find ten levels that bite for an idea, ship fewer levels in that world rather than padding it.
+- **A hill-climbing generator converges for small boards and few elements.** With long delays or many elements it found one to three candidates in 100 seconds; plan the search budget per world, run the hard worlds first, and measure how many candidates you got before you design the world around the rule.
+- **Measure similarity, not just solvability.** Reject a candidate whose interior cells match an existing level at a threshold (the trial used 0.72 under any rotation or mirror), and report the most similar pairs; check that the difficulty score never falls from one level to the next inside a new world.
+- **A rule the helper can undo is weaker than a rule that is required.** If the shadow can undo your lever, the level may be solvable without it; test that each level cannot be solved without the new rule (or is much longer without it), not only that it is solvable.
+- **Report the weakest levels honestly** (loose levels have thousands of par routes: a puzzle with thousands of solutions is not sharp) and re-check the level grid, saves and budget (ROM banks, frame cycles, test time) at the new size.
+- `vly highlight` cannot tell a scrolling page from a weak selection (the whole page moves, so the changed pixels do not line up); judge a scrolling grid by eye on its screenshots.
+
 ## 6. Readability on four colours
 
 - **Give each piece a different shape as well as a colour** (circle, diamond, triangle, burst, star); colour alone fails on four shades and for some players.
