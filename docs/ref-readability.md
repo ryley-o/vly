@@ -43,12 +43,12 @@ The numbers we use: relative luminance `L = 0.2126 R + 0.7152 G + 0.0722 B` on l
 6. **A sound** on each move (`sfx_play`) as a redundant channel, never the only one.
 7. **Blink only as an extra**, with both phases visible; never let the off phase hide the cursor.
 
-**Match the strength to the thing selected.** Passing the check is a floor, not a target. After a fix that made a board cursor clearly visible (it inverted the whole cell), the owner's verdict was "much better clarity, but a little extreme contrast". The rule that came out of it:
+**Do not soften a selection by default.** In one puzzle game the board cursor was a full inversion (a cream cell with dark silhouettes and a white frame). The first reaction was "a little extreme", so it was changed to a soft spotlight (about 5:1) with a lilac frame. After playing both, the owner preferred the original: on a puzzle board the cursor is the thing you look at all the time, and the strong version was easier to follow. So:
 
-- **Menus, lists and level pickers** (text rows, one selection, nothing else to read in the cell): use the strong treatment, pattern 1. Full inversion is right here.
-- **A board or grid of similar items** (puzzle cells, a hand of cards, an inventory, a map): the player must keep reading the *item* under the cursor, so a solid block that blanks it, or a flash that outshines everything else on screen, is too much. Use the weakest treatment that still passes under every vision: a two-tone frame on the cell's edge (pattern 2, about 2 pixels), a lifted or outlined item (pattern 4), or a tint that keeps the item's own shape visible. Aim for roughly **3:1 to 7:1** between the selected state and its neighbours rather than the maximum the palette allows, and let the change be a ring or a corner bracket of tens of pixels rather than a whole filled cell.
-- **A cursor that moves quickly** (held direction, many cells per second) should be quieter still, because the eye sees it flash on every step.
-- Check both ends: `vly highlight` for "enough, for every player", and your own screenshot for "not shouting". If a player can read the tile *and* find the cursor, it is right.
+- **Keep the strong treatment (pattern 1 or 2) as the default**, on menus, lists and puzzle boards alike. "Extreme" is not a defect when the player is steering the cursor all the time; being hard to see is.
+- **Soften only for a reason you can show:** the cursor hides the item the player must read (give the item's name in words, as the label line below the board does, before you weaken the cursor), or it flashes on every step of a held direction.
+- **If you do soften it, test both versions with the person** (or keep the strong one): both pass `vly highlight`, so the tool cannot choose for you.
+- Check the other direction too: the label line, so the player always knows *what* the selected item is.
 
 ## 4. Choosing four colours for a screen with a selection
 
@@ -68,7 +68,7 @@ The numbers we use: relative luminance `L = 0.2126 R + 0.7152 G + 0.0722 B` on l
 ## 6. Anti-patterns
 
 - A highlight that is a different hue at the same brightness.
-- A solid, maximum-contrast block over a cell the player has to read (a board cursor that blanks the tile, or the brightest thing on the screen).
+- A cursor so strong that it blanks the item beneath it with no label saying what the item is.
 - A one-pixel outline, or an outline the colour of the cell, the page or the grid.
 - A cursor that exists only in a blink's on phase.
 - Red against green (or green against orange, or blue against purple) with no brightness or shape difference, for good against bad, teams, or selected against not.
