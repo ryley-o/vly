@@ -13,6 +13,7 @@ This playbook says what a good game needs. The reference guides say exactly how,
 | Your game has... | Read | What is in it |
 |---|---|---|
 | a character that runs and jumps through a scrolling level | `vly docs ref-sidescroller` | the exact Super Mario Bros. movement numbers (walk, run, skid, variable jump, air control), collision and corner sliding, how Mario judges enemy contact (falling onto an enemy always stomps), forgiveness, camera, level design philosophy; and `import "std/platformer"`, a tested module that does it |
+| ready-made music: public-domain classical, ragtime and march tunes already converted to VLY-1 | `vly docs ref-classics` and `vly tune` | choosing by mood, scene, energy and tempo, pacing a whole score, transforming a tune so it is yours, licence and credit, converting a MIDI of your own |
 | music (every game) | `vly docs ref-music` | channel roles on this machine, what Kondo, the Baroque-minded Castlevania composers and Uematsu did, public-domain classical pieces to arrange, loop length and variation, mixing for a tiny speaker |
 | **any game, before you choose the idea** | `vly docs ref-originality` | how to invent a mechanic that is simple, elegant and tied to the story: a process with random constraints to escape the first-idea trap, ten elegance tests, being original in several facets at once, and making the levels come from the mechanic |
 | levels (every game with stages) | `vly docs ref-levels` | what makes levels fun: every jump needs a consequence, the four beats, pacing and rest, enemy arrangements, terrain and verticality, a working method, and `vly levels` to find dead screens, flat runs, repeated enemies and jumps with no consequence |
@@ -332,7 +333,7 @@ Players feel the difference between a game that responds and one that merely upd
 
 ## 8. Sound and music
 
-**For the music itself (writing a tune that is remembered, how long it should be, what to borrow from the classics and from public-domain composers) read `vly docs ref-music`.** What follows is the checklist.
+**For the music itself (writing a tune that is remembered, how long it should be, what to borrow from the classics and from public-domain composers) read `vly docs ref-music`; for a melody that already works, `vly tune` (guide `vly docs ref-classics`).** What follows is the checklist.
 
 The machine has 4 channels: **0 and 1 are pulse (square), 2 is triangle, 3 is noise.** Plan them before writing anything:
 
@@ -343,7 +344,7 @@ The machine has 4 channels: **0 and 1 are pulse (square), 2 is triangle, 3 is no
 | 2 triangle | bass line | none |
 | 3 noise | drums (kick and snare as short bursts) | **noise effects** (landing, hit, explosion, engine rumble) |
 
-**Music is part of your game's identity, so write or arrange your own** (`vly docs ref-music`, "Where your music comes from": a motif of your own, or a public-domain tune you arrange and transform). `std/tunes` has five placeholder loops (`tune_play(TUNE_ACTION)`, `TUNE_ADVENTURE`, `TUNE_TITLE`, `TUNE_BOSS`, `TUNE_SPACE`) for an early build, but every game that ships them sounds like every other one, and `vly check` warns about them; build the real score with `std/music` (`music_build` makes long songs out of patterns). Use `std/music` for songs (`music_play`, `music_update`) and `std/sfx` for effects (`sfx_play(SFX_JUMP)`, `sfx_update()` each
+**Music is part of your game's identity, so write or arrange your own** (`vly docs ref-music`, "Where your music comes from": a motif of your own, or a public-domain tune you transform: `vly tune --scene night` lists 83 ready-made ones by mood and scene, `vly docs ref-classics` says how to choose, pace and credit them). `std/tunes` has five placeholder loops (`tune_play(TUNE_ACTION)`, `TUNE_ADVENTURE`, `TUNE_TITLE`, `TUNE_BOSS`, `TUNE_SPACE`) for an early build, but every game that ships them sounds like every other one, and `vly check` warns about them; build the real score with `std/music` (`music_build` makes long songs out of patterns). Use `std/music` for songs (`music_play`, `music_update`) and `std/sfx` for effects (`sfx_play(SFX_JUMP)`, `sfx_update()` each
 frame), which cooperate so effects interrupt the music cleanly and the music comes back.
 
 - **Every event the player causes has its own sound:** jump, land, hit, pickup, power-up, shoot, enemy defeat, menu move,

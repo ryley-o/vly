@@ -1,0 +1,1569 @@
+[
+{
+"id": 528,
+"slug": "ode-to-joy",
+"title": "Ode to Joy (Beethoven)",
+"tags": [
+"joyful",
+"anthem",
+"simple"
+],
+"scenes": [
+"title",
+"victory",
+"ending",
+"festival"
+],
+"energy": 3,
+"note": "The famous theme in four-part harmony; the top line is the tune. Stepwise and singable: the easiest melody on the list to recognise. Works as a title, a level-clear or an ending. Slow it down for solemn, speed it up for celebration."
+},
+{
+"id": 900,
+"slug": "eine-kleine-nachtmusik",
+"title": "Eine kleine Nachtmusik, 1st movement (Mozart)",
+"tags": [
+"bright",
+"elegant",
+"brisk"
+],
+"scenes": [
+"title",
+"explore",
+"castle",
+"ballroom",
+"menu"
+],
+"energy": 4,
+"note": "Fanfare-like opening (a rising arpeggio answered by a falling one) then a lyrical second theme. Elegant and bright; good for a town, a palace or a confident title."
+},
+{
+"id": 614,
+"slug": "mozart-k331-theme",
+"title": "Piano Sonata K.331, theme (Mozart)",
+"tags": [
+"gentle",
+"pastoral",
+"lilting"
+],
+"scenes": [
+"hub",
+"menu",
+"explore",
+"village",
+"calm"
+],
+"energy": 2,
+"note": "A siciliano-like 6/8 theme in A major: gentle and sweet. A fine hub, village or \"a quiet day\" tune; also the theme of a set of six variations if you want a game that develops one tune."
+},
+{
+"id": 108,
+"slug": "rondo-alla-turca",
+"title": "Rondo alla Turca (Mozart)",
+"tags": [
+"lively",
+"exotic",
+"playful",
+"bouncy"
+],
+"scenes": [
+"chase",
+"market",
+"bazaar",
+"minigame",
+"comic"
+],
+"energy": 4,
+"note": "Fast, bouncy, \"Turkish\" (the left hand imitates drums). Great for chases, markets, caper levels. The A section is the famous part; the left hand is busy, so the arp voice is thin.",
+"bpm": 120
+},
+{
+"id": 239,
+"slug": "mozart-gigue",
+"title": "Gigue in G (Mozart)",
+"tags": [
+"bright",
+"dancing",
+"quick"
+],
+"scenes": [
+"explore",
+"minigame",
+"festival"
+],
+"energy": 3,
+"note": "A short, dancing gigue with quick contrapuntal lines; compound time. Use for a lively exploration stage."
+},
+{
+"id": 522,
+"slug": "haydn-austria",
+"title": "Austria / Emperor's Hymn (Haydn)",
+"tags": [
+"stately",
+"hymn",
+"solemn-warm"
+],
+"scenes": [
+"title",
+"ceremony",
+"credits",
+"ending"
+],
+"energy": 2,
+"note": "A stately hymn tune (also the German anthem melody). Good for a ceremony, a coronation, a credits roll. Slow and square: easy to loop.",
+"bpm": 80
+},
+{
+"id": 1864,
+"slug": "royal-fireworks",
+"title": "Music for the Royal Fireworks, Réjouissance (Handel)",
+"tags": [
+"festive",
+"triumphant",
+"fanfare"
+],
+"scenes": [
+"victory",
+"festival",
+"title",
+"parade"
+],
+"energy": 4,
+"note": "A trumpet-led celebration; bright and brisk. Use for a victory screen or a festival level."
+},
+{
+"id": 904,
+"slug": "beethoven-menuett",
+"title": "Minuet in E-flat, WoO 82 (Beethoven)",
+"tags": [
+"courtly",
+"polite",
+"light"
+],
+"scenes": [
+"hub",
+"menu",
+"ballroom",
+"explore"
+],
+"energy": 2,
+"note": "A courtly minuet in 3/4: relaxed, elegant. For a manor, a ballroom or a gentle puzzle."
+},
+{
+"id": 695,
+"slug": "bach-minuet-in-g",
+"title": "Minuet in G (Petzold, in Anna Magdalena's notebook, long attributed to J. S. Bach)",
+"tags": [
+"light",
+"dance",
+"classic"
+],
+"scenes": [
+"hub",
+"explore",
+"menu",
+"tutorial"
+],
+"energy": 2,
+"note": "The best-known beginner minuet. Simple, clear, perfectly suited to four-channel playback. Note: this is the Anna Magdalena Notebook minuet (BWV Anh. 114), now attributed to Christian Petzold; the Mutopia edition is public domain.",
+"composer": "Christian Petzold (c. 1677–1733), long attributed to J. S. Bach"
+},
+{
+"id": 257,
+"slug": "bach-bist-du-bei-mir",
+"title": "Bist du bei mir (BWV 508, attributed to Stölzel)",
+"tags": [
+"tender",
+"warm",
+"slow"
+],
+"scenes": [
+"calm",
+"ending",
+"credits",
+"sad-sweet"
+],
+"energy": 1,
+"note": "A tender slow aria. Good for an ending, a lullaby moment, a loving story beat.",
+"bpm": 64,
+"composer": "Gottfried Heinrich Stölzel (1690–1749), long attributed to J. S. Bach"
+},
+{
+"id": 1794,
+"slug": "bach-sheep-may-safely-graze",
+"title": "Sheep May Safely Graze (J. S. Bach, from BWV 208)",
+"tags": [
+"pastoral",
+"peaceful",
+"serene"
+],
+"scenes": [
+"hub",
+"farm",
+"meadow",
+"calm",
+"ending"
+],
+"energy": 1,
+"note": "A serene pastoral in 3/8-like lilt with a gentle flowing bass. Ideal for a farm, a garden, a sleeping village."
+},
+{
+"id": 5,
+"slug": "bach-prelude-in-c",
+"title": "Prelude in C major, WTC I (J. S. Bach)",
+"tags": [
+"flowing",
+"calm",
+"arpeggiated",
+"meditative"
+],
+"scenes": [
+"hub",
+"explore",
+"night",
+"water",
+"menu",
+"puzzle"
+],
+"energy": 2,
+"note": "Pure broken chords. There is no melody on top, so the \"lead\" will be the top note of each chord: a gentle, constantly moving background (great under puzzle or exploration). Use the lead and bass only; skip the arp voice.",
+"bpm": 72
+},
+{
+"id": 1534,
+"slug": "bach-air-on-the-g-string",
+"title": "Air on the G string (J. S. Bach)",
+"tags": [
+"solemn",
+"sublime",
+"slow"
+],
+"scenes": [
+"ending",
+"credits",
+"night",
+"sad-sweet",
+"ceremony"
+],
+"energy": 1,
+"note": "A slow, singing melody over a walking bass. Solemn and beautiful; for an emotional ending or a night scene."
+},
+{
+"id": 23,
+"slug": "maple-leaf-rag",
+"title": "Maple Leaf Rag (Joplin)",
+"tags": [
+"syncopated",
+"jaunty",
+"cheerful"
+],
+"scenes": [
+"explore",
+"town",
+"platformer",
+"comic",
+"minigame"
+],
+"energy": 4,
+"note": "The classic ragtime: a syncopated melody over an oom-pah bass. Ragtime suits platformers, towns and comic scenes. The left hand is a steady alternation of bass and chord, which maps well to bass + arp.",
+"bpm": 100
+},
+{
+"id": 352,
+"slug": "the-easy-winners",
+"title": "The Easy Winners (Joplin)",
+"tags": [
+"syncopated",
+"swaggering",
+"cheerful"
+],
+"scenes": [
+"explore",
+"town",
+"comic",
+"platformer"
+],
+"energy": 4,
+"note": "A swaggering ragtime with a lively, hummable first strain.",
+"bpm": 100
+},
+{
+"id": 1540,
+"slug": "elite-syncopations",
+"title": "Elite Syncopations (Joplin)",
+"tags": [
+"syncopated",
+"lively",
+"playful"
+],
+"scenes": [
+"explore",
+"town",
+"comic",
+"minigame"
+],
+"energy": 4,
+"note": "Quick, syncopated and bright; the rhythm is the hook.",
+"bpm": 104
+},
+{
+"id": 335,
+"slug": "peacherine-rag",
+"title": "Peacherine Rag (Joplin)",
+"tags": [
+"syncopated",
+"sunny",
+"light"
+],
+"scenes": [
+"explore",
+"town",
+"hub",
+"comic"
+],
+"energy": 3,
+"note": "A sunny ragtime, a little gentler than Maple Leaf; good for a friendly town."
+},
+{
+"id": 1899,
+"slug": "pineapple-rag",
+"title": "Pineapple Rag (Joplin)",
+"tags": [
+"syncopated",
+"bright",
+"busy"
+],
+"scenes": [
+"explore",
+"platformer",
+"market"
+],
+"energy": 4,
+"note": "Bright and busy ragtime with a quick left hand."
+},
+{
+"id": 465,
+"slug": "sun-flower-slow-drag",
+"title": "Sun Flower Slow Drag (Joplin, with Scott Hayden)",
+"tags": [
+"relaxed",
+"syncopated",
+"lazy-summer"
+],
+"scenes": [
+"hub",
+"calm",
+"explore",
+"beach"
+],
+"energy": 2,
+"note": "A \"slow drag\": relaxed and swaying. A good easy-going town or beach hub."
+},
+{
+"id": 482,
+"slug": "solace",
+"title": "Solace, a Mexican serenade (Joplin)",
+"tags": [
+"gentle",
+"dreamy",
+"habanera"
+],
+"scenes": [
+"calm",
+"night",
+"ending",
+"hub",
+"sad-sweet"
+],
+"energy": 2,
+"note": "A tender habanera rhythm under a singing melody: gentle, a little wistful. Good for a calm evening scene."
+},
+{
+"id": 463,
+"slug": "bethena",
+"title": "Bethena, a concert waltz (Joplin)",
+"tags": [
+"waltz",
+"wistful",
+"tender"
+],
+"scenes": [
+"calm",
+"sad-sweet",
+"ending",
+"night"
+],
+"energy": 2,
+"note": "A sweet-sad waltz; a good emotional stage or ending."
+},
+{
+"id": 485,
+"slug": "breeze-from-alabama",
+"title": "A Breeze from Alabama (Joplin)",
+"tags": [
+"syncopated",
+"cheerful",
+"springy"
+],
+"scenes": [
+"explore",
+"town",
+"platformer"
+],
+"energy": 4,
+"note": "Cheerful ragtime with a springy step."
+},
+{
+"id": 625,
+"slug": "liberty-bell-march",
+"title": "The Liberty Bell march (Sousa)",
+"tags": [
+"march",
+"brisk",
+"bright"
+],
+"scenes": [
+"march",
+"title",
+"victory",
+"parade",
+"minigame"
+],
+"energy": 4,
+"note": "A brisk, bright march. Marches have clear repeating phrases that loop well; good for a parade, a title, or a quick-paced stage.",
+"bpm": 120
+},
+{
+"id": 600,
+"slug": "el-capitan",
+"title": "El Capitan march (Sousa)",
+"tags": [
+"march",
+"swashbuckling",
+"bright"
+],
+"scenes": [
+"march",
+"adventure",
+"title",
+"parade"
+],
+"energy": 4,
+"note": "A swashbuckling march with a lively trio.",
+"bpm": 120
+},
+{
+"id": 609,
+"slug": "hands-across-the-sea",
+"title": "Hands Across the Sea (Sousa)",
+"tags": [
+"march",
+"stately",
+"proud"
+],
+"scenes": [
+"march",
+"title",
+"ceremony",
+"victory"
+],
+"energy": 3,
+"note": "A proud, stately march; slower and more ceremonial than the others.",
+"bpm": 116
+},
+{
+"id": 634,
+"slug": "king-cotton",
+"title": "King Cotton march (Sousa)",
+"tags": [
+"march",
+"jaunty",
+"bright"
+],
+"scenes": [
+"march",
+"explore",
+"parade"
+],
+"energy": 4,
+"note": "A jaunty march.",
+"bpm": 120
+},
+{
+"id": 623,
+"slug": "the-gladiator",
+"title": "The Gladiator march (Sousa)",
+"tags": [
+"march",
+"heroic",
+"driving"
+],
+"scenes": [
+"march",
+"boss-approach",
+"arena",
+"parade"
+],
+"energy": 4,
+"note": "A driving, heroic march; fits an arena or a \"here we go\" stage.",
+"bpm": 120
+},
+{
+"id": 37,
+"slug": "gymnopedie-1",
+"title": "Gymnopédie No. 1 (Satie)",
+"tags": [
+"slow",
+"dreamy",
+"lonely",
+"spacious"
+],
+"scenes": [
+"calm",
+"night",
+"menu",
+"ending",
+"sad-sweet"
+],
+"energy": 1,
+"note": "Slow waltz with a floating melody over alternating bass and chord. A model of what four channels do well: leave lots of space. Use it quiet and very slow; the lead is sparse.",
+"bpm": 66,
+"composer": "E. Satie (1866–1925)",
+"edition": "Dover Edition (as named on Mutopia)",
+"form": "Gymnopédie No. 1",
+"instrument": "Piano",
+"style": "Modern"
+},
+{
+"id": 38,
+"slug": "gymnopedie-2",
+"title": "Gymnopédie No. 2 (Satie)",
+"tags": [
+"slow",
+"dreamy",
+"gentle"
+],
+"scenes": [
+"calm",
+"night",
+"menu",
+"ending"
+],
+"energy": 1,
+"note": "A gentler sibling of No. 1, in C major. Slow and sparse.",
+"bpm": 66
+},
+{
+"id": 39,
+"slug": "gymnopedie-3",
+"title": "Gymnopédie No. 3 (Satie)",
+"tags": [
+"slow",
+"wistful",
+"minor"
+],
+"scenes": [
+"calm",
+"night",
+"sad-sweet",
+"ending"
+],
+"energy": 1,
+"note": "The most melancholy of the three. Very sparse.",
+"bpm": 66
+},
+{
+"id": 1778,
+"slug": "clair-de-lune",
+"title": "Clair de lune (Debussy, Suite bergamasque)",
+"tags": [
+"moonlit",
+"dreamy",
+"impressionist",
+"calm"
+],
+"scenes": [
+"night",
+"calm",
+"ending",
+"menu",
+"water"
+],
+"energy": 1,
+"note": "Moonlight itself. The famous melody enters after a short introduction; it is slow and spacious, with soft arpeggios. Debussy died in 1918. For a night, a lake, a quiet emotional moment.",
+"bpm": 76
+},
+{
+"id": 1777,
+"slug": "arabesque-1",
+"title": "Première arabesque (Debussy)",
+"tags": [
+"flowing",
+"light",
+"graceful"
+],
+"scenes": [
+"explore",
+"water",
+"night",
+"hub"
+],
+"energy": 2,
+"note": "Flowing broken chords with a graceful melody. A gentle, moving background for exploration."
+},
+{
+"id": 504,
+"slug": "traumerei",
+"title": "Träumerei (Schumann, Kinderszenen)",
+"tags": [
+"dreamy",
+"tender",
+"nostalgic"
+],
+"scenes": [
+"calm",
+"ending",
+"credits",
+"menu",
+"sad-sweet"
+],
+"energy": 1,
+"note": "The classic \"Dreaming\": a long, singing line over soft harmony. Slow and beautiful; very good for an emotional ending.",
+"bpm": 56
+},
+{
+"id": 354,
+"slug": "von-fremden-landern",
+"title": "Of Foreign Lands and Peoples (Schumann, Kinderszenen)",
+"tags": [
+"curious",
+"gentle",
+"wistful"
+],
+"scenes": [
+"explore",
+"menu",
+"travel",
+"calm"
+],
+"energy": 2,
+"note": "A gentle, curious tune about faraway places: a good \"map\" or \"a journey begins\" theme."
+},
+{
+"id": 372,
+"slug": "glueckes-genug",
+"title": "Glückes genug (Schumann, Kinderszenen)",
+"tags": [
+"content",
+"warm",
+"simple"
+],
+"scenes": [
+"calm",
+"hub",
+"ending"
+],
+"energy": 2,
+"note": "\"Happy enough\": warm, simple and content."
+},
+{
+"id": 1040,
+"slug": "schubert-wiegenlied",
+"title": "Wiegenlied / Cradle Song (Schubert)",
+"tags": [
+"lullaby",
+"soft",
+"rocking"
+],
+"scenes": [
+"calm",
+"night",
+"menu",
+"ending",
+"sleep"
+],
+"energy": 1,
+"note": "A lullaby with a rocking accompaniment. For a bedtime scene or a sleep screen.",
+"bpm": 56
+},
+{
+"id": 1054,
+"slug": "ave-maria-schubert",
+"title": "Ave Maria (Schubert, Ellens dritter Gesang)",
+"tags": [
+"sacred",
+"serene",
+"flowing"
+],
+"scenes": [
+"ending",
+"ceremony",
+"night",
+"calm"
+],
+"energy": 1,
+"note": "A flowing, serene hymn-like melody over arpeggios. Solemn and calming.",
+"bpm": 60
+},
+{
+"id": 1555,
+"slug": "heidenroslein",
+"title": "Heidenröslein (Schubert)",
+"tags": [
+"folk-like",
+"simple",
+"sweet"
+],
+"scenes": [
+"hub",
+"meadow",
+"explore",
+"menu"
+],
+"energy": 2,
+"note": "A simple strophic folk-style song: very easy to loop. For a meadow or a village.",
+"bpm": 92
+},
+{
+"id": 1053,
+"slug": "du-bist-die-ruh",
+"title": "Du bist die Ruh (Schubert)",
+"tags": [
+"serene",
+"tender",
+"slow"
+],
+"scenes": [
+"calm",
+"ending",
+"night"
+],
+"energy": 1,
+"note": "A slow, tender, serene song.",
+"bpm": 56
+},
+{
+"id": 1052,
+"slug": "auf-dem-wasser-zu-singen",
+"title": "Auf dem Wasser zu singen (Schubert)",
+"tags": [
+"water",
+"rocking",
+"sparkling"
+],
+"scenes": [
+"water",
+"boat",
+"lake",
+"explore",
+"calm"
+],
+"energy": 2,
+"note": "The accompaniment ripples like water: for a lake, a river or a boat. The 6/8 rocking figure is the point; the melody floats over it."
+},
+{
+"id": 1001,
+"slug": "an-die-musik",
+"title": "An die Musik (Schubert)",
+"tags": [
+"warm",
+"noble",
+"gentle"
+],
+"scenes": [
+"hub",
+"menu",
+"ending",
+"credits"
+],
+"energy": 2,
+"note": "A warm, noble song to music itself; a good menu or credits tune."
+},
+{
+"id": 502,
+"slug": "die-forelle",
+"title": "Die Forelle / The Trout (Schubert)",
+"tags": [
+"playful",
+"stream",
+"light"
+],
+"scenes": [
+"water",
+"explore",
+"comic",
+"hub"
+],
+"energy": 3,
+"note": "A playful tune with a darting piano figure (the trout in the stream). For a stream, a fishing stage, a light-hearted level."
+},
+{
+"id": 921,
+"slug": "chopin-prelude-4",
+"title": "Prelude Op. 28 No. 4 (Chopin)",
+"tags": [
+"sad",
+"slow",
+"resigned"
+],
+"scenes": [
+"sad",
+"ending",
+"night",
+"calm"
+],
+"energy": 1,
+"note": "Slow and heavy, a sinking left-hand chord pattern under a restrained melody. For a sad scene or a loss.",
+"bpm": 50
+},
+{
+"id": 472,
+"slug": "chopin-prelude-20",
+"title": "Prelude Op. 28 No. 20 (Chopin)",
+"tags": [
+"solemn",
+"funereal",
+"short"
+],
+"scenes": [
+"sad",
+"ceremony",
+"ending",
+"boss-defeated"
+],
+"energy": 1,
+"note": "Twelve bars of solemn chords: very short, very strong. A funeral or a moment of silence; loops well because it is short.",
+"bpm": 60
+},
+{
+"id": 511,
+"slug": "chopin-waltz-bminor",
+"title": "Waltz in B minor, Op. 69 No. 2 (Chopin)",
+"tags": [
+"waltz",
+"wistful",
+"elegant"
+],
+"scenes": [
+"ballroom",
+"night",
+"sad-sweet",
+"hub"
+],
+"energy": 2,
+"note": "A wistful, elegant waltz."
+},
+{
+"id": 483,
+"slug": "minute-waltz",
+"title": "Minute Waltz, Op. 64 No. 1 (Chopin)",
+"tags": [
+"waltz",
+"quick",
+"sparkling"
+],
+"scenes": [
+"minigame",
+"explore",
+"chase-light",
+"comic"
+],
+"energy": 4,
+"note": "A quick, sparkling waltz (about a minute, as the nickname says). The opening has a whirling figure; good for a lively comic scene.",
+"bpm": 192
+},
+{
+"id": 489,
+"slug": "etude-op25-1",
+"title": "Étude Op. 25 No. 1, \"Aeolian Harp\" (Chopin)",
+"tags": [
+"flowing",
+"shimmering",
+"arpeggiated"
+],
+"scenes": [
+"water",
+"night",
+"explore",
+"calm"
+],
+"energy": 2,
+"note": "A constant wash of broken chords with a melody floating on top: shimmering water or wind. Use the lead and bass."
+},
+{
+"id": 914,
+"slug": "etude-op10-1",
+"title": "Étude Op. 10 No. 1 (Chopin)",
+"tags": [
+"rolling",
+"heroic",
+"arpeggiated"
+],
+"scenes": [
+"explore",
+"adventure",
+"chase-light"
+],
+"energy": 3,
+"note": "Rolling arpeggios across the keyboard; an energetic, heroic motion. The lead is the top note of each arpeggio.",
+"bpm": 132
+},
+{
+"id": 757,
+"slug": "etude-op25-2",
+"title": "Étude Op. 25 No. 2, \"The Bees\" (Chopin)",
+"tags": [
+"busy",
+"light",
+"murmuring"
+],
+"scenes": [
+"explore",
+"minigame",
+"insects"
+],
+"energy": 3,
+"note": "A quick, murmuring figure like bees: fits a busy, light stage.",
+"bpm": 160
+},
+{
+"id": 794,
+"slug": "brahms-waltz-15",
+"title": "Waltz Op. 39 No. 15 (Brahms)",
+"tags": [
+"waltz",
+"gentle",
+"sweet"
+],
+"scenes": [
+"hub",
+"calm",
+"menu",
+"ending"
+],
+"energy": 2,
+"note": "A gentle, famous little waltz. A model of a perfect eight-bar melody; sweet and simple."
+},
+{
+"id": 535,
+"slug": "brahms-intermezzo-118-2",
+"title": "Intermezzo Op. 118 No. 2 (Brahms)",
+"tags": [
+"tender",
+"autumnal",
+"warm"
+],
+"scenes": [
+"calm",
+"ending",
+"night",
+"sad-sweet"
+],
+"energy": 2,
+"note": "A tender, autumnal piece with a warm melody."
+},
+{
+"id": 1171,
+"slug": "seasons-january",
+"title": "The Seasons: January, \"At the Fireside\" (Tchaikovsky)",
+"tags": [
+"cosy",
+"warm",
+"calm"
+],
+"scenes": [
+"hub",
+"calm",
+"night",
+"menu",
+"winter"
+],
+"energy": 2,
+"note": "A cosy, warm tune for a fireside or an indoor winter scene.",
+"bpm": 76
+},
+{
+"id": 1398,
+"slug": "seasons-february",
+"title": "The Seasons: February, \"Carnival\" (Tchaikovsky)",
+"tags": [
+"lively",
+"festive",
+"dancing"
+],
+"scenes": [
+"festival",
+"explore",
+"minigame",
+"comic"
+],
+"energy": 4,
+"note": "A lively carnival dance."
+},
+{
+"id": 803,
+"slug": "seasons-august",
+"title": "The Seasons: August, \"Harvest\" (Tchaikovsky)",
+"tags": [
+"bustling",
+"rustic",
+"bright"
+],
+"scenes": [
+"farm",
+"explore",
+"festival"
+],
+"energy": 3,
+"note": "A bustling harvest-time piece; fits a farm or a country fair."
+},
+{
+"id": 896,
+"slug": "napolitan-dance",
+"title": "Neapolitan Dance (Tchaikovsky, Swan Lake)",
+"tags": [
+"brisk",
+"showy",
+"festive"
+],
+"scenes": [
+"festival",
+"ballroom",
+"comic",
+"minigame"
+],
+"energy": 4,
+"note": "A showy dance that starts with a fanfare; good for a fair or a party stage."
+},
+{
+"id": 1536,
+"slug": "faure-berceuse",
+"title": "Berceuse (Fauré, Dolly Suite)",
+"tags": [
+"lullaby",
+"tender",
+"soft"
+],
+"scenes": [
+"calm",
+"night",
+"ending",
+"menu"
+],
+"energy": 1,
+"note": "A tender lullaby from the Dolly Suite. Very gentle.",
+"bpm": 56,
+"transpose": -12
+},
+{
+"id": 299,
+"slug": "pathetique-1",
+"title": "Sonata No. 8 \"Pathétique\", 1st movement, Allegro (Beethoven)",
+"tags": [
+"stormy",
+"dramatic",
+"driving",
+"minor"
+],
+"scenes": [
+"boss",
+"chase",
+"tension",
+"dungeon"
+],
+"energy": 5,
+"note": "After a slow, heavy introduction (the Grave, about 10 bars), the Allegro is driving, stormy and minor. This excerpt starts at the Allegro. Excellent boss or dungeon music.",
+"from": 11,
+"bpm": 132
+},
+{
+"id": 295,
+"slug": "pathetique-2",
+"title": "Sonata No. 8 \"Pathétique\", 2nd movement, Adagio cantabile (Beethoven)",
+"tags": [
+"singing",
+"tender",
+"noble"
+],
+"scenes": [
+"calm",
+"ending",
+"ceremony",
+"sad-sweet",
+"night"
+],
+"energy": 1,
+"note": "One of the most beautiful melodies of the period: a long, singing line. For an emotional ending.",
+"bpm": 54
+},
+{
+"id": 937,
+"slug": "appassionata-3",
+"title": "Sonata No. 23 \"Appassionata\", 3rd movement (Beethoven)",
+"tags": [
+"furious",
+"relentless",
+"minor"
+],
+"scenes": [
+"boss",
+"chase",
+"final-battle"
+],
+"energy": 5,
+"note": "Relentless, furious sixteenth-note motion. For a final battle or a desperate chase. Very busy: the lead will be dense."
+},
+{
+"id": 497,
+"slug": "symphony-5-reduction",
+"title": "Symphony No. 5 in C minor, piano reduction (Beethoven)",
+"tags": [
+"fate",
+"dramatic",
+"heroic",
+"minor"
+],
+"scenes": [
+"boss",
+"title-dramatic",
+"tension",
+"final-battle"
+],
+"energy": 5,
+"note": "The short-short-short-long \"fate\" motif is the most recognisable four notes in classical music; the piano reduction carries the whole first movement. Use the motif as a leitmotif for a villain or a doom.",
+"bpm": 108
+},
+{
+"id": 1380,
+"slug": "mozart-symphony-25-1",
+"title": "Symphony No. 25 in G minor, 1st movement (Mozart)",
+"tags": [
+"driving",
+"agitated",
+"minor"
+],
+"scenes": [
+"boss",
+"chase",
+"tension",
+"dungeon"
+],
+"energy": 5,
+"note": "The \"little G minor\": restless, syncopated, urgent. A good boss or pursuit."
+},
+{
+"id": 1030,
+"slug": "erlkonig",
+"title": "Erlkönig (Schubert)",
+"tags": [
+"galloping",
+"urgent",
+"horror",
+"minor"
+],
+"scenes": [
+"chase",
+"horror",
+"boss",
+"night-ride"
+],
+"energy": 5,
+"note": "A pounding, galloping triplet figure under a frightened melody. For a night chase or a haunting."
+},
+{
+"id": 1544,
+"slug": "death-and-the-maiden",
+"title": "Der Tod und das Mädchen (Schubert)",
+"tags": [
+"somber",
+"solemn",
+"minor"
+],
+"scenes": [
+"sad",
+"boss-defeated",
+"ceremony",
+"graveyard"
+],
+"energy": 1,
+"note": "A solemn, chordal theme (Death's reply is a slow hymn-like chord progression). For death, a graveyard, a solemn choice.",
+"bpm": 50
+},
+{
+"id": 1196,
+"slug": "quartettsatz",
+"title": "Quartettsatz in C minor, D. 703 (Schubert)",
+"tags": [
+"urgent",
+"restless",
+"minor"
+],
+"scenes": [
+"chase",
+"tension",
+"boss",
+"escape"
+],
+"energy": 4,
+"note": "Restless tremolo and a driving theme; an urgent chase or escape."
+},
+{
+"id": 1693,
+"slug": "fantaisie-impromptu",
+"title": "Fantaisie-Impromptu (Chopin)",
+"tags": [
+"stormy",
+"virtuosic",
+"minor"
+],
+"scenes": [
+"chase",
+"boss",
+"minigame",
+"final-battle"
+],
+"energy": 5,
+"note": "A flurry of fast notes with a rolling left hand; stormy and breathless. Use for a chase. Busy: the lead will be dense.",
+"bpm": 132
+},
+{
+"id": 446,
+"slug": "mozart-marche-funebre",
+"title": "Marche funèbre in C minor, K. 453a (Mozart)",
+"tags": [
+"funereal",
+"solemn",
+"march"
+],
+"scenes": [
+"sad",
+"ceremony",
+"boss-defeated",
+"graveyard"
+],
+"energy": 1,
+"note": "A slow funeral march.",
+"bpm": 50
+},
+{
+"id": 1213,
+"slug": "traviata-preludio",
+"title": "La traviata, Preludio (Verdi)",
+"tags": [
+"delicate",
+"sad",
+"tender"
+],
+"scenes": [
+"sad",
+"ending",
+"night",
+"menu"
+],
+"energy": 1,
+"note": "The delicate, aching string prelude. For a sad ending or a quiet menu.",
+"bpm": 54,
+"transpose": -12
+},
+{
+"id": 1215,
+"slug": "traviata-brindisi",
+"title": "La traviata, Brindisi, the drinking song (Verdi)",
+"tags": [
+"festive",
+"waltz",
+"joyful"
+],
+"scenes": [
+"festival",
+"party",
+"ballroom",
+"victory",
+"title"
+],
+"energy": 4,
+"note": "The famous drinking song: a lilting waltz tune that everyone knows. Great for a party scene or a victory.",
+"bpm": 120
+},
+{
+"id": 1216,
+"slug": "traviata-valzer",
+"title": "La traviata, Valzer e duetto (Verdi)",
+"tags": [
+"waltz",
+"elegant",
+"festive"
+],
+"scenes": [
+"ballroom",
+"party",
+"festival"
+],
+"energy": 3,
+"note": "A waltz from the party scene.",
+"bpm": 132
+},
+{
+"id": 1512,
+"slug": "traviata-zingari",
+"title": "La traviata, Coro di zingari, the gypsy chorus (Verdi)",
+"tags": [
+"rhythmic",
+"exotic",
+"stamping"
+],
+"scenes": [
+"festival",
+"market",
+"chase-light",
+"camp"
+],
+"energy": 4,
+"note": "A rhythmic, stamping chorus with a Spanish-gypsy colour; good for a camp or a market.",
+"bpm": 120
+},
+{
+"id": 1513,
+"slug": "traviata-mattadori",
+"title": "La traviata, Coro di mattadori spagnuoli, the bullfighters (Verdi)",
+"tags": [
+"fanfare",
+"bright",
+"spanish"
+],
+"scenes": [
+"festival",
+"arena",
+"parade",
+"title"
+],
+"energy": 4,
+"note": "A brisk, bright Spanish fanfare; a good arena or a festival title.",
+"bpm": 124
+},
+{
+"id": 1509,
+"slug": "tempest-1",
+"title": "Piano Sonata No. 17 \"Tempest\", 1st movement (Beethoven)",
+"tags": [
+"tense",
+"stormy",
+"minor"
+],
+"scenes": [
+"tension",
+"dungeon",
+"boss"
+],
+"energy": 4,
+"note": "A slow, searching opening (Largo) alternating with a stormy Allegro; tense and unsettled. Good for an uneasy exploration or a cave of danger.",
+"bpm": 88
+},
+{
+"id": 790,
+"slug": "beethoven-quartet-4-1",
+"title": "String Quartet No. 4 in C minor, 1st movement (Beethoven)",
+"tags": [
+"restless",
+"minor",
+"driving"
+],
+"scenes": [
+"tension",
+"chase",
+"dungeon"
+],
+"energy": 4,
+"note": "A restless, driven C minor; the top line is the first violin."
+},
+{
+"id": 1780,
+"slug": "toccata-and-fugue-dm",
+"title": "Toccata and Fugue in D minor (J. S. Bach, organ)",
+"tags": [
+"dramatic",
+"dark",
+"organ",
+"minor"
+],
+"scenes": [
+"title-dramatic",
+"boss-intro",
+"haunted",
+"dungeon"
+],
+"energy": 5,
+"note": "The famous opening: a flourish, then long chords. The very start is the \"villain appears\" sting; the fugue after it is a moving, restless background. Use bars 1-5 as a sting and the fugue as music.",
+"bpm": 72
+},
+{
+"id": 1016,
+"slug": "bach-polonaise-g-minor",
+"title": "Polonaise in G minor (Anna Magdalena Notebook, BWV Anh. 119)",
+"tags": [
+"stately",
+"minor",
+"dance"
+],
+"scenes": [
+"hub",
+"ballroom",
+"explore"
+],
+"energy": 2,
+"note": "A stately little polonaise in minor; light and clear.",
+"bpm": 100,
+"composer": "Notebook for Anna Magdalena Bach (1725); composer uncertain, some pieces are by Bach's contemporaries"
+},
+{
+"id": 1612,
+"slug": "bach-minuet-a-minor",
+"title": "Minuet in A minor (Anna Magdalena Notebook, BWV Anh. 120)",
+"tags": [
+"light",
+"minor",
+"dance"
+],
+"scenes": [
+"hub",
+"explore",
+"menu"
+],
+"energy": 2,
+"note": "A light minuet in A minor.",
+"composer": "Notebook for Anna Magdalena Bach (1725); composer uncertain, some pieces are by Bach's contemporaries"
+},
+{
+"id": 1614,
+"slug": "bach-march-e-flat",
+"title": "March in E-flat major (Anna Magdalena Notebook, BWV Anh. 127)",
+"tags": [
+"march",
+"bright",
+"simple"
+],
+"scenes": [
+"march",
+"hub",
+"title"
+],
+"energy": 3,
+"note": "A clear, simple march.",
+"composer": "Notebook for Anna Magdalena Bach (1725); composer uncertain, some pieces are by Bach's contemporaries"
+},
+{
+"id": 74,
+"slug": "bach-menuet-anh-113",
+"title": "Menuet (Anna Magdalena Notebook, BWV Anh. 113)",
+"tags": [
+"light",
+"simple",
+"dance"
+],
+"scenes": [
+"hub",
+"menu",
+"tutorial"
+],
+"energy": 2,
+"note": "A short, simple minuet; very easy to loop.",
+"composer": "Notebook for Anna Magdalena Bach (1725); composer uncertain, some pieces are by Bach's contemporaries"
+},
+{
+"id": 364,
+"slug": "mozart-dies-irae",
+"title": "Dies irae, from the Requiem (Mozart)",
+"tags": [
+"ominous",
+"choral",
+"minor"
+],
+"scenes": [
+"boss",
+"haunted",
+"doom"
+],
+"energy": 4,
+"note": "The \"day of wrath\": dark and urgent, in a choral texture (top voice as the tune). Use sparingly, as a doom or a boss sting."
+},
+{
+"id": 1545,
+"slug": "schubert-marche-militaire",
+"title": "Marche militaire No. 1 (Schubert)",
+"tags": [
+"march",
+"bright",
+"brisk",
+"confident"
+],
+"scenes": [
+"march",
+"parade",
+"title",
+"victory",
+"minigame"
+],
+"energy": 4,
+"note": "The famous military march (the first of three): a crisp, dotted rhythm and a tune everyone half-knows. Marches loop well because the phrases are square. Good for a parade, a brisk title or a \"soldiers set out\" scene.",
+"bpm": 120
+},
+{
+"id": 1743,
+"slug": "bach-bourree-e-minor",
+"title": "Bourrée in E minor, BWV 996 (J. S. Bach, lute)",
+"tags": [
+"lively",
+"minor",
+"dance",
+"wry"
+],
+"scenes": [
+"explore",
+"market",
+"hub",
+"night",
+"chase-light"
+],
+"energy": 3,
+"note": "A cheerful-but-minor dance on the lute; quick stepwise motion and a clear two-part texture that suits the lead and bass well. The minor key without gloom: a good tavern, a night market or a clever heist.",
+"bpm": 112,
+"transpose": 12
+},
+{
+"id": 85,
+"slug": "bach-bourree-english-suite",
+"title": "English Suite No. 1, Bourrée I (J. S. Bach)",
+"tags": [
+"bright",
+"dance",
+"confident"
+],
+"scenes": [
+"explore",
+"hub",
+"title",
+"menu"
+],
+"energy": 3,
+"note": "A bright, steady dance with a clear tune: confident without being loud. A sturdy exploration or hub theme.",
+"bpm": 112
+},
+{
+"id": 151,
+"slug": "handel-gavotte",
+"title": "Gavotte (Handel)",
+"tags": [
+"courtly",
+"neat",
+"bright"
+],
+"scenes": [
+"hub",
+"menu",
+"ballroom",
+"tutorial"
+],
+"energy": 2,
+"note": "A neat, courtly dance with a four-square tune: simple enough for a tutorial, polite enough for a castle hall.",
+"bpm": 104
+}
+]

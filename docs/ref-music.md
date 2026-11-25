@@ -28,6 +28,8 @@ Music is data, and data is cheap: a 32-bar, two-voice tune is a few hundred byte
 
 ### Classical music is a free library (the compositions, not the recordings)
 
+**Skip the transcribing: `vly tune` is this library, already converted and checked to compile and play** (`vly tune --scene boss`, `vly tune <id> --out song.vly`); the guide is `vly docs ref-classics`. The table below is the wider list of famous pieces, for when you want one that is not in it (convert a MIDI of your own with `vly tune --midi`).
+
 The *compositions* of composers who died long ago are in the public domain: you may arrange them. Reduce to melody + bass (+ arpeggio) and make it your own; credit the composer on the title or credits screen. Do not copy another *game's* tune. Pieces that already suit a four-channel band:
 
 | Mood | Pieces to arrange |
@@ -51,7 +53,7 @@ What we found when we looked at how the field handles this (summaries from searc
 So the recommended order of preference, with the reason for each:
 
 1. **A motif you invent for this game, built into a full piece by craft** (section 3): 3 to 6 notes and a tappable rhythm; one motif that returns in the title, the stage, the boss and the ending in different moods. This is what makes the music *yours*. Put the motif in `DESIGN.md`.
-2. **An arranged public-domain tune that fits the game's world**, from the table above or your own find (a sea shanty for a harbour, a lullaby for a night level, a waltz for a ballroom, a march for a parade), reduced to melody, bass and a hint of harmony, then **transformed** (a different mode or key, tempo, rhythm, instrument and register) so it sounds like your game. Check the melody against a score you can read (do not trust memory for a note-by-note transcription); credit it.
+2. **An arranged public-domain tune that fits the game's world** (**`vly tune` has 83 already converted, with mood, scene, energy and tempo; read `vly docs ref-classics`**), from the table above or your own find (a sea shanty for a harbour, a lullaby for a night level, a waltz for a ballroom, a march for a parade), reduced to melody, bass and a hint of harmony, then **transformed** (a different mode or key, tempo, rhythm, instrument and register) so it sounds like your game. Check the melody against a score you can read (do not trust memory for a note-by-note transcription); credit it.
 3. **A stock loop** only as a placeholder while you build, replaced before release.
 
 **Make your music different from everyone else's on purpose.** Before you write a note, choose a *sound world* and record it in `DESIGN.md`: a **mode** (major, natural minor, dorian, mixolydian, minor or major pentatonic, harmonic minor, a whole-tone or hexatonic colour), a **tempo** and a **groove** (straight, swung, a waltz in three, a march), a **timbre plan** (which duty width for the lead, whether the second voice arpeggiates or echoes, whether the bass walks or pedals) and a **motif**. Draw two or three of these at random from the lists rather than taking the first that comes to mind; the first idea is everyone's first idea. A different sound world per place (a key and tempo and instrument per stage) is one of the cheapest ways to make a game feel big.

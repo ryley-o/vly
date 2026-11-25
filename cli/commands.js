@@ -16,6 +16,8 @@ import { parseUntil } from '../src/tools/names.js';
 import { profileCartridge, profileFrames } from '../src/tools/profile.js';
 import { checkCartridge, monkeyScript, audibility } from '../src/tools/check.js';
 import { analyzeLevel, formatLevelProfile } from '../src/tools/levelprofile.js';
+import { findTunes, getTune, suggest, vocabulary, tuneSong, tuneSource, loadTunes } from '../src/tools/tunes.js';
+import { midiToSong, songToVly, barsForSeconds, noteName } from '../src/tools/midi.js';
 import { contrast, parseColor, simulateColor, simulateImage, highlightReport, highlightVerdict, VISIONS } from '../src/tools/colorvision.js';
 import { compare as compareProject, verdict, loadIndex as loadOriginalityIndex, readProjectFiles } from '../src/tools/originality.js';
 import { parseTilesText, tilesFromRGBA, tilesToRGBA, pngToTilesText } from '../src/tools/tiles.js';
@@ -783,6 +785,54 @@ export const commands = {
       const rep = highlightReport(rom, { input, frames: args.flags.frames ? int(args.flags.frames) : null, ...(dirs ? { dirs } : {}), save });
       const v = highlightVerdict(rep);
       return { text: `${v.ok ? 'PASS' : 'LOOK AT THIS'}: selection visibility at frame ${rep.lastFrame}\n${v.text}\n`, data: { ...rep, ok: v.ok }, ok: v.ok, exitCode: v.ok ? 0 : 1 };
+    },
+  },
+  tune: {
+    help: 'vly tune [id] [--midi file.mid] [--mood W] [--scene W] [--energy 1-5|N-M] [--composer W] [--search W] [--max-seconds N] [--tags] [--bars 3-10] [--transpose N] [--bpm N|--fps N] [--name id] [--no-arp] [--out file.vly] [--json]\n  A library of public-domain classical, ragtime and march melodies already converted to VLY-1 music (a lead, a bass and an arpeggio voice). With no id it lists tunes (filter by mood, scene, energy, composer or a search word; --tags lists the words). With an id it prints what the tune is, where it fits, and the source: three btables and a function that plays them. --bars takes bars of the excerpt, --transpose shifts by semitones, --bpm or --fps change the tempo, --out writes the source to a file. --midi file.mid converts a MIDI file you found (with --bars 1-16, --bpm, --split 60, --transpose, --name): the licence of that file is yours to check. The notes are a starting point, not a finished score: read docs ref-classics (where each tune fits, how to transform it, how to credit it) before you use one.',
+    async run(args) {
+      const f = args.flags;
+      if (f.tags) {
+        const v = vocabulary();
+        return { text: `moods:  ${v.tags.map(([w, n]) => `${w} (${n})`).join(', ')}\nscenes: ${v.scenes.map(([w, n]) => `${w} (${n})`).join(', ')}\n`, data: v };
+      }
+      const str = (k) => (typeof f[k] === 'string' ? f[k] : undefined);
+      if (str('midi')) {
+        if (!fs.existsSync(f.midi)) throw new CliError(`no such file: ${f.midi}`);
+        const bytes = new Uint8Array(fs.readFileSync(f.midi));
+        let bars = null;
+        if (str('bars')) { const m = /^(\d+)(?:-(\d+))?$/.exec(f.bars); if (!m) throw new CliError('--bars looks like 1-16'); bars = [+m[1], +(m[2] || m[1])]; }
+        let song;
+        try {
+          if (!bars) { const n = barsForSeconds(bytes, 36, str('bpm') ? { bpm: Number(f.bpm) } : {}); bars = [1, n]; }
+          song = midiToSong(bytes, { bars, grid: 'auto', bpm: str('bpm') ? Number(f.bpm) : undefined, split: str('split') ? int(f.split) : undefined, transpose: str('transpose') ? int(f.transpose) : undefined, arp: f['no-arp'] ? false : undefined });
+        } catch (e) { throw new CliError(`cannot convert ${f.midi}: ${e.message}`); }
+        const name = String(str('name') || path.basename(f.midi).replace(/\.[^.]+$/, '')).replace(/[^a-z0-9_]/gi, '_').replace(/^(\d)/, '_$1').toLowerCase();
+        const src = `// Converted from ${path.basename(f.midi)} by vly tune --midi. Check that this piece is in the public domain (the composition AND this edition) and credit it.\n` + songToVly(song, name);
+        if (str('out')) { fs.mkdirSync(path.dirname(path.resolve(f.out)), { recursive: true }); fs.writeFileSync(f.out, src); }
+        const first = song.lead.slice(0, 12).map(([x]) => (x ? noteName(x + 35) : '-')).join(' ');
+        const head = `${path.basename(f.midi)}: ${song.ts.num}/${song.ts.den}, ${song.bpm} bpm, key ${song.key.name} (estimated), bars ${bars[0]}-${bars[1]} (${song.bars}), ${Math.round(song.steps * song.framesPerStep / 60)} s, music_tempo(${song.framesPerStep})\nlead ${song.range.lead.join('-')}; first notes: ${first}\nCompare the first notes with a score you can read before you use it.\n`;
+        return { text: head + (str('out') ? `\nwrote ${f.out}\n` : '\n' + src), data: { bars, framesPerStep: song.framesPerStep, bpm: song.bpm, key: song.key.name, first, source: src } };
+      }
+      if (!args._[0]) {
+        let list;
+        try { list = findTunes({ mood: str('mood'), scene: str('scene'), energy: str('energy'), composer: str('composer'), q: str('search'), maxSeconds: str('max-seconds') }); } catch (e) { throw new CliError(e.message); }
+        const lib = loadTunes();
+        const text = list.length
+          ? `${list.length} of ${lib.tunes.length} tunes (id, energy 1-5, seconds, tempo, meter, key, title; fits: scenes)\n` + list.map((t) => `${t.id.padEnd(26)} ${t.energy} ${String(t.seconds).padStart(3)}s ${String(t.bpm).padStart(3)}bpm ${t.meter.padEnd(4)} ${t.key.padEnd(10)} ${t.title}\n${' '.repeat(28)}fits: ${t.scenes.join(', ')}; mood: ${t.tags.join(', ')}`).join('\n') + '\n\nvly tune <id> prints one with its source. vly tune --tags lists the words you can filter by.\n'
+          : 'no tune matches; try fewer filters, or vly tune --tags for the words\n';
+        return { text, data: { tunes: list.map(({ lead, bass, arp, ...rest }) => rest), source: lib.source } };
+      }
+      const t = getTune(args._[0]);
+      if (!t) {
+        const near = suggest(args._[0]);
+        throw new CliError(`no tune "${args._[0]}"${near.length ? `; did you mean ${near.join(', ')}?` : '; run vly tune to list them'}`);
+      }
+      let src;
+      try { src = tuneSource(t, { bars: str('bars'), transpose: str('transpose') ? int(f.transpose) : 0, bpm: str('bpm'), fps: str('fps'), arp: f['no-arp'] ? false : undefined, name: str('name') }); } catch (e) { throw new CliError(e.message); }
+      const song = tuneSong(t, { bars: str('bars'), transpose: str('transpose') ? int(f.transpose) : 0, bpm: str('bpm'), fps: str('fps'), arp: f['no-arp'] ? false : undefined });
+      if (str('out')) { fs.mkdirSync(path.dirname(path.resolve(f.out)), { recursive: true }); fs.writeFileSync(f.out, src); }
+      const head = `${t.title}\n${t.composer}; ${t.form}; ${t.instrument} (${t.style})\n${t.meter}, ${t.key} (estimated), ${t.bpm} bpm, ${t.bars} bars, ${t.seconds} s; energy ${t.energy}/5; lead ${t.leadRange.join('-')}, ${Math.round(t.restShare * 100)}% rests\nmood: ${t.tags.join(', ')}\nfits: ${t.scenes.join(', ')}\n${t.note}\nsource: ${t.sourceUrl} (${t.license})\n`;
+      return { text: head + (str('out') ? `\nwrote ${f.out} (${song.bars} bars, music_tempo(${song.framesPerStep}))\n` : '\n' + src), data: { tune: { ...t, lead: undefined, bass: undefined, arp: undefined }, bars: song.bars, framesPerStep: song.framesPerStep, source: src } };
     },
   },
   isa: {

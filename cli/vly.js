@@ -9,7 +9,7 @@ import { commands, CliError } from './commands.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const BOOLEAN_FLAGS = new Set(['profile', 'tile', 'accept', 
-  'new', 'no-sources', 'no-verify', 'no-publish', 'dry-run', 'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex', 'audio', 'list', 'oam',
+  'new', 'no-sources', 'no-verify', 'no-publish', 'dry-run', 'json', 'ascii', 'listing', 'symbols', 'asm', 'update', 'help', 'quiet', 'verbose', 'all', 'force', 'no-color', 'version', 'markdown', 'hex', 'audio', 'list', 'oam', 'tags',
 ]);
 // flags whose value is optional: `--notes` or `--notes 40`; `--cvd` or `--cvd deutan,gray`
 const OPTIONAL_VALUE = { notes: (v) => /^\d+$/.test(v), cvd: (v) => /^(protan|deutan|tritan|gray|all)(,(protan|deutan|tritan|gray))*$/.test(v) };
@@ -63,6 +63,7 @@ Commands:
   import <picture.png>  Turn a PNG into .tiles art (colours reduced to what the hardware allows)
   tiles <file>          Convert .tiles/.png art to tile data, or preview a tile sheet
   levels <map.txt>      Profile an ASCII level map: dead screens, flat runs, repeated enemies, jumps with no consequence
+  tune [id]             Public-domain classical/ragtime/march melodies converted to VLY-1 music: list by mood or scene, print the source
   isa                   Print the instruction set
   docs [topic]          Print documentation (run with no topic to list)
   export <cart>         Package a cartridge as one self-contained HTML file
