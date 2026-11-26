@@ -71,6 +71,17 @@ Asked to triple a proven puzzle campaign, the agent kept the first 30 levels in 
 - **Report the weakest levels honestly** (loose levels have thousands of par routes: a puzzle with thousands of solutions is not sharp) and re-check the level grid, saves and budget (ROM banks, frame cycles, test time) at the new size.
 - `vly highlight` cannot tell a scrolling page from a weak selection (the whole page moves, so the changed pixels do not line up); judge a scrolling grid by eye on its screenshots.
 
+### 5d. Raising the bar on a finished campaign (a lesson from ECHO: 90 levels became 88 better ones)
+
+When the owner said "level design is key", the same agent re-audited the whole campaign and replaced worlds 7 to 12 and ten earlier levels. Patterns that worked (use them as a starting point, not a rule):
+- **Audit the finished levels with an analyser, not by eye.** For each level: count the optimal routes exactly (a layered dynamic programme, not sampling); remove each element in turn (each door, arrow, guard, lever flip, pad) and re-solve; record how many extra moves it costs; run a bot that walks the shortest path and ignores the helper. Levels where an element costs about nothing are decoration; levels the plain walk wins are not puzzles.
+- **Set the bar in numbers before searching, and say which level is allowed to miss it** (a teaching level may). ECHO's bar: at most 8 optimal routes, the straight walk wins none, every door costs at least 3 moves, every guard 2, and in lever levels the helper's own action must help.
+- **Give each world a rule that changes what the helper can do** (here a pad that switches the delay). A world that only recombines earlier rules gives few distinct insights; the agent found three tactics repeated across a ten-level lever world and said so. Count the distinct insights you can name, not the levels.
+- **Make worlds data, not code**, so an uneven world (9 levels, not 10) is easy and padding is never the cheap choice. Ship fewer levels rather than pad.
+- **Migrating saves when levels are replaced**: clear the grade and best moves of every slot that now holds a different level, keep all others, and test with saves from every earlier release.
+- **Regenerating `vly.json` silently resets `auto` picture hashes**; run `vly test --update` only after you have looked at the screens.
+- Still unverified by any human: difficulty and the clarity of new rules. Have a person play before you call a ramp good; the pars of a generated world do not rise cleanly.
+
 ## 6. Readability on four colours
 
 - **Give each piece a different shape as well as a colour** (circle, diamond, triangle, burst, star); colour alone fails on four shades and for some players.
